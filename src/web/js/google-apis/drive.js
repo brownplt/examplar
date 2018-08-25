@@ -6,8 +6,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
   var drive;
   var SCOPE = "https://www.googleapis.com/auth/drive.file "
     + "https://spreadsheets.google.com/feeds "
+    + "https://www.googleapis.com/auth/drive.appdata "
     + "https://www.googleapis.com/auth/drive.install";
-  var FOLDER_MIME = "application/vnd.google-apps.folder";
+  var FOLDER_MIME =  "application/vnd.google-apps.folder";
   var BACKREF_KEY = "originalProgram";
   var PUBLIC_LINK = "pubLink";
 
@@ -218,9 +219,43 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           return ret.promise;
         }
 
-        var fromDrive = ls("'"+ id + "' in parents and title = 'template.arr'").then(function(results) {
-          return makeSharedFile(results[0], true);
-        });
+        var fromDrive = ls("properties has { key='assignment' and value='" + id + "' and visibility='PRIVATE' }")
+          .then(function(results) {
+              if (results[0]) {
+                // load the student's work
+                return drive.files.get({"fileId": results[0].id});
+              } else {
+                // copy the template
+                return ls("'"+ id + "' in parents and title = 'template.arr'").then(function(results) {
+                  let template = results[0];
+                  return drive.files.copy({
+                    "fileId": template.id,
+                    "keepRevisionForever": "true",
+                  }).then(function(file) {
+                    return drive.properties.insert({
+                        "fileId": file.id,
+                        "resource": {
+                          "key": "assignment",
+                          "value": id
+                        }
+                      }).then(function(_) {
+                          return drive.permissions.insert({
+                                "fileId": file.id,
+                                "emailMessage": "TEST MESSAGE",
+                                "sendNotificationEmails": "true",
+                                "resource": {
+                                  "role": "reader",
+                                  "type": "user",
+                                  "value": "me@jswrenn.com"
+                                }
+                            });
+                      }).then(function(_) {
+                        return file;
+                      });
+                  });
+                });
+              }
+            }).then(fileBuilder);
 
         var fromServer = fromDrive.fail(function() {
           return Q($.get("/shared-file", {
