@@ -177,6 +177,51 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         var fromDrive = drive.files.get({fileId: id}, true).then(function(googFileObject) {
           return makeSharedFile(googFileObject, true);
         });
+        fromDrive.catch(function(e){
+          console.error("BAH", e);
+        });
+        var fromServer = fromDrive.fail(function() {
+          return Q($.get("/shared-file", {
+            sharedProgramId: id
+          })).then(function(googlishFileObject) {
+            return makeSharedFile(googlishFileObject, false);
+          });
+        });
+        var result = Q.any([fromDrive, fromServer]);
+        result.then(function(r) {
+          console.log("Got result for shared file: ", r);
+        }, function(r) {
+          console.log("Got failure: ", r);
+        });
+        return result;
+      },
+      getTemplateFileById: function(id) {
+        function ls(q) {
+          var ret = Q.defer();
+          var retrievePageOfFiles = function(request, result) {
+            request.execute(function(resp) {
+              result = result.concat(resp.items);
+              var nextPageToken = resp.nextPageToken;
+              if (nextPageToken) {
+                request = gapi.client.drive.files.list({
+                  'q': q,
+                  'pageToken': nextPageToken
+                });
+                retrievePageOfFiles(request, result);
+              } else {
+                ret.resolve(result);
+              }
+            });
+          }
+          var initialRequest = gapi.client.drive.files.list({'q': q});
+          retrievePageOfFiles(initialRequest, []);
+          return ret.promise;
+        }
+
+        var fromDrive = ls("'"+ id + "' in parents and title = 'template.arr'").then(function(results) {
+          return makeSharedFile(results[0], true);
+        });
+
         var fromServer = fromDrive.fail(function() {
           return Q($.get("/shared-file", {
             sharedProgramId: id

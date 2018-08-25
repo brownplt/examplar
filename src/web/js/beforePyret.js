@@ -289,6 +289,13 @@ $(function() {
         });
       programLoad = api.getSharedFileById(params["get"]["share"]);
     }
+    if(params["get"] && params["get"]["template"]) {
+      logger.log('template-program-load',
+        {
+          id: params["get"]["template"]
+        });
+      programLoad = api.getTemplateFileById(params["get"]["template"]);
+    }
     if(programLoad) {
       programLoad.fail(function(err) {
         console.error(err);
