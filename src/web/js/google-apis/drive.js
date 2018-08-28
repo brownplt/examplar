@@ -219,7 +219,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           return ret.promise;
         }
 
-        var fromDrive = ls("properties has { key='assignment' and value='" + id + "' and visibility='PRIVATE' }")
+        var sweepFromDrive = ls("properties has { key='assignment' and value='" + id + "' and visibility='PRIVATE' }")
           .then(function(results) {
               if (results[0]) {
                 // load the student's work
@@ -257,20 +257,28 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               }
             }).then(fileBuilder);
 
-        var fromServer = fromDrive.fail(function() {
-          return Q($.get("/shared-file", {
-            sharedProgramId: id
-          })).then(function(googlishFileObject) {
-            return makeSharedFile(googlishFileObject, false);
+        var wheat = ls("'"+ id + "' in parents and title = 'wheat'")
+          .then(function(results) {
+            return ls("'"+ results[0].id + "' in parents")
+          })
+          .then(function(wheat) {
+            return Q.all(wheat.map(file => drive.files.get({"fileId": file.id})
+                      .then(function(file) { return makeSharedFile(file,true); })));
           });
-        });
-        var result = Q.any([fromDrive, fromServer]);
-        result.then(function(r) {
-          console.log("Got result for shared file: ", r);
-        }, function(r) {
-          console.log("Got failure: ", r);
-        });
-        return result;
+
+        var chaff = ls("'"+ id + "' in parents and title = 'chaff'")
+          .then(function(results) {
+            return ls("'"+ results[0].id + "' in parents")
+          })
+          .then(function(chaff) {
+            return Q.all(chaff.map(file => drive.files.get({"fileId": file.id})
+                      .then(function(file) { return makeSharedFile(file,true); })));
+          });
+
+        return Q.all([sweepFromDrive, wheat, chaff])
+          .then(function(assets) {
+            return { sweep: assets[0], wheat: assets[1], chaff: assets[2] }
+          });
       },
       getFiles: function(c) {
         return c.then(function(bc) {
