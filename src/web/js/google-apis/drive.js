@@ -277,7 +277,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
         return Q.all([sweepFromDrive, wheat, chaff])
           .then(function(assets) {
-            return { sweep: assets[0], wheat: assets[1], chaff: assets[2] }
+            window.wheat = assets[1];
+            window.chaff = assets[2];
+            return assets[0];
           });
       },
       getFiles: function(c) {

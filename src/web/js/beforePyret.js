@@ -344,11 +344,11 @@ $(function() {
   }
 
   function loadProgram(p) {
-    programToSave = p.then(p => p.sweep);
+    programToSave = p;
     return p.then(function(prog) {
-      if(prog.sweep !== null) {
-        updateName(prog.sweep);
-        return prog.sweep.getContents();
+      if(prog !== null) {
+        updateName(prog);
+        return prog.getContents();
       }
     });
   }

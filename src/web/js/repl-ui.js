@@ -657,6 +657,9 @@
           checkAll: false // NOTE(joe): this is a good spot to fetch something from the ui options
                           // if this becomes a check box somewhere in CPO
         };
+
+        window.injection = window.wheat[0];
+
         var replResult = repl.restartInteractions(src, options);
         var startRendering = replResult.then(function(r) {
           maybeShowOutputPending();

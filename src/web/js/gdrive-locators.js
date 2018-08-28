@@ -51,6 +51,10 @@ define("cpo/gdrive-locators", [], function() {
         return "Could not load file with name " + filename;
       }
 
+      if (typeof window.injection !== 'undefined') {
+        return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
+      }
+
       // Pause because we'll fetch the Google Drive file object and restart
       // with it to create the actual locator
       return runtime.pauseStack(function(restarter) {
