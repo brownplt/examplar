@@ -287,8 +287,6 @@
               "An unexpected error halted the " +
               (keywordCheck ? "check" : "examples") + "-block before Pyret was finished with it. "
               + "Some tests may not have run.";
-            var errorTestsSummary = document.createTextNode("Before the unexpected error, " + tests.executed + (tests.executed === 0 ? " tests " : " test ") + "in this block ran" + (tests.executed > 0 ? " (" + tests.passing + " passed):" : "."));
-            testList.appendChild(errorTestsSummary);
           } else {
             summary.textContent = tests.executed == 1 && tests.passing == 1 ? "The test in this block passed."
             // Only one test in block; it fails
@@ -329,20 +327,6 @@
             this.maybeStackLoc = outputUI.makeMaybeStackLoc(runtime, documents, srcloc, richStack);
             this.pyretStack = richStack;
           }
-
-          header.addEventListener("click", function (e) {
-            if (this.container.classList.contains("expanded"))
-              this.hideTests();
-            else
-              this.showTests();
-          }.bind(this));
-
-          summary.addEventListener("click", function (e) {
-            if (this.container.classList.contains("expanded"))
-              this.hideTests();
-            else
-              this.showTests();
-          }.bind(this));
 
           this.needRefreshing = new Array();
           this.container = container;
@@ -450,24 +434,7 @@
         
         var testsPassing  = 0;
         var testsExecuted = 0;
-        
-        var tests = ffi.toArray(get(checkBlock, "test-results")).
-          reverse().
-          map(function(test) {
-            var testSuccess = isTestSuccess(test);
-            testsExecuted++;
-            var skeleton = undefined;
-            if (testSuccess) {
-              testsPassing++;
-              skeleton = new PassingTestSkeleton(test, testsExecuted);
-              testsPassedSkeletons.push(skeleton);
-            } else {
-              skeleton = new FailingTestSkeleton(test, testsExecuted);
-              testsFailedSkeletons.push(skeleton);
-            }
-            return skeleton;
-          });
-          
+
         var endedInError    = get(option, "is-some").app(maybeError);
         var allTestsPassing = testsPassing === testsExecuted;
         
@@ -478,13 +445,14 @@
             get(checkBlock, "name"), 
             get(checkBlock, "loc"),
             get(checkBlock, "keyword-check"),
-            { skeletons: tests,
+            { skeletons: [],
               passing  : testsPassing,
               executed : testsExecuted }, error);
         
-        if (endedInError)
+        if (endedInError) {
           checkErroredSkeletons.push(skeleton);
-        checkResultsContainer.appendChild(skeleton.container);
+          checkResultsContainer.appendChild(skeleton.container);
+        }
       }
       
       
@@ -508,10 +476,6 @@
       } else {
         var testsFailedAll = (checkTotalAll - checkPassedAll);
         function TESTS(n){return n == 1 ? "TEST" : "TESTS";}
-        summary.append(
-          $("<div>").addClass("summary-bits")
-            .append($("<div>").addClass("summary-bit summary-passed").html("<span class='summary-count'>" + checkPassedAll + "</span> " + TESTS(checkPassedAll) + " PASSED"))
-            .append($("<div>").addClass("summary-bit summary-failed").html("<span class='summary-count'>" + testsFailedAll + "</span> " + TESTS(testsFailedAll) + " FAILED")));
 
         if (checkBlocksErrored > 0) {
           summary.append($("<div>").addClass("summary-errored")
