@@ -272,8 +272,6 @@
         }, 200);
       }
       runtime.setStdout(function(str) {
-          ct_log(str);
-          output.append($("<pre>").addClass("replPrint").text(str));
         });
       var currentZIndex = 15000;
       runtime.setParam("current-animation-port", function(dom, title, closeCallback) {
@@ -518,30 +516,6 @@
       // SETUP FOR TRACING ALL OUTPUTS
       var replOutputCount = 0;
       outputUI.installRenderers(repl.runtime);
-      repl.runtime.setParam("onTrace", function(loc, val, url) {
-        if (repl.runtime.getParam("currentMainURL") !== url) { return { "onTrace": "didn't match" }; }
-        if (repl.runtime.isNothing(val)) { return { "onTrace": "was nothing" }; }
-        return repl.runtime.pauseStack(function(restarter) {
-          repl.runtime.runThunk(function() {
-            return repl.runtime.toReprJS(val, repl.runtime.ReprMethods["$cpo"]);
-          }, function(container) {
-            if (repl.runtime.isSuccessResult(container)) {
-              $(output)
-                .append($("<div>").addClass("trace")
-                        .append($("<span>").addClass("trace").text("Trace #" + (++replOutputCount)))
-                        .append(container.result));
-              scroll(output);
-            } else {
-              $(output).append($("<div>").addClass("error trace")
-                               .append($("<span>").addClass("trace").text("Trace #" + (++replOutputCount)))
-                               .append($("<span>").text("<error displaying value: details logged to console>")));
-              console.log(container.exn);
-              scroll(output);
-            }
-            restarter.resume(val);
-          });
-        });
-      });
 
       repl.runtime.setParam("onSpy", function(loc, message, locs, names, vals) {
         return repl.runtime.safeCall(function() {
