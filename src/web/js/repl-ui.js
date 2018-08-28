@@ -465,7 +465,7 @@
       });
 
       var breakButton = options.breakButton;
-      container.append(output).append(promptContainer);
+      container.append(output);
 
       var img = $("<img>").attr({
         "src": "/img/pyret-spin.gif",
