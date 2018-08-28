@@ -658,9 +658,14 @@
                           // if this becomes a check box somewhere in CPO
         };
 
-        window.injection = window.wheat[0];
+        var wheat_results =
+          Q.all(window.wheat.map(
+            function(impl) {
+              window.injection = impl;
+              return repl.restartInteractions(src, options);
+            }));
 
-        var replResult = repl.restartInteractions(src, options);
+        var replResult = wheat_results.then(results => results[0]);
         var startRendering = replResult.then(function(r) {
           maybeShowOutputPending();
           return r;
