@@ -628,6 +628,17 @@ $(function() {
     // in which undo can revert the program back to empty
     CPO.editor.cm.clearHistory();
     CPO.editor.cm.setValue(c);
+
+    // Freeze the document contents up to the following border
+    var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";
+    var border_end_index = c.indexOf(border) + border.length;
+    var border_end_pos = CPO.editor.cm.posFromIndex(border_end_index);
+
+    CPO.editor.cm.doc.markText({line:0,ch:0}, border_end_pos,
+      { inclusiveLeft: true,
+        inclusiveRight: true,
+        readOnly: true,
+        addToHistory: false });
   });
 
   programLoaded.fail(function() {
