@@ -679,6 +679,30 @@
       }
 
       function renderChaffResults(check_results) {
+        let chaffs = check_results.length;
+        let caught =
+          check_results.filter(
+            wheat => !wheat.every(
+              block => !block.error
+                && block.tests.every(test => test.passed))).length;
+
+        /* https://medium.com/@pppped/how-to-code-a-responsive-circular-percentage-chart-with-svg-and-css-3632f8cd7705 */
+        var msg = $(
+          `<svg viewBox="0 0 36 36" class="circular-chart blue">
+            <path class="circle-bg"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <path class="circle"
+              stroke-dasharray="${(caught / chaffs) * 100}, 100"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <text x="18" y="20.35" class="percentage">${caught}⁄${chaffs}</text>
+          </svg>`);
+        output.append(msg);
         console.info("CHAFF RESULTS", check_results);
       }
 
@@ -739,7 +763,8 @@
                       && block.tests.every(test => test.passed)));
 
               if (all_passed) {
-                return run_injections(window.chaff).then(renderChaffResults);
+                return run_injections(window.chaff).then(renderChaffResults,
+                        displayResult(output, runtime, repl.runtime, true));
               } else {
                 return renderWheatFailure(check_results);
               }

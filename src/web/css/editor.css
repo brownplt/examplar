@@ -284,8 +284,10 @@ div.spy-block > table > th { display: none; }
 }
 
 .repl {
+  display: flex;
+  align-items: center;
+
   padding-left: 1em;
-  padding-bottom: 5em;
   padding-top: 5px;
   box-sizing: border-box;
   -moz-box-sizing: border-box;
@@ -294,6 +296,11 @@ div.spy-block > table > th { display: none; }
   background-color: #f8f8f8;
   cursor: text;
 }
+
+#output {
+  flex: 1;
+}
+
 .check {
   font-family: monospace;
   border: 1px solid black;
@@ -1916,4 +1923,54 @@ label.controller {
 button.controller {
   margin: auto;
   display: block;
+}
+
+
+
+/* https://medium.com/@pppped/how-to-code-a-responsive-circular-percentage-chart-with-svg-and-css-3632f8cd7705 */
+.circular-chart {
+  display: block;
+  margin: 10px auto;
+  max-width: 80%;
+  max-height: 250px;
+  flex: 1;
+}
+
+.circle-bg {
+  fill: none;
+  stroke: #eee;
+  stroke-width: 3.8;
+}
+
+.circle {
+  fill: none;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  animation: progress 1s ease-out forwards;
+}
+
+@keyframes progress {
+  0% {
+    stroke-dasharray: 0 100;
+  }
+}
+
+.circular-chart.orange .circle {
+  stroke: #ff9f00;
+}
+
+.circular-chart.green .circle {
+  stroke: #4CC790;
+}
+
+.circular-chart.blue .circle {
+  stroke: #3c9ee5;
+}
+
+.percentage {
+  letter-spacing: 1px;
+  fill: #666;
+  font-family: sans-serif;
+  font-size: 0.5em;
+  text-anchor: middle;
 }
