@@ -674,6 +674,14 @@
         }, "CPO-onSpy");
       });
 
+      function renderWheatFailure(check_results) {
+        console.info("WHEAT FAIL");
+      }
+
+      function renderChaffResults(check_results) {
+        console.info("CHAFF RESULTS", check_results);
+      }
+
       var runMainCode = function(src, uiOptions) {
         if(running) { return; }
         running = true;
@@ -721,11 +729,21 @@
         }
 
         run_injections(window.wheat)
+          .then(function(r) { maybeShowOutputPending(); return r; })
           .then(
             function (check_results) {
-              console.log("Check Results:", check_results);
+              let all_passed =
+                check_results.every(
+                  wheat => wheat.every(
+                    block => !block.error
+                      && block.tests.every(test => test.passed)));
+
+              if (all_passed) {
+                return run_injections(window.chaff).then(renderChaffResults);
+              } else {
+                return renderWheatFailure(check_results);
+              }
             }, function(run_result) {
-              maybeShowOutputPending();
               return displayResult(output, runtime, repl.runtime, true)(run_result);
             })
           .fin(afterRun(false));
