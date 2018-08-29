@@ -208,6 +208,74 @@
       }
     }
 
+    // the result of applying `displayResult` is a function that MUST
+    // NOT BE CALLED ON THE PYRET STACK.
+    function jsonResult(output, callingRuntime, resultRuntime, isMain) {
+      var runtime = callingRuntime;
+      var rr = resultRuntime;
+
+      // this function must NOT be called on the pyret stack
+      return function(result) {
+        var base_result = result;
+        var doneDisplay = Q.defer();
+        // Start a new pyret stack.
+        // this returned function must not be called on the pyret stack
+        // b/c `callingRuntime.runThunk` must not be called on the pyret stack
+        callingRuntime.runThunk(function() {
+          if(callingRuntime.isFailureResult(result)) {
+            // Parse Errors
+            return false;
+          }
+          else if(callingRuntime.isSuccessResult(result)) {
+            result = result.result;
+            return ffi.cases(ffi.isEither, "is-Either", result, {
+              left: function(compileResultErrors) {
+                return false;
+              },
+              right: function(v) {
+                // TODO(joe): This is a place to consider which runtime level
+                // to use if we have separate compile/run runtimes.  I think
+                // that loadLib will be instantiated with callingRuntime, and
+                // I think that's correct.
+                return callingRuntime.pauseStack(function(restarter) {
+                  rr.runThunk(function() {
+                    var runResult = rr.getField(loadLib, "internal").getModuleResultResult(v);
+                    if(rr.isSuccessResult(runResult)) {
+                      return rr.safeCall(function() {
+                        return checkUI.jsonCheckResults(output, CPO.documents, rr,
+                                                        runtime.getField(runResult.result, "checks"), v);
+                      }, function(result) {
+                        if (result.some(c => c.error)) {
+                          return false;
+                        } else {
+                          return result;
+                        }
+                      }, "rr.jsonCheckResults");
+                    } else {
+                      return false;
+                    }
+                  }, function(result) {
+                    restarter.resume(result.result);
+                  });
+                });
+              }
+            });
+          }
+          else {
+            return false;
+          }
+        }, function(r) {
+          if (r.result === false) {
+            doneDisplay.reject(base_result);
+          } else {
+            doneDisplay.resolve(r.result);
+          }
+          return base_result;
+        });
+      return doneDisplay.promise;
+      }
+    }
+
     //: -> (code -> printing it on the repl)
     function makeRepl(container, repl, runtime, options) {
 
@@ -632,22 +700,35 @@
                           // if this becomes a check box somewhere in CPO
         };
 
-        var wheat_results =
-          Q.all(window.wheat.map(
-            function(impl) {
-              window.injection = impl;
-              return repl.restartInteractions(src, options);
-            }));
+        function run_injections(injections) {
+          let first = injections[0];
+          let rest = injections.slice(1);
+          if (first !== undefined) {
+            window.injection = first;
+            return repl.restartInteractions(src, options)
+              .then(jsonResult(output, runtime, repl.runtime, true))
+              .then(
+                function(result) {
+                  return run_injections(rest)
+                    .then(function(rest_results) {
+                      rest_results.push(result);
+                      return rest_results;
+                    });
+                });
+          } else {
+            return Q([]);
+          }
+        }
 
-        var replResult = wheat_results.then(results => results[0]);
-        var startRendering = replResult.then(function(r) {
-          maybeShowOutputPending();
-          return r;
-        });
-        var doneRendering = startRendering.then(displayResult(output, runtime, repl.runtime, true)).fail(function(err) {
-          console.error("Error displaying result: ", err);
-        });
-        doneRendering.fin(afterRun(false));
+        run_injections(window.wheat)
+          .then(
+            function (check_results) {
+              console.log("Check Results:", check_results);
+            }, function(run_result) {
+              maybeShowOutputPending();
+              return displayResult(output, runtime, repl.runtime, true)(run_result);
+            })
+          .fin(afterRun(false));
       };
 
       var runner = function(code) {
