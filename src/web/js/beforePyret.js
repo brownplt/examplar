@@ -633,7 +633,7 @@ $(function() {
     var border_end_index = c.indexOf(border) + border.length;
     var border_end_pos = CPO.editor.cm.posFromIndex(border_end_index);
 
-    CPO.editor.cm.doc.markText({line:0,ch:0}, border_end_pos,
+    CPO.editor.cm.doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
       { inclusiveLeft: true,
         inclusiveRight: false,
         readOnly: true,

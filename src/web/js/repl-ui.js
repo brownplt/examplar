@@ -726,7 +726,7 @@
         var border_end_index = CPO.documents.get("definitions://").getValue().indexOf(border) + border.length;
         var border_end_pos = CPO.documents.get("definitions://").posFromIndex(border_end_index);
 
-        CPO.documents.get("definitions://").markText({line:0,ch:0}, border_end_pos,
+        CPO.documents.get("definitions://").markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
           { inclusiveLeft: true,
             inclusiveRight: false,
             readOnly: true,
