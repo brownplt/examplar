@@ -709,17 +709,6 @@
           flashError("Invalid file type: " + documents[0][picker.Document.TYPE]);
         }
       }
-      var pyretPicker = new FilePicker({
-        onLoaded: function() {
-          $("#open").attr("disabled", false);
-          pyretPicker.openOn($("#open")[0], "click");
-        },
-        onSelect: handlePickerData,
-        onError: flashError,
-        onInternalError: stickError,
-        views: ["pyretView"],
-        title: "Select a Pyret file to use"
-      });
 
       return runtime.makeModuleReturn({
         repl: runtime.makeOpaque(repl)

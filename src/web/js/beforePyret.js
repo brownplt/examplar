@@ -524,10 +524,7 @@ $(function() {
     CPO.autoSave();
   });
 
-  $("#new").click(newEvent);
   $("#save").click(saveEvent);
-  $("#rename").click(rename);
-  $("#saveas").click(saveAs);
 
   shareAPI.makeHoverMenu($("#filemenu"), $("#filemenuContents"), false, function(){});
   shareAPI.makeHoverMenu($("#bonniemenu"), $("#bonniemenuContents"), false, function(){});
