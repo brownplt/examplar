@@ -709,17 +709,6 @@
           flashError("Invalid file type: " + documents[0][picker.Document.TYPE]);
         }
       }
-      var insertPicker = new FilePicker({
-        onLoaded: function() {
-          $("#insert").attr("disabled", false);
-          insertPicker.openOn($("#insert")[0], "click");
-        },
-        onSelect: handlePickerData,
-        onError: flashError,
-        onInternalError: stickError,
-        views: ["imageView"],
-        title: "Select an image to use"
-      });
       var pyretPicker = new FilePicker({
         onLoaded: function() {
           $("#open").attr("disabled", false);
