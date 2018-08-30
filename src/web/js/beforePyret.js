@@ -340,7 +340,6 @@ $(function() {
     filename = p.getName();
     $("#filename").text(" (" + truncateName(filename) + ")");
     setTitle(filename);
-    showShareContainer(p);
   }
 
   function loadProgram(p) {
