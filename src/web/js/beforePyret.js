@@ -520,11 +520,19 @@ $(function() {
     });
   }
 
+  function openInCPO() {
+    CPO.save().done(function(p) {
+      $(window).unbind("beforeunload");
+      window.location.href = "https://code.pyret.org/editor#program=" + p.getUniqueId();
+    });
+  }
+
   $("#runButton").click(function() {
     CPO.autoSave();
   });
 
   $("#save").click(saveEvent);
+  $("#openInCPO").click(openInCPO);
 
   shareAPI.makeHoverMenu($("#filemenu"), $("#filemenuContents"), false, function(){});
   shareAPI.makeHoverMenu($("#bonniemenu"), $("#bonniemenuContents"), false, function(){});
