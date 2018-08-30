@@ -61,6 +61,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         getExternalURL: function() {
           return googFileObject.alternateLink;
         },
+        getAssignment: function() {
+          return drive.properties.get({
+              "fileId": googFileObject.id,
+              "propertyKey": "assignment",
+              "visibility": "PUBLIC"
+            }).then(function(result){return result.value;});
+        },
         getShares: function() {
           return drive.files.list({
             q: "trashed=false and properties has {key='" + BACKREF_KEY + "' and value='" + googFileObject.id + "' and visibility='PRIVATE'}"
@@ -196,6 +203,38 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         });
         return result;
       },
+      getGrainFilesByTemplate: function(id, type) {
+        function ls(q) {
+          var ret = Q.defer();
+          var retrievePageOfFiles = function(request, result) {
+            request.execute(function(resp) {
+              result = result.concat(resp.items);
+              var nextPageToken = resp.nextPageToken;
+              if (nextPageToken) {
+                request = gapi.client.drive.files.list({
+                  'q': q,
+                  'pageToken': nextPageToken
+                });
+                retrievePageOfFiles(request, result);
+              } else {
+                ret.resolve(result);
+              }
+            });
+          }
+          var initialRequest = gapi.client.drive.files.list({'q': q});
+          retrievePageOfFiles(initialRequest, []);
+          return ret.promise;
+        }
+
+        return ls("'"+ id + "' in parents and title = '" + type + "'")
+          .then(function(results) {
+            return ls("'"+ results[0].id + "' in parents")
+          })
+          .then(function(chaff) {
+            return Q.all(chaff.map(file => drive.files.get({"fileId": file.id})
+                      .then(function(file) { return makeSharedFile(file,true); })));
+          });
+      },
       getTemplateFileById: function(id) {
         function ls(q) {
           var ret = Q.defer();
@@ -221,7 +260,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
         var sweepFromDrive =
           baseCollection.then(function(bc){
-            return ls("'" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PRIVATE' }")
+            return ls("not trashed and '" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PUBLIC' }")
               .then(function(results) {
                 if (results[0]) {
                   // load the student's work
@@ -240,8 +279,17 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                             "fileId": file.id,
                             "resource": {
                               "key": "assignment",
-                              "value": id
+                              "value": id,
+                              "visibility": "PUBLIC"
                             }
+                          }).then(function(_) {
+                            return drive.properties.insert({
+                                "fileId": file.id,
+                                "resource": {
+                                  "key": "examplar",
+                                  "value": "yes",
+                                  "visibility": "PUBLIC"
+                                }});
                           }).then(function(_) {
                             return drive.permissions.insert({
                                   "fileId": file.id,
@@ -262,30 +310,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               }).then(fileBuilder);
             });
 
-        var wheat = ls("'"+ id + "' in parents and title = 'wheat'")
-          .then(function(results) {
-            return ls("'"+ results[0].id + "' in parents")
-          })
-          .then(function(wheat) {
-            return Q.all(wheat.map(file => drive.files.get({"fileId": file.id})
-                      .then(function(file) { return makeSharedFile(file,true); })));
-          });
-
-        var chaff = ls("'"+ id + "' in parents and title = 'chaff'")
-          .then(function(results) {
-            return ls("'"+ results[0].id + "' in parents")
-          })
-          .then(function(chaff) {
-            return Q.all(chaff.map(file => drive.files.get({"fileId": file.id})
-                      .then(function(file) { return makeSharedFile(file,true); })));
-          });
-
-        return Q.all([sweepFromDrive, wheat, chaff])
-          .then(function(assets) {
-            window.wheat = assets[1];
-            window.chaff = assets[2];
-            return assets[0];
-          });
+        return sweepFromDrive;
       },
       getFiles: function(c) {
         return c.then(function(bc) {

@@ -78,7 +78,7 @@ class GoogleAPI {
         else {
           return window.gapi.client.drive.files.list({
             fields: "files(id, name)",
-            q: 'not trashed and not (' + isSharedFile + ') and (fileExtension="' + ext + '" or "' + savedFiles[0].id + '" in parents)',
+            q: 'not trashed and properties has {key="examplar" and value="yes"} and not (' + isSharedFile + ') and (fileExtension="' + ext + '" or "' + savedFiles[0].id + '" in parents)',
           });
         }
       })
@@ -90,7 +90,7 @@ class GoogleAPI {
   getRecentFilesByExt = (ext) => {
     return window.gapi.client.drive.files.list({
       fields: "files(id, name)",
-      q: 'not trashed and fileExtension="' + ext + '"',
+      q: 'not trashed and properties has {key="examplar" and value="yes"} and fileExtension="' + ext + '"',
     });
   }
 

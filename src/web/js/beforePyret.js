@@ -282,13 +282,6 @@ $(function() {
       programLoad = api.getFileById(params["get"]["program"]);
       programLoad.then(function(p) { showShareContainer(p); });
     }
-    if(params["get"] && params["get"]["share"]) {
-      logger.log('shared-program-load',
-        {
-          id: params["get"]["share"]
-        });
-      programLoad = api.getSharedFileById(params["get"]["share"]);
-    }
     if(params["get"] && params["get"]["template"]) {
       logger.log('template-program-load',
         {
@@ -355,6 +348,22 @@ $(function() {
   var programLoaded = loadProgram(initialProgram);
 
   var programToSave = initialProgram;
+
+  let assignment_id = programToSave.then(function(p) { return p.getAssignment() });
+
+  window.wheat =
+    assignment_id.then(function(id) {
+      return storageAPI.then(function(api) {
+        return api.getGrainFilesByTemplate(id,'wheat');
+      });
+    });
+
+  window.chaff =
+    assignment_id.then(function(id) {
+      return storageAPI.then(function(api) {
+        return api.getGrainFilesByTemplate(id,'chaff');
+      });
+    });
 
   function showShareContainer(p) {
     if(!p.shared) {

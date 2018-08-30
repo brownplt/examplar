@@ -763,7 +763,7 @@
           }
         }
 
-        run_injections(window.wheat)
+        window.wheat.then(run_injections)
           .then(function(r) { maybeShowOutputPending(); return r; })
           .then(
             function (check_results) {
@@ -774,7 +774,7 @@
                       && block.tests.every(test => test.passed)));
 
               if (all_passed) {
-                return run_injections(window.chaff).then(renderChaffResults,
+                return window.chaff.then(run_injections).then(renderChaffResults,
                         displayResult(output, runtime, repl.runtime, true));
               } else {
                 return renderWheatFailure(check_results);
