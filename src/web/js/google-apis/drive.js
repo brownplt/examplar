@@ -219,43 +219,48 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           return ret.promise;
         }
 
-        var sweepFromDrive = ls("properties has { key='assignment' and value='" + id + "' and visibility='PRIVATE' }")
-          .then(function(results) {
-              if (results[0]) {
-                // load the student's work
-                return drive.files.get({"fileId": results[0].id});
-              } else {
-                // copy the template
-                return ls("'"+ id + "' in parents and title = 'template.arr'").then(function(results) {
-                  let template = results[0];
-                  return drive.files.copy({
-                    "fileId": template.id,
-                    "keepRevisionForever": "true",
-                  }).then(function(file) {
-                    return drive.properties.insert({
-                        "fileId": file.id,
-                        "resource": {
-                          "key": "assignment",
-                          "value": id
-                        }
-                      }).then(function(_) {
-                          return drive.permissions.insert({
-                                "fileId": file.id,
-                                "emailMessage": "TEST MESSAGE",
-                                "sendNotificationEmails": "true",
-                                "resource": {
-                                  "role": "reader",
-                                  "type": "user",
-                                  "value": "me@jswrenn.com"
-                                }
-                            });
-                      }).then(function(_) {
-                        return file;
+        var sweepFromDrive =
+          baseCollection.then(function(bc){
+            return ls("'" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PRIVATE' }")
+              .then(function(results) {
+                if (results[0]) {
+                  // load the student's work
+                  return drive.files.get({"fileId": results[0].id});
+                } else {
+                  // copy the template
+                  return ls("'"+ id + "' in parents and title contains 'tests.arr'").then(function(results) {
+                    let template = results[0];
+                    return drive.files.copy({
+                      "fileId": template.id,
+                      "resource": {
+                        "parents": [{"id": bc.id}]
+                      }})
+                      .then(function(file) {
+                        return drive.properties.insert({
+                            "fileId": file.id,
+                            "resource": {
+                              "key": "assignment",
+                              "value": id
+                            }
+                          }).then(function(_) {
+                            return drive.permissions.insert({
+                                  "fileId": file.id,
+                                  "emailMessage": "TEST MESSAGE",
+                                  "sendNotificationEmails": "true",
+                                  "resource": {
+                                    "role": "reader",
+                                    "type": "user",
+                                    "value": "me@jswrenn.com"
+                                  }
+                              });
+                        }).then(function(_) {
+                          return file;
+                        });
                       });
                   });
-                });
-              }
-            }).then(fileBuilder);
+                }
+              }).then(fileBuilder);
+            });
 
         var wheat = ls("'"+ id + "' in parents and title = 'wheat'")
           .then(function(results) {
