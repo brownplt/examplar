@@ -636,7 +636,7 @@ $(function() {
 
     CPO.editor.cm.doc.markText({line:0,ch:0}, border_end_pos,
       { inclusiveLeft: true,
-        inclusiveRight: true,
+        inclusiveRight: false,
         readOnly: true,
         addToHistory: false });
   });
