@@ -351,6 +351,8 @@ $(function() {
 
   let assignment_id = programToSave.then(function(p) { return p.getAssignment() });
 
+  window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
+
   window.wheat =
     assignment_id.then(function(id) {
       return storageAPI.then(function(api) {

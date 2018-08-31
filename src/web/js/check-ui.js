@@ -44,7 +44,7 @@
 
       // MUST NOT BE CALLED ON PYRET STACK
       function format(loc) {
-        return Q(null)
+        return Q(outputUI.Position.fromPyretSrcloc(runtime, srcloc, loc, documents));
       }
 
       var any = runtime.makeFunction(function(_){return runtime.pyretTrue;});

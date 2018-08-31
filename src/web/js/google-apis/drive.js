@@ -160,6 +160,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     }
 
     var api = {
+      about: function() {
+        return drive.about.get({});
+      },
       getCollectionLink: function() {
         return baseCollection.then(function(bc) {
           return "https://drive.google.com/drive/u/0/folders/" + bc.id;

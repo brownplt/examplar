@@ -34,10 +34,94 @@
     var ffi = runtime.ffi;
 
     var output = jQuery("<div id='output' class='cm-s-default'>");
+    output.append($("<p class='examplar_info'>Examplar will run your test cases against a set of correct implementations ('wheats'), then against a small set of buggy ones ('chaffs'). Try to catch as many bugs as you can!<p>"));
+
     var outputPending = jQuery("<span>").text("Gathering results...");
     var outputPendingHidden = true;
     var canShowRunningIndicator = false;
     var running = false;
+
+    class Graph {
+      constructor(value) {
+        let xmlns = "http://www.w3.org/2000/svg";
+        let svg = document.createElementNS(xmlns, "svg");
+
+        svg.setAttributeNS(null, "viewBox", "0 0 36 36");
+        svg.classList.add("circular-chart");
+        svg.classList.add("blue");
+
+        let circle = "M18 2.0845 "
+                   + "a 15.9155 15.9155 0 0 1 0 31.831 "
+                   + "a 15.9155 15.9155 0 0 1 0 -31.831";
+
+        let bg = document.createElementNS(xmlns, "path");
+        bg.classList.add("circle-bg");
+        bg.setAttributeNS(null, 'd', circle);
+
+        let fg = document.createElementNS(xmlns, "path");
+        fg.classList.add("circle");
+        fg.setAttributeNS(null, 'd', circle);
+        fg.setAttributeNS(null, 'stroke-dasharray', "0, 100");
+
+        let text = document.createElementNS(xmlns, "text");
+        text.classList.add("percentage");
+        text.setAttributeNS(null, 'x', "18");
+        text.setAttributeNS(null, 'y', "20.35");
+
+        this.bg = svg.appendChild(bg);
+        this.fg = svg.appendChild(fg);
+        this.text = svg.appendChild(text);
+        this.element = svg;
+
+        let fallback = {numerator: "none", denominator: "none"};
+        this.numerator = (value || fallback).numerator;
+        this.denominator = (value || fallback).denominator;
+        this.value = {numerator: this.numerator, denominator: this.denominator};
+      }
+
+      set value(value){
+        if (typeof value.numerator === "number" &&
+            typeof value.denominator === "number")
+        {
+          this.numerator = value.numerator;
+          this.denominator = value.denominator;
+          this.fg.setAttributeNS(null, 'stroke-dasharray',
+            `${(value.numerator / value.denominator) * 100}, 100`);
+          this.text.innerHTML = `${value.numerator}⁄${value.denominator}`;
+        } else {
+          this.fg.setAttributeNS(null, 'stroke-dasharray', "0, 100");
+          this.text.innerHTML = "?";
+        }
+      }
+    }
+
+    class StatusWidget {
+      constructor() {
+        let element = document.createElement('div');
+        element.classList.add("examplar_status_widget");
+
+        let wheat_side = document.createElement('div');
+        wheat_side.classList.add("examplar_status");
+        let wheat_graph = new Graph();
+        wheat_side.innerHTML = "Wheats<br>Accepted";
+        wheat_side.prepend(wheat_graph.element);
+
+        let chaff_side = document.createElement('div');
+        chaff_side.classList.add("examplar_status");
+        chaff_side.innerHTML = "Chaffs<br>Rejected";
+        let chaff_graph = new Graph();
+        chaff_side.prepend(chaff_graph.element);
+
+        this.wheat_side = element.appendChild(wheat_side);
+        this.chaff_side = element.appendChild(chaff_side);
+        this.element = element;
+
+        this.wheat_graph = wheat_graph;
+        this.chaff_graph = chaff_graph;
+      }
+    }
+
+    var status_widget = new StatusWidget();
 
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
@@ -533,6 +617,7 @@
       });
 
       var breakButton = options.breakButton;
+      container[0].appendChild(status_widget.element);
       container.append(output);
 
       var img = $("<img>").attr({
@@ -675,35 +760,143 @@
       });
 
       function renderWheatFailure(check_results) {
-        console.info("WHEAT FAIL");
+        let wheats = check_results.length;
+        let failed =
+          check_results.filter(
+            wheat => wheat.some(
+              block => block.error
+                || block.tests.some(test => !test.passed))).length;
+
+        let wheat_catchers =
+          check_results.map(
+            wheat => wheat.map(
+              block => block.error
+                || block.tests.filter(test => !test.passed)
+                              .map(test => test.loc))
+              .reduce((acc, val) => acc.concat(val), []));
+
+        function render_wheat(catchers) {
+          let wheat = document.createElement('a');
+          wheat.setAttribute('href','#');
+          wheat.classList.add('wheat');
+          wheat.textContent = '⚙';
+
+          if (catchers.length > 0) {
+            wheat.classList.add('failed');
+          }
+
+          wheat.addEventListener('click',function(e) {
+            e.preventDefault();
+          });
+
+          wheat.addEventListener('mouseenter',function() {
+            catchers.forEach(function(loc) { loc.highlight('#FF0000'); });
+          });
+
+          wheat.addEventListener('mouseleave',function() {
+            catchers.forEach(function(loc) { loc.highlight(''); });
+          });
+
+          return wheat;
+        }
+
+        status_widget.wheat_graph.value = {numerator: failed, denominator: wheats};
+
+        let wheat_info = document.createElement('div');
+        wheat_info.classList.add('wheat_info');
+
+        let intro = document.createElement('p');
+        intro.textContent = `Your tests rejected ${failed} out of ${wheats} wheats:`;
+        wheat_info.appendChild(intro);
+
+        let wheat_list = document.createElement('ul');
+        wheat_list.classList.add('wheat_list');
+
+        wheat_catchers.map(render_wheat)
+          .forEach(function(wheat_widget){
+            let li = document.createElement('li');
+            li.appendChild(wheat_widget);
+            wheat_list.appendChild(li);
+          });
+
+        wheat_info.appendChild(wheat_list);
+
+        let outro = document.createElement('p');
+        outro.textContent = "The wheats your tests rejected are highlighted above in red. Mouseover a wheat to see which of your tests rejected it. Are these tests assignment with the problem specification?";
+
+        if (failed != wheats) {
+          outro.textContent += " Do they test unspecified behavior?";
+        }
+
+        wheat_info.appendChild(outro);
+        output.append(wheat_info);
       }
 
       function renderChaffResults(check_results) {
         let chaffs = check_results.length;
         let caught =
           check_results.filter(
-            wheat => !wheat.every(
+            chaff => !chaff.every(
               block => !block.error
                 && block.tests.every(test => test.passed))).length;
 
-        /* https://medium.com/@pppped/how-to-code-a-responsive-circular-percentage-chart-with-svg-and-css-3632f8cd7705 */
-        var msg = $(
-          `<svg viewBox="0 0 36 36" class="circular-chart blue">
-            <path class="circle-bg"
-              d="M18 2.0845
-                a 15.9155 15.9155 0 0 1 0 31.831
-                a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            <path class="circle"
-              stroke-dasharray="${(caught / chaffs) * 100}, 100"
-              d="M18 2.0845
-                a 15.9155 15.9155 0 0 1 0 31.831
-                a 15.9155 15.9155 0 0 1 0 -31.831"
-            />
-            <text x="18" y="20.35" class="percentage">${caught}⁄${chaffs}</text>
-          </svg>`);
-        output.append(msg);
-        console.info("CHAFF RESULTS", check_results);
+        let chaff_catchers =
+          check_results.map(chaff =>
+              chaff.map(block => block.tests.filter(test => !test.passed)
+                                            .map(test => test.loc))
+                .reduce((acc, val) => acc.concat(val), []));
+
+        function render_chaff(catchers) {
+          let chaff = document.createElement('a');
+          chaff.setAttribute('href','#');
+          chaff.classList.add('chaff');
+          chaff.textContent = '🐛';
+
+          if (catchers.length > 0) {
+            chaff.classList.add('caught');
+          }
+
+          chaff.addEventListener('click',function(e) {
+            e.preventDefault();
+          });
+
+          chaff.addEventListener('mouseenter',function() {
+            catchers.forEach(function(loc) { loc.highlight('#91ccec'); });
+          });
+
+          chaff.addEventListener('mouseleave',function() {
+            catchers.forEach(function(loc) { loc.highlight(''); });
+          });
+
+          return chaff;
+        }
+
+        status_widget.chaff_graph.value = {numerator: caught, denominator: chaffs};
+
+        let chaff_info = document.createElement('div');
+        chaff_info.classList.add('chaff_info');
+
+        let intro = document.createElement('p');
+        intro.textContent = `You caught ${caught} out of ${chaffs} chaffs:`;
+        chaff_info.appendChild(intro);
+
+        let chaff_list = document.createElement('ul');
+        chaff_list.classList.add('chaff_list');
+
+        chaff_catchers.map(render_chaff)
+          .forEach(function(chaff_widget){
+            let li = document.createElement('li');
+            li.appendChild(chaff_widget);
+            chaff_list.appendChild(li);
+          });
+
+        chaff_info.appendChild(chaff_list);
+
+        let outro = document.createElement('p');
+        outro.textContent = "The chaffs you caught are highlighted above in blue. Mouseover a chaff to see which of your tests caught it.";
+        chaff_info.appendChild(outro);
+
+        output.append(chaff_info);
       }
 
       var runMainCode = function(src, uiOptions) {
@@ -763,21 +956,30 @@
           }
         }
 
+        status_widget.wheat_graph.value = {numerator: "none", denominator: "none"};
+        status_widget.chaff_graph.value = {numerator: "none", denominator: "none"};
+
         window.wheat.then(run_injections)
           .then(function(r) { maybeShowOutputPending(); return r; })
           .then(
             function (check_results) {
-              let all_passed =
-                check_results.every(
+              let wheats = check_results.length;
+              let passed =
+                check_results.filter(
                   wheat => wheat.every(
                     block => !block.error
-                      && block.tests.every(test => test.passed)));
+                      && block.tests.every(test => test.passed))).length;
+
+              let all_passed = wheats == passed;
+
+              status_widget.wheat_graph.value = {numerator: passed, denominator: wheats};
 
               if (all_passed) {
                 return window.chaff.then(run_injections).then(renderChaffResults,
                         displayResult(output, runtime, repl.runtime, true));
               } else {
-                return renderWheatFailure(check_results);
+                afterRun(false);
+                renderWheatFailure(check_results);
               }
             }, function(run_result) {
               return displayResult(output, runtime, repl.runtime, true)(run_result);
