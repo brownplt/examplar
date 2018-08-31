@@ -2062,3 +2062,7 @@ ul.chaff_list {
   background: #d2d2d2;
   opacity:0.8;
 }
+
+#bonniemenu > button {
+  font-weight: bold;
+}
