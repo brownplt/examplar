@@ -822,7 +822,7 @@
         wheat_info.appendChild(wheat_list);
 
         let outro = document.createElement('p');
-        outro.textContent = "The wheats your tests rejected are highlighted above in red. Mouseover a wheat to see which of your tests rejected it. Are these tests assignment with the problem specification?";
+        outro.textContent = "The wheats your tests rejected are highlighted above in red. Mouseover a wheat to see which of your tests rejected it. Are these tests consistent with the problem specification?";
 
         if (failed != wheats) {
           outro.textContent += " Do they test unspecified behavior?";
