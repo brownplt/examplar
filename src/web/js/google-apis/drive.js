@@ -234,8 +234,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             return ls("'"+ results[0].id + "' in parents")
           })
           .then(function(chaff) {
-            return Q.all(chaff.map(file => drive.files.get({"fileId": file.id})
-                      .then(function(file) { return makeSharedFile(file,true); })));
+            return chaff.reduce((promiseChain, file) => {
+                return promiseChain.then(chainResults =>
+                    drive.files.get({"fileId": file.id}).then(file =>
+                        [ ...chainResults, makeSharedFile(file,true) ]
+                    )
+                );
+            }, Promise.resolve([]))
           });
       },
       getTemplateFileById: function(id) {
