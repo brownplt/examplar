@@ -187,6 +187,7 @@ $(function() {
       gutters: gutters,
       lineWrapping: true,
       logging: true,
+      readOnly: true,
       rulers: rulers,
       rulersMinCol: rulersMinCol
     };
@@ -255,7 +256,16 @@ $(function() {
           console.log("Logged in and has program to load: ", toLoad);
           loadProgram(toLoad);
           programToSave = toLoad;
+          $(window).unbind("beforeunload");
+          window.location.reload();
+        } else if(params["get"] && params["get"]["template"]) {
+          var toLoad = api.api.getTemplateFileById(params["get"]["template"]);
+          loadProgram(toLoad);
+          programToSave = toLoad;
+          $(window).unbind("beforeunload");
+          window.location.reload();
         } else {
+          window.location.href = "/";
           programToSave = Q.fcall(function() { return null; });
         }
       });
@@ -281,13 +291,14 @@ $(function() {
       enableFileOptions();
       programLoad = api.getFileById(params["get"]["program"]);
       programLoad.then(function(p) { showShareContainer(p); });
-    }
-    if(params["get"] && params["get"]["template"]) {
+    } else if(params["get"] && params["get"]["template"]) {
       logger.log('template-program-load',
         {
           id: params["get"]["template"]
         });
       programLoad = api.getTemplateFileById(params["get"]["template"]);
+    } else {
+      window.location.href = "/";
     }
     if(programLoad) {
       programLoad.fail(function(err) {
@@ -638,6 +649,7 @@ $(function() {
 
   programLoaded.then(function(c) {
     CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
+    CPO.editor.cm.setOption('readOnly', false);
 
     // NOTE(joe): Clearing history to address https://github.com/brownplt/pyret-lang/issues/386,
     // in which undo can revert the program back to empty
@@ -733,7 +745,6 @@ $(function() {
 
   programLoaded.fin(function() {
     CPO.editor.focus();
-    CPO.editor.cm.setOption("readOnly", false);
   });
 
   CPO.autoSave = autoSave;

@@ -2066,3 +2066,7 @@ ul.chaff_list {
 #bonniemenu > button {
   font-weight: bold;
 }
+
+#connectButton {
+  font-weight: bold;
+}
