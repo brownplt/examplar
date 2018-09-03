@@ -936,11 +936,11 @@
                           // if this becomes a check box somewhere in CPO
         };
 
-        Q.all([window.user, window.assignment_id])
-          .done(function([email, id]) {
+        Q.all([window.user, window.assignment_id, window.program_id])
+          .done(function([email, id, gdrive_id]) {
             return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
               method: 'PUT',
-              body: JSON.stringify({email: email, assignment: id, submission: CPO.documents.get("definitions://").getValue()}),
+              body: JSON.stringify({email: email, assignment: id, gdrive: gdrive_id, submission: CPO.documents.get("definitions://").getValue()}),
               headers:{
                 'Content-Type': 'application/json'
               }

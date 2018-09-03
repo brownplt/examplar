@@ -361,6 +361,7 @@ $(function() {
   var programToSave = initialProgram;
 
   window.assignment_id = programToSave.then(function(p) { return p.getAssignment() });
+  window.program_id = programToSave.then(function(p) { return p.getUniqueId(); });
 
   window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
 
