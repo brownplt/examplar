@@ -936,6 +936,20 @@
                           // if this becomes a check box somewhere in CPO
         };
 
+        Q.all([window.user, window.assignment_id])
+          .done(function([email, id]) {
+            return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
+              method: 'PUT',
+              body: JSON.stringify({email: email, assignment: id, submission: CPO.documents.get("definitions://").getValue()}),
+              headers:{
+                'Content-Type': 'application/json'
+              }
+            })
+          }, function (err) {
+            console.error("Failed to submit sweep.", err);
+            window.stickError("Failed to submit sweep.");
+          });
+
         function run_injections(injections) {
           let first = injections[0];
           let rest = injections.slice(1);

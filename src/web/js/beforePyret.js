@@ -360,7 +360,7 @@ $(function() {
 
   var programToSave = initialProgram;
 
-  let assignment_id = programToSave.then(function(p) { return p.getAssignment() });
+  window.assignment_id = programToSave.then(function(p) { return p.getAssignment() });
 
   window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
 
