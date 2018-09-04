@@ -52,7 +52,11 @@ define("cpo/gdrive-locators", [], function() {
       }
 
       if (typeof window.injection !== 'undefined') {
-        return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
+        if (window.injection.getName().endsWith('.arr')) {
+          return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
+        } else if (window.injection.getName().endsWith('.js')) {
+          return makeGDriveJSLocator(window.injection.getName(), window.injection.getUniqueId());
+        }
       }
 
       // Pause because we'll fetch the Google Drive file object and restart
