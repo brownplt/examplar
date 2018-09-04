@@ -566,7 +566,7 @@ body {
 }
 
 #shareContainer {
-  display: inline-block;
+  display: none;
   height: 100%;
   float:left;
 }
