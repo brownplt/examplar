@@ -800,7 +800,7 @@
           return wheat;
         }
 
-        status_widget.wheat_graph.value = {numerator: failed, denominator: wheats};
+        status_widget.wheat_graph.value = {numerator: wheats - failed, denominator: wheats};
 
         let wheat_info = document.createElement('div');
         wheat_info.classList.add('wheat_info');
