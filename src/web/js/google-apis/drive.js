@@ -306,7 +306,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                                   "resource": {
                                     "role": "reader",
                                     "type": "user",
-                                    "value": "me@jswrenn.com"
+                                    "value": "pyret.examplar@gmail.com"
                                   }
                               });
                         }).then(function(_) {
