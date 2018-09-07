@@ -897,6 +897,12 @@
         chaff_info.appendChild(outro);
 
         output.append(chaff_info);
+
+        if (caught == chaffs) {
+          let reminder = document.createElement('p');
+          reminder.textContent = "Nice work! Remember, the set of chaffs in Examplar is only a subset of what we'll run your final test submission against, so keep writing tests! You can continue to use Examplar to ensure that your tests accept the wheats.";
+          chaff_info.appendChild(reminder);
+        }
       }
 
       var runMainCode = function(src, uiOptions) {
