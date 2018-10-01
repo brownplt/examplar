@@ -102,24 +102,6 @@
     // immediately returns.  This avoids needlessly serializing multiple save
     // requests when this is called repeatedly from Pyret.
     function saveGDriveCachedFile(name, content) {
-      var file = storageAPI.then(function(storageAPI) {
-        var existingFile = storageAPI.getCachedFileByName(name);
-        return existingFile.then(function(f) {
-          if(f.length >= 1) {
-            return f[0];
-          }
-          else {
-            return storageAPI.createFile(name, {
-              saveInCache: true,
-              fileExtension: ".js",
-              mimeType: "text/plain"
-            });
-          }
-        });
-      });
-      file.then(function(f) {
-        f.save(content, true);
-      });
       return runtime.nothing;
     }
 
