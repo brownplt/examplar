@@ -303,7 +303,7 @@ $(function() {
     if(programLoad) {
       programLoad.fail(function(err) {
         console.error(err);
-        window.stickError("The program failed to load.");
+        window.stickError("The program failed to load. Please connect to Google Drive.");
       });
       return programLoad;
     } else {
