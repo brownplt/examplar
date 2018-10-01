@@ -357,6 +357,9 @@
           editor.cm.eachLine(function(lh){
             editor.cm.removeLineClass(lh, "background");});
           for(var i = 0; i < marks.length; i++) {
+            if (marks[i].className === "import-marker") {
+              continue;
+            }
             marks[i].clear();
           }
         });

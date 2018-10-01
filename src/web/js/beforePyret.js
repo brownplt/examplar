@@ -663,11 +663,17 @@ $(function() {
     var border_end_index = c.indexOf(border) + border.length;
     var border_end_pos = CPO.editor.cm.posFromIndex(border_end_index);
 
-    CPO.editor.cm.doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
-      { inclusiveLeft: true,
-        inclusiveRight: false,
-        readOnly: true,
-        addToHistory: false });
+    let marker =
+      CPO.editor.cm.doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
+        { inclusiveLeft: true,
+          inclusiveRight: false,
+          addToHistory: false,
+          readOnly: true,
+          className: "import-marker" });
+
+    marker.lines.slice(0, -1).forEach(function(line) {
+      CPO.editor.cm.doc.addLineClass(line, "wrap", "import-line-background");
+    });
   });
 
   programLoaded.fail(function() {

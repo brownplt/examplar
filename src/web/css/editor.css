@@ -2070,3 +2070,7 @@ ul.chaff_list {
 #connectButton {
   font-weight: bold;
 }
+
+.import-line-background {
+  background: #ddd;
+}

@@ -920,17 +920,6 @@
 
         CPO.documents.set("definitions://", uiOptions.cm.getDoc());
 
-        // Freeze the document contents up to the following border
-        var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";
-        var border_end_index = CPO.documents.get("definitions://").getValue().indexOf(border) + border.length;
-        var border_end_pos = CPO.documents.get("definitions://").posFromIndex(border_end_index);
-
-        CPO.documents.get("definitions://").markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
-          { inclusiveLeft: true,
-            inclusiveRight: false,
-            readOnly: true,
-            addToHistory: false });
-
         interactionsCount = 0;
         replOutputCount = 0;
         logger.log('run', { name      : "definitions://",
