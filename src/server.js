@@ -315,7 +315,8 @@ function start(config, onServerReady) {
     res.render("editor.html", {
       BASE_URL: config.baseUrl,
       GOOGLE_API_KEY: config.google.apiKey,
-      CSRF_TOKEN: req.csrfToken()
+      CSRF_TOKEN: req.csrfToken(),
+      CURRENT_VERSION: config.version
     });
   });
 
