@@ -357,6 +357,7 @@ $(function() {
   }
 
   var programLoaded = loadProgram(initialProgram);
+  window.programLoaded = programLoaded;
 
   var programToSave = initialProgram;
 
