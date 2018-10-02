@@ -95,7 +95,7 @@ var VERSION_CHECK_INTERVAL = 120000 + (30000 * Math.random());
 function checkVersion() {
   $.get("/current-version").then(function(resp) {
     resp = JSON.parse(resp);
-    if(resp.version && resp.version !== window.CURRENT_VERSION) {
+    if(resp.version && resp.version > Number(window.CURRENT_VERSION)) {
       window.stickMessage("A new version of Examplar is available. Save and reload the page to get the newest version.");
     }
   });
