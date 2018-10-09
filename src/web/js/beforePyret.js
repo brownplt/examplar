@@ -359,7 +359,7 @@ $(function() {
   var programLoaded = loadProgram(initialProgram);
   window.programLoaded = programLoaded;
 
-  var programToSave = initialProgram;
+  var programToSave = programLoaded.then(function(){ return initialProgram });
 
   window.assignment_id = programToSave.then(function(p) { return p.getAssignment() });
   window.program_id = programToSave.then(function(p) { return p.getUniqueId(); });
@@ -676,8 +676,8 @@ $(function() {
     });
   });
 
-  programLoaded.fail(function() {
-    CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
+  programLoaded.fail(function(error) {
+    window.stickError("Unable to load program.", error.toString());
   });
 
   var pyretLoad = document.createElement('script');
