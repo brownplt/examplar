@@ -161,6 +161,8 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       }
     }
 
+    let file_cache = new Map();
+
     var api = {
       about: function() {
         return drive.about.get({});
@@ -174,7 +176,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         return baseCollection.then(function(bc) { return bc.id; });
       },
       getFileById: function(id) {
-        return drive.files.get({fileId: id}).then(fileBuilder);
+        if (file_cache.has(id)) {
+          return file_cache.get(id);
+        } else {
+          let req = drive.files.get({fileId: id}).then(fileBuilder);
+          file_cache.set(id, req);
+          return req;
+        }
       },
       getFileByName: function(name) {
         return this.getAllFiles().then(function(files) {
