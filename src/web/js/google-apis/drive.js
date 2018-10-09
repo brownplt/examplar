@@ -77,14 +77,16 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               else { return files.items.map(fileBuilder); }
             });
         },
-        getContents: function() {
-          return Q($.ajax(googFileObject.downloadUrl, {
-            method: "get",
-            dataType: 'text',
-            headers: {'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }
-          })).then(function(response) {
-            return response;
-          });
+        getContents: function(cache_mode) {
+          return fetch(googFileObject.downloadUrl,
+            { method: "get",
+              cache: cache_mode || "no-cache",
+              headers: new Headers([
+                  ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
+                ])
+            }).then(function(response) {
+              return response.text();
+            });
         },
         rename: function(newName) {
           return drive.files.update({

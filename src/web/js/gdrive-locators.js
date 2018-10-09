@@ -334,7 +334,7 @@ define("cpo/gdrive-locators", [], function() {
           return file;
         });
 
-        var contentsP = fileP.then(function(file) { return file.getContents(); });
+        var contentsP = fileP.then(function(file) { return file.getContents('force-cache'); });
 
         var F = runtime.makeFunction;
 
