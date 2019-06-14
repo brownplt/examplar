@@ -9,12 +9,36 @@ em {
 #loader {
   position: fixed;
   right: 0;
-  bottom: 10px;
-  width: 50%;
+  bottom: 0;
+  width: 100%;
   height: 100%;
   z-index: 8700;
-  background: url('/img/pyret-spin.gif') 50% 30% no-repeat rgba(249, 249, 249, 0.5);
-  background-size: 50px 50px;
+  animation: loaderbackground 60s ease infinite;
+  /* pretty colors from: https://codepen.io/P1N2O/pen/pyBNzX */
+  background: url(/img/pyret-spin.gif) 50% 50% no-repeat,
+    linear-gradient(-45deg,
+      hsla(14, 82%, 63%, 0.5),
+      hsla(337, 78%, 57%, 0.5),
+      hsla(196, 72%, 49%, 0.5),
+      hsla(166, 72%, 49%, 0.5)),
+    white;
+  background-size: auto 20%, 400% 400%;
+}
+
+#loader p {
+  display: none;
+}
+
+@keyframes loaderbackground {
+  0% {
+    background-position: 50% 50%, 0% 50%
+  }
+  50% {
+    background-position: 50% 50%, 100% 50%
+  }
+  100% {
+    background-position: 50% 50%, 0% 50%
+  }
 }
 
 #help-keys {
@@ -164,7 +188,7 @@ em {
   top: 0;
   width: 100%;
   height: 40px;
-  background:#C8C8C8;
+  background:#0f9d58;
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   box-shadow: 0px 1px 2px rgba(0,0,0,0.6);

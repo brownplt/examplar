@@ -27,6 +27,84 @@
     function isTestSuccess(val) { return runtime.unwrap(runtime.getField(CH, "is-success").app(val)); }
 
     // NOTE: MUST BE CALLED WHILE RUNNING ON runtime's STACK
+    function jsonCheckResults(container, documents, runtime, checkResults, result) {
+      var ffi = runtime.ffi;
+      var cases = ffi.cases;
+      var get = runtime.getField;
+
+      // RETURNED FUNCTION MUST BE CALLED IN THE CONTEXT OF THE PYRET STACK
+      function applyMethod(value, name, args) {
+        return runtime.
+          safeThen(function() {
+            return runtime.getField(value, name);
+          }, applyMethod).then(function(fun) {
+            return fun.app.apply(value, args);
+          })
+      }
+
+      // MUST NOT BE CALLED ON PYRET STACK
+      function format(loc) {
+        return Q(outputUI.Position.fromPyretSrcloc(runtime, srcloc, loc, documents));
+      }
+
+      var any = runtime.makeFunction(function(_){return runtime.pyretTrue;});
+      var contents = ffi.toArray(checkResults);
+      var result   = [];
+
+      function render_TestResult(testresult) {
+        function render_result(passed) {
+          return function(result) {
+            return format(result)
+              .then(function(loc){return {loc: loc, passed: passed};});
+          };
+        }
+        return runtime.ffi.cases(any, "TestResult", testresult, {
+           "success"                         : render_result(true),
+           "failure-not-equal"               : render_result(false),
+           "failure-not-different"           : render_result(false),
+           "failure-not-satisfied"           : render_result(false),
+           "failure-not-dissatisfied"        : render_result(false),
+           "failure-wrong-exn"               : render_result(false),
+           "failure-right-exn"               : render_result(false),
+           "failure-exn"                     : render_result(false),
+           "failure-no-exn"                  : render_result(false),
+           "failure-raise-not-satisfied"     : render_result(false),
+           "failure-raise-not-dissatisfied"  : render_result(false),
+           "error-not-boolean"               : render_result(false)
+        });
+      }
+
+      function render_CheckBlockResult(checkblockresult) {
+        return runtime.ffi.cases(any, "CheckBlockResult", checkblockresult, {
+          "check-block-result": function(name,loc,keyword_check,test_results,maybe_err) {
+            var results = runtime.ffi.toArray(test_results);
+            var render  = [];
+            return runtime.safeThen(function() {
+                return runtime.eachLoop(runtime.makeFunction(function(i) {
+                    return render_TestResult(results[i])
+                      .then(function(rendered) {render.push(rendered);});
+                  }), 0, results.length);
+              }, render_CheckBlockResult)
+              .then(function(loc) {
+                return { name : name,
+                         loc  : loc,
+                         error: runtime.ffi.isSome(maybe_err),
+                         tests: render }; })
+          }});
+      }
+
+      return runtime.safeCall(function() {
+        return runtime.eachLoop(runtime.makeFunction(function(i) {
+          return render_CheckBlockResult(contents[i])
+            .then(function(rendered) { result.push(rendered); })
+            .start();
+        }), 0, contents.length);
+      }, function(_) {
+        return result;
+      }, "check-block-comments: each: contents");
+    }
+
+    // NOTE: MUST BE CALLED WHILE RUNNING ON runtime's STACK
     function drawCheckResults(container, documents, runtime, checkResults, result) {
       var ffi = runtime.ffi;
       var cases = ffi.cases;
@@ -450,7 +528,7 @@
         
         var testsPassing  = 0;
         var testsExecuted = 0;
-        
+
         var tests = ffi.toArray(get(checkBlock, "test-results")).
           reverse().
           map(function(test) {
@@ -467,7 +545,7 @@
             }
             return skeleton;
           });
-          
+
         var endedInError    = get(option, "is-some").app(maybeError);
         var allTestsPassing = testsPassing === testsExecuted;
         
@@ -562,7 +640,8 @@
     }
 
     return runtime.makeJSModuleReturn({
-      drawCheckResults: drawCheckResults
+      drawCheckResults: drawCheckResults,
+      jsonCheckResults: jsonCheckResults
     });
   }
 })

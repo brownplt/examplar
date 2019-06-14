@@ -2,8 +2,8 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <title>code.pyret.org</title>
-  <link rel="stylesheet" href="/css/reset.css" />
+  <title>Examplar</title>
+  <link rel="stylesheet" href="/css/reset.css"></link>
   <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
   <link rel="stylesheet" href="/css/codemirror.css" />
   <link rel="stylesheet" href="/css/foldgutter.css" />
@@ -378,6 +378,8 @@ function handleGoogLoad() {
 <script>
 var APP_BASE_URL = "{{{ BASE_URL }}}";
 var CSRF_TOKEN = "{{{ CSRF_TOKEN }}}";
+var CURRENT_VERSION = "{{{ CURRENT_VERSION }}}"
+
 $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
   var a = document.createElement("a");
   a.href = options.url;

@@ -109,8 +109,8 @@ var VERSION_CHECK_INTERVAL = 120000 + (30000 * Math.random());
 function checkVersion() {
   $.get("/current-version").then(function(resp) {
     resp = JSON.parse(resp);
-    if(resp.version && resp.version !== process.env.CURRENT_PYRET_RELEASE) {
-      window.flashMessage("A new version of Pyret is available. Save and reload the page to get the newest version.");
+    if(resp.version && resp.version > Number(window.CURRENT_VERSION)) {
+      window.stickMessage("A new version of Pyret is available. Save and reload the page to get the newest version.");
     }
   });
 }
@@ -279,7 +279,16 @@ $(function() {
           console.log("Logged in and has program to load: ", toLoad);
           loadProgram(toLoad);
           programToSave = toLoad;
+          $(window).unbind("beforeunload");
+          window.location.reload();
+        } else if(params["get"] && params["get"]["template"]) {
+          var toLoad = api.api.getTemplateFileById(params["get"]["template"]);
+          loadProgram(toLoad);
+          programToSave = toLoad;
+          $(window).unbind("beforeunload");
+          window.location.reload();
         } else {
+          window.location.href = "/";
           programToSave = Q.fcall(function() { return null; });
         }
       });
@@ -310,12 +319,7 @@ $(function() {
       enableFileOptions();
       programLoad = api.getFileById(params["get"]["program"]);
       programLoad.then(function(p) { showShareContainer(p); });
-    }
-    if(params["get"] && params["get"]["share"]) {
-      logger.log('shared-program-load',
-        {
-          id: params["get"]["share"]
-        });
+    } else if(params["get"] && params["get"]["share"]) {
       programLoad = api.getSharedFileById(params["get"]["share"]);
       programLoad.then(function(file) {
         // NOTE(joe): If the current user doesn't own or have access to this file
@@ -331,11 +335,19 @@ $(function() {
           });
         });
       });
+    } else if(params["get"] && params["get"]["template"]) {
+      logger.log('template-program-load',
+        {
+          id: params["get"]["template"]
+        });
+      programLoad = api.getTemplateFileById(params["get"]["template"]);
+    } else {
+      window.location.href = "/";
     }
     if(programLoad) {
       programLoad.fail(function(err) {
         console.error(err);
-        window.stickError("The program failed to load.");
+        window.stickError("The program failed to load. Please connect to Google Drive.");
       });
       return programLoad;
     } else {
@@ -519,8 +531,28 @@ $(function() {
   }
 
   var programLoaded = loadProgram(initialProgram);
+  window.programLoaded = programLoaded;
 
-  var programToSave = initialProgram;
+  var programToSave = programLoaded.then(function(){ return initialProgram });
+
+  window.assignment_id = programToSave.then(function(p) { return p.getAssignment() });
+  window.program_id = programToSave.then(function(p) { return p.getUniqueId(); });
+
+  window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
+
+  window.wheat =
+    assignment_id.then(function(id) {
+      return storageAPI.then(function(api) {
+        return api.getGrainFilesByTemplate(id,'wheat');
+      });
+    });
+
+  window.chaff =
+    assignment_id.then(function(id) {
+      return storageAPI.then(function(api) {
+        return api.getGrainFilesByTemplate(id,'chaff');
+      });
+    });
 
   function showShareContainer(p) {
     //console.log('called showShareContainer');
@@ -1131,15 +1163,33 @@ $(function() {
 
   programLoaded.then(function(c) {
     CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
+    CPO.editor.cm.setOption('readOnly', false);
 
     // NOTE(joe): Clearing history to address https://github.com/brownplt/pyret-lang/issues/386,
     // in which undo can revert the program back to empty
     CPO.editor.cm.setValue(c);
     CPO.editor.cm.clearHistory();
+
+    // Freeze the document contents up to the following border
+    var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";
+    var border_end_index = c.indexOf(border) + border.length;
+    var border_end_pos = CPO.editor.cm.posFromIndex(border_end_index);
+
+    let marker =
+      CPO.editor.cm.doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
+        { inclusiveLeft: true,
+          inclusiveRight: false,
+          addToHistory: false,
+          readOnly: true,
+          className: "import-marker" });
+
+    marker.lines.slice(0, -1).forEach(function(line) {
+      CPO.editor.cm.doc.addLineClass(line, "wrap", "import-line-background");
+    });
   });
 
-  programLoaded.fail(function() {
-    CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
+  programLoaded.fail(function(error) {
+    window.stickError("Unable to load program.", error.toString());
   });
 
   var pyretLoad = document.createElement('script');
@@ -1215,7 +1265,6 @@ $(function() {
 
   programLoaded.fin(function() {
     CPO.editor.focus();
-    CPO.editor.cm.setOption("readOnly", false);
   });
 
   CPO.autoSave = autoSave;

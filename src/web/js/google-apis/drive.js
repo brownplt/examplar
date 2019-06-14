@@ -6,8 +6,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
   var drive;
   var SCOPE = "https://www.googleapis.com/auth/drive.file "
     + "https://spreadsheets.google.com/feeds "
+    + "https://www.googleapis.com/auth/drive.appdata "
     + "https://www.googleapis.com/auth/drive.install";
-  var FOLDER_MIME = "application/vnd.google-apps.folder";
+  var FOLDER_MIME =  "application/vnd.google-apps.folder";
   var BACKREF_KEY = "originalProgram";
   var PUBLIC_LINK = "pubLink";
 
@@ -68,6 +69,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         getExternalURL: function() {
           return googFileObject.alternateLink;
         },
+        getAssignment: function() {
+          return drive.properties.get({
+              "fileId": googFileObject.id,
+              "propertyKey": "assignment",
+              "visibility": "PUBLIC"
+            }).then(function(result){return result.value;});
+        },
         getShares: function() {
           return drive.files.list({
             q: "trashed=false and properties has {key='" + BACKREF_KEY + "' and value='" + googFileObject.id + "' and visibility='PRIVATE'}"
@@ -77,14 +85,16 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               else { return files.items.map(fileBuilder); }
             });
         },
-        getContents: function() {
-          return Q($.ajax(googFileObject.downloadUrl, {
-            method: "get",
-            dataType: 'text',
-            headers: {'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }
-          })).then(function(response) {
-            return response;
-          });
+        getContents: function(cache_mode) {
+          return fetch(googFileObject.downloadUrl,
+            { method: "get",
+              cache: cache_mode || "no-cache",
+              headers: new Headers([
+                  ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
+                ])
+            }).then(function(response) {
+              return response.text();
+            });
         },
         rename: function(newName) {
           return drive.files.update({
@@ -159,7 +169,12 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       }
     }
 
+    let file_cache = new Map();
+
     var api = {
+      about: function() {
+        return drive.about.get({});
+      },
       getCollectionLink: function() {
         return baseCollection.then(function(bc) {
           return "https://drive.google.com/drive/u/0/folders/" + bc.id;
@@ -169,7 +184,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         return baseCollection.then(function(bc) { return bc.id; });
       },
       getFileById: function(id) {
-        return drive.files.get({fileId: id}).then(fileBuilder);
+        if (file_cache.has(id)) {
+          return file_cache.get(id);
+        } else {
+          let req = drive.files.get({fileId: id}).then(fileBuilder);
+          file_cache.set(id, req);
+          return req;
+        }
       },
       getFileByName: function(name) {
         return this.getAllFiles().then(function(files) {
@@ -185,6 +206,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         var fromDrive = drive.files.get({fileId: id}, true).then(function(googFileObject) {
           return makeSharedFile(googFileObject, true);
         });
+        fromDrive.catch(function(e){
+          console.error("BAH", e);
+        });
         var fromServer = fromDrive.fail(function() {
           return Q($.get("/shared-file", {
             sharedProgramId: id
@@ -199,6 +223,120 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           console.log("Got failure: ", r);
         });
         return result;
+      },
+      getGrainFilesByTemplate: function(id, type) {
+        function ls(q) {
+          var ret = Q.defer();
+          var retrievePageOfFiles = function(request, result) {
+            request.execute(function(resp) {
+              result = result.concat(resp.items);
+              var nextPageToken = resp.nextPageToken;
+              if (nextPageToken) {
+                request = gapi.client.drive.files.list({
+                  'q': q,
+                  'pageToken': nextPageToken
+                });
+                retrievePageOfFiles(request, result);
+              } else {
+                ret.resolve(result);
+              }
+            });
+          }
+          var initialRequest = gapi.client.drive.files.list({'q': q});
+          retrievePageOfFiles(initialRequest, []);
+          return ret.promise;
+        }
+
+        return ls("'"+ id + "' in parents and title = '" + type + "'")
+          .then(function(results) {
+            return ls("'"+ results[0].id + "' in parents")
+          })
+          .then(function(chaff) {
+            return chaff.reduce((promiseChain, file) => {
+                return promiseChain.then(chainResults =>
+                    drive.files.get({"fileId": file.id}).then(file =>
+                        [ ...chainResults, makeSharedFile(file,true) ]
+                    )
+                );
+            }, Promise.resolve([]))
+          });
+      },
+      getTemplateFileById: function(id) {
+        function ls(q) {
+          var ret = Q.defer();
+          var retrievePageOfFiles = function(request, result) {
+            request.execute(function(resp) {
+              result = result.concat(resp.items);
+              var nextPageToken = resp.nextPageToken;
+              if (nextPageToken) {
+                request = gapi.client.drive.files.list({
+                  'q': q,
+                  'pageToken': nextPageToken
+                });
+                retrievePageOfFiles(request, result);
+              } else {
+                ret.resolve(result);
+              }
+            });
+          }
+          var initialRequest = gapi.client.drive.files.list({'q': q});
+          retrievePageOfFiles(initialRequest, []);
+          return ret.promise;
+        }
+
+        var sweepFromDrive =
+          baseCollection.then(function(bc){
+            return ls("not trashed and '" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PUBLIC' }")
+              .then(function(results) {
+                if (results[0]) {
+                  // load the student's work
+                  return drive.files.get({"fileId": results[0].id});
+                } else {
+                  // copy the template
+                  return ls("'"+ id + "' in parents and title contains 'tests.arr'").then(function(results) {
+                    let template = results[0];
+                    return drive.files.copy({
+                      "fileId": template.id,
+                      "resource": {
+                        "parents": [{"id": bc.id}]
+                      }})
+                      .then(function(file) {
+                        return drive.properties.insert({
+                            "fileId": file.id,
+                            "resource": {
+                              "key": "assignment",
+                              "value": id,
+                              "visibility": "PUBLIC"
+                            }
+                          }).then(function(_) {
+                            return drive.properties.insert({
+                                "fileId": file.id,
+                                "resource": {
+                                  "key": "examplar",
+                                  "value": "yes",
+                                  "visibility": "PUBLIC"
+                                }});
+                          }).then(function(_) {
+                            return drive.permissions.insert({
+                                  "fileId": file.id,
+                                  "emailMessage": "TEST MESSAGE",
+                                  "sendNotificationEmails": "true",
+                                  "resource": {
+                                    "role": "reader",
+                                    "type": "user",
+                                    "value": "pyret.examplar@gmail.com"
+                                  }
+                              });
+                        }).then(function(_) {
+                          return file;
+                        });
+                      });
+                  });
+                }
+              }).then(fileBuilder);
+            });
+
+        return sweepFromDrive;
       },
       getFiles: function(c) {
         return c.then(function(bc) {

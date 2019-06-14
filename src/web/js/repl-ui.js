@@ -34,10 +34,94 @@
     var ffi = runtime.ffi;
 
     var output = jQuery("<div id='output' aria-hidden='true' class='cm-s-default'>");
+    output.append($("<p class='examplar_info'>Examplar will run your test cases against a set of correct implementations ('wheats'), then against a small set of buggy ones ('chaffs'). Try to catch as many bugs as you can!<p>"));
+
     var outputPending = jQuery("<span>").text("Gathering results...");
     var outputPendingHidden = true;
     var canShowRunningIndicator = false;
     var running = false;
+
+    class Graph {
+      constructor(value) {
+        let xmlns = "http://www.w3.org/2000/svg";
+        let svg = document.createElementNS(xmlns, "svg");
+
+        svg.setAttributeNS(null, "viewBox", "0 0 36 36");
+        svg.classList.add("circular-chart");
+        svg.classList.add("blue");
+
+        let circle = "M18 2.0845 "
+                   + "a 15.9155 15.9155 0 0 1 0 31.831 "
+                   + "a 15.9155 15.9155 0 0 1 0 -31.831";
+
+        let bg = document.createElementNS(xmlns, "path");
+        bg.classList.add("circle-bg");
+        bg.setAttributeNS(null, 'd', circle);
+
+        let fg = document.createElementNS(xmlns, "path");
+        fg.classList.add("circle");
+        fg.setAttributeNS(null, 'd', circle);
+        fg.setAttributeNS(null, 'stroke-dasharray', "0, 100");
+
+        let text = document.createElementNS(xmlns, "text");
+        text.classList.add("percentage");
+        text.setAttributeNS(null, 'x', "18");
+        text.setAttributeNS(null, 'y', "20.35");
+
+        this.bg = svg.appendChild(bg);
+        this.fg = svg.appendChild(fg);
+        this.text = svg.appendChild(text);
+        this.element = svg;
+
+        let fallback = {numerator: "none", denominator: "none"};
+        this.numerator = (value || fallback).numerator;
+        this.denominator = (value || fallback).denominator;
+        this.value = {numerator: this.numerator, denominator: this.denominator};
+      }
+
+      set value(value){
+        if (typeof value.numerator === "number" &&
+            typeof value.denominator === "number")
+        {
+          this.numerator = value.numerator;
+          this.denominator = value.denominator;
+          this.fg.setAttributeNS(null, 'stroke-dasharray',
+            `${(value.numerator / value.denominator) * 100}, 100`);
+          this.text.innerHTML = `${value.numerator}⁄${value.denominator}`;
+        } else {
+          this.fg.setAttributeNS(null, 'stroke-dasharray', "0, 100");
+          this.text.innerHTML = "?";
+        }
+      }
+    }
+
+    class StatusWidget {
+      constructor() {
+        let element = document.createElement('div');
+        element.classList.add("examplar_status_widget");
+
+        let wheat_side = document.createElement('div');
+        wheat_side.classList.add("examplar_status");
+        let wheat_graph = new Graph();
+        wheat_side.innerHTML = "Wheats<br>Accepted";
+        wheat_side.prepend(wheat_graph.element);
+
+        let chaff_side = document.createElement('div');
+        chaff_side.classList.add("examplar_status");
+        chaff_side.innerHTML = "Chaffs<br>Rejected";
+        let chaff_graph = new Graph();
+        chaff_side.prepend(chaff_graph.element);
+
+        this.wheat_side = element.appendChild(wheat_side);
+        this.chaff_side = element.appendChild(chaff_side);
+        this.element = element;
+
+        this.wheat_graph = wheat_graph;
+        this.chaff_graph = chaff_graph;
+      }
+    }
+
+    var status_widget = new StatusWidget();
 
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
@@ -221,6 +305,74 @@
           //speakHistory(1);
           doneDisplay.resolve("Done displaying output");
           return callingRuntime.nothing;
+        });
+      return doneDisplay.promise;
+      }
+    }
+
+    // the result of applying `displayResult` is a function that MUST
+    // NOT BE CALLED ON THE PYRET STACK.
+    function jsonResult(output, callingRuntime, resultRuntime, isMain) {
+      var runtime = callingRuntime;
+      var rr = resultRuntime;
+
+      // this function must NOT be called on the pyret stack
+      return function(result) {
+        var base_result = result;
+        var doneDisplay = Q.defer();
+        // Start a new pyret stack.
+        // this returned function must not be called on the pyret stack
+        // b/c `callingRuntime.runThunk` must not be called on the pyret stack
+        callingRuntime.runThunk(function() {
+          if(callingRuntime.isFailureResult(result)) {
+            // Parse Errors
+            return false;
+          }
+          else if(callingRuntime.isSuccessResult(result)) {
+            result = result.result;
+            return ffi.cases(ffi.isEither, "is-Either", result, {
+              left: function(compileResultErrors) {
+                return false;
+              },
+              right: function(v) {
+                // TODO(joe): This is a place to consider which runtime level
+                // to use if we have separate compile/run runtimes.  I think
+                // that loadLib will be instantiated with callingRuntime, and
+                // I think that's correct.
+                return callingRuntime.pauseStack(function(restarter) {
+                  rr.runThunk(function() {
+                    var runResult = rr.getField(loadLib, "internal").getModuleResultResult(v);
+                    if(rr.isSuccessResult(runResult)) {
+                      return rr.safeCall(function() {
+                        return checkUI.jsonCheckResults(output, CPO.documents, rr,
+                                                        runtime.getField(runResult.result, "checks"), v);
+                      }, function(result) {
+                        if (result.some(c => c.error)) {
+                          return false;
+                        } else {
+                          return result;
+                        }
+                      }, "rr.jsonCheckResults");
+                    } else {
+                      return false;
+                    }
+                  }, function(result) {
+                    restarter.resume(result.result);
+                  });
+                });
+              }
+            });
+          }
+          else {
+            return false;
+          }
+        }, function(r) {
+          if (r.result === false) {
+            doneDisplay.reject(base_result);
+          } else {
+            doneDisplay.resolve(r.result);
+          }
+          return base_result;
         });
       return doneDisplay.promise;
       }
@@ -610,6 +762,8 @@
 
       var breakButton = options.breakButton;
       var stopLi = $('#stopli');
+      container[0].appendChild(status_widget.element);
+      container.append(output);
       container.append(output).append(promptContainer);
 
       var img = $("<img>").attr({
@@ -827,6 +981,152 @@
         }, "CPO-onSpy");
       });
 
+      function renderWheatFailure(check_results) {
+        let wheats = check_results.length;
+        let failed =
+          check_results.filter(
+            wheat => wheat.some(
+              block => block.error
+                || block.tests.some(test => !test.passed))).length;
+
+        let wheat_catchers =
+          check_results.map(
+            wheat => wheat.map(
+              block => block.error
+                || block.tests.filter(test => !test.passed)
+                              .map(test => test.loc))
+              .reduce((acc, val) => acc.concat(val), []));
+
+        function render_wheat(catchers) {
+          let wheat = document.createElement('a');
+          wheat.setAttribute('href','#');
+          wheat.classList.add('wheat');
+          wheat.textContent = '⚙';
+
+          if (catchers.length > 0) {
+            wheat.classList.add('failed');
+          }
+
+          wheat.addEventListener('click',function(e) {
+            e.preventDefault();
+          });
+
+          wheat.addEventListener('mouseenter',function() {
+            catchers.forEach(function(loc) { loc.highlight('#FF0000'); });
+          });
+
+          wheat.addEventListener('mouseleave',function() {
+            catchers.forEach(function(loc) { loc.highlight(''); });
+          });
+
+          return wheat;
+        }
+
+        status_widget.wheat_graph.value = {numerator: wheats - failed, denominator: wheats};
+
+        let wheat_info = document.createElement('div');
+        wheat_info.classList.add('wheat_info');
+
+        let intro = document.createElement('p');
+        intro.textContent = `Your tests rejected ${failed} out of ${wheats} wheats:`;
+        wheat_info.appendChild(intro);
+
+        let wheat_list = document.createElement('ul');
+        wheat_list.classList.add('wheat_list');
+
+        wheat_catchers.map(render_wheat)
+          .forEach(function(wheat_widget){
+            let li = document.createElement('li');
+            li.appendChild(wheat_widget);
+            wheat_list.appendChild(li);
+          });
+
+        wheat_info.appendChild(wheat_list);
+
+        let outro = document.createElement('p');
+        outro.textContent = "The wheats your tests rejected are highlighted above in red. Mouseover a wheat to see which of your tests rejected it. Are these tests consistent with the problem specification?";
+
+        if (failed != wheats) {
+          outro.textContent += " Do they test unspecified behavior?";
+        }
+
+        wheat_info.appendChild(outro);
+        output.append(wheat_info);
+      }
+
+      function renderChaffResults(check_results) {
+        let chaffs = check_results.length;
+        let caught =
+          check_results.filter(
+            chaff => !chaff.every(
+              block => !block.error
+                && block.tests.every(test => test.passed))).length;
+
+        let chaff_catchers =
+          check_results.map(chaff =>
+              chaff.map(block => block.tests.filter(test => !test.passed)
+                                            .map(test => test.loc))
+                .reduce((acc, val) => acc.concat(val), []));
+
+        function render_chaff(catchers) {
+          let chaff = document.createElement('a');
+          chaff.setAttribute('href','#');
+          chaff.classList.add('chaff');
+          chaff.textContent = '🐛';
+
+          if (catchers.length > 0) {
+            chaff.classList.add('caught');
+          }
+
+          chaff.addEventListener('click',function(e) {
+            e.preventDefault();
+          });
+
+          chaff.addEventListener('mouseenter',function() {
+            catchers.forEach(function(loc) { loc.highlight('#91ccec'); });
+          });
+
+          chaff.addEventListener('mouseleave',function() {
+            catchers.forEach(function(loc) { loc.highlight(''); });
+          });
+
+          return chaff;
+        }
+
+        status_widget.chaff_graph.value = {numerator: caught, denominator: chaffs};
+
+        let chaff_info = document.createElement('div');
+        chaff_info.classList.add('chaff_info');
+
+        let intro = document.createElement('p');
+        intro.textContent = `You caught ${caught} out of ${chaffs} chaffs:`;
+        chaff_info.appendChild(intro);
+
+        let chaff_list = document.createElement('ul');
+        chaff_list.classList.add('chaff_list');
+
+        chaff_catchers.map(render_chaff)
+          .forEach(function(chaff_widget){
+            let li = document.createElement('li');
+            li.appendChild(chaff_widget);
+            chaff_list.appendChild(li);
+          });
+
+        chaff_info.appendChild(chaff_list);
+
+        let outro = document.createElement('p');
+        outro.textContent = "The chaffs you caught are highlighted above in blue. Mouseover a chaff to see which of your tests caught it.";
+        chaff_info.appendChild(outro);
+
+        output.append(chaff_info);
+
+        if (caught == chaffs) {
+          let reminder = document.createElement('p');
+          reminder.textContent = "Nice work! Remember, the set of chaffs in Examplar is only a subset of what we'll run your final test submission against, so keep writing tests! You can continue to use Examplar to ensure that your tests accept the wheats.";
+          chaff_info.appendChild(reminder);
+        }
+      }
+
       var runMainCode = function(src, uiOptions) {
         if(running) { return; }
         running = true;
@@ -855,15 +1155,70 @@
           checkAll: false // NOTE(joe): this is a good spot to fetch something from the ui options
                           // if this becomes a check box somewhere in CPO
         };
-        var replResult = repl.restartInteractions(src, options);
-        var startRendering = replResult.then(function(r) {
-          maybeShowOutputPending();
-          return r;
-        });
-        var doneRendering = startRendering.then(displayResult(output, runtime, repl.runtime, true, updateItems)).fail(function(err) {
-          console.error("Error displaying result: ", err);
-        });
-        doneRendering.fin(afterRun(false));
+
+        Q.all([window.user, window.assignment_id, window.program_id])
+          .done(function([email, id, gdrive_id]) {
+            return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
+              method: 'PUT',
+              body: JSON.stringify({email: email, assignment: id, gdrive: gdrive_id, submission: CPO.documents.get("definitions://").getValue()}),
+              headers:{
+                'Content-Type': 'application/json'
+              }
+            })
+          }, function (err) {
+            console.error("Failed to submit sweep.", err);
+            window.stickError("Failed to submit sweep.");
+          });
+
+        function run_injections(injections) {
+          let first = injections[0];
+          let rest = injections.slice(1);
+          if (first !== undefined) {
+            window.injection = first;
+            return repl.restartInteractions(src, options)
+              .then(jsonResult(output, runtime, repl.runtime, true))
+              .then(
+                function(result) {
+                  return run_injections(rest)
+                    .then(function(rest_results) {
+                      rest_results.push(result);
+                      return rest_results;
+                    });
+                });
+          } else {
+            return Q([]);
+          }
+        }
+
+        status_widget.wheat_graph.value = {numerator: "none", denominator: "none"};
+        status_widget.chaff_graph.value = {numerator: "none", denominator: "none"};
+
+        window.wheat.then(run_injections)
+          .then(function(r) { maybeShowOutputPending(); return r; })
+          .then(
+            function (check_results) {
+              let wheats = check_results.length;
+              let passed =
+                check_results.filter(
+                  wheat => wheat.every(
+                    block => !block.error
+                      && block.tests.every(test => test.passed))).length;
+
+              let all_passed = wheats == passed;
+
+              status_widget.wheat_graph.value = {numerator: passed, denominator: wheats};
+
+              if (all_passed) {
+                return window.chaff.then(run_injections).then(renderChaffResults,
+                        displayResult(output, runtime, repl.runtime, true, updateItems));
+              } else {
+                afterRun(false);
+                renderWheatFailure(check_results);
+              }
+            }, function(run_result) {
+              return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+            })
+          .fin(afterRun(false));
       };
 
       var runner = function(code) {

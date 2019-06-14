@@ -51,6 +51,14 @@ define("cpo/gdrive-locators", [], function() {
         return "Could not load file with name " + filename;
       }
 
+      if (typeof window.injection !== 'undefined') {
+        if (window.injection.getName().endsWith('.arr')) {
+          return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
+        } else if (window.injection.getName().endsWith('.js')) {
+          return makeGDriveJSLocator(window.injection.getName(), window.injection.getUniqueId());
+        }
+      }
+
       // Pause because we'll fetch the Google Drive file object and restart
       // with it to create the actual locator
       return runtime.pauseStack(function(restarter) {
@@ -326,7 +334,7 @@ define("cpo/gdrive-locators", [], function() {
           return file;
         });
 
-        var contentsP = fileP.then(function(file) { return file.getContents(); });
+        var contentsP = fileP.then(function(file) { return file.getContents('force-cache'); });
 
         var F = runtime.makeFunction;
 

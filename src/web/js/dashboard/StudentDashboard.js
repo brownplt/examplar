@@ -160,9 +160,6 @@ class StudentDashboard extends Component {
             <div className='button-wrapper right'>
               <button className={'auth-button ' + (this.state.signedIn !== NOT_SIGNED_IN ? '' : 'hidden')} onClick={this.handleSignOutClick} id='signout-button' >Sign out</button>
             </div>
-            <div className='button-wrapper right start'>
-              <button className={'start-button ' + (this.state.signedIn === SIGNED_IN ? '' : 'hidden')} onClick={this.handleStartCodingClick} id='start-button' >Open Editor</button>
-            </div>
           </div>
         </div>
         <div className={'main middle container ' + (this.state.signedIn === NOT_SIGNED_IN ? '' : 'hidden')}>
@@ -173,12 +170,7 @@ class StudentDashboard extends Component {
 
           <div className='clearfix'></div>
 
-
-          <div className={'left'}>
-            <p><button onClick={this.handleStartCodingClick} id='start-button' >Open Editor</button></p><p><em>to start coding immediately</em></p>
-          </div>
-
-          <div className={'right'}>
+          <div>
             <p><button className={'auth-button'} onClick={this.handleSignInClick} id='signin-button' >Sign in</button></p><p><em>to save and view programs</em></p>
           </div>
 
