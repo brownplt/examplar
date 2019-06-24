@@ -392,6 +392,7 @@ $(function() {
   }
 
   function loadProgram(p) {
+    p = p.then(p => p.tests);
     programToSave = p;
     return p.then(function(prog) {
       if(prog !== null) {
@@ -535,8 +536,8 @@ $(function() {
 
   var programToSave = programLoaded.then(function(){ return initialProgram });
 
-  window.assignment_id = programToSave.then(function(p) { return p.getAssignment() });
-  window.program_id = programToSave.then(function(p) { return p.getUniqueId(); });
+  window.assignment_id = programToSave.then(function(p) { return p.assignment_id });
+  window.program_id = programToSave.then(function(p) { return p.tests.getUniqueId(); });
 
   window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
 

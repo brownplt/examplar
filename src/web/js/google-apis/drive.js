@@ -161,7 +161,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     // The primary purpose of this is to have some sort of fallback for
     // any situation in which the file object has somehow lost its info
     function fileBuilder(googFileObject) {
-      if ((googFileObject.mimeType === 'text/plain' && !googFileObject.fileExtension)
+      if (fileBuilder == null ) {
+        return null;
+      } else if ((googFileObject.mimeType === 'text/plain' && !googFileObject.fileExtension)
           || googFileObject.fileExtension === 'arr') {
         return makeFile(googFileObject, 'text/plain', 'arr');
       } else {
@@ -284,58 +286,75 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           return ret.promise;
         }
 
+        function copy_template_to_drive(bc, template) {
+          return drive.files.copy({
+            "fileId": template.id,
+            "resource": {
+              "parents": [{"id": bc.id}]
+            }})
+            .then(function(file) {
+              return drive.properties.insert({
+                  "fileId": file.id,
+                  "resource": {
+                    "key": "assignment",
+                    "value": id,
+                    "visibility": "PUBLIC"
+                  }
+                }).then(function(_) {
+                  return drive.properties.insert({
+                      "fileId": file.id,
+                      "resource": {
+                        "key": "examplar",
+                        "value": "yes",
+                        "visibility": "PUBLIC"
+                      }});
+                }).then(function(_) {
+                  return drive.permissions.insert({
+                        "fileId": file.id,
+                        "emailMessage": "TEST MESSAGE",
+                        "sendNotificationEmails": "true",
+                        "resource": {
+                          "role": "reader",
+                          "type": "user",
+                          "value": "pyret.examplar@gmail.com"
+                        }
+                    });
+              }).then(function(_) {
+                return file;
+              });
+            });
+        }
+
         var sweepFromDrive =
           baseCollection.then(function(bc){
             return ls("not trashed and '" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PUBLIC' }")
               .then(function(results) {
-                if (results[0]) {
-                  // load the student's work
-                  return drive.files.get({"fileId": results[0].id});
-                } else {
-                  // copy the template
-                  return ls("'"+ id + "' in parents and title contains 'tests.arr'").then(function(results) {
-                    let template = results[0];
-                    return drive.files.copy({
-                      "fileId": template.id,
-                      "resource": {
-                        "parents": [{"id": bc.id}]
-                      }})
-                      .then(function(file) {
-                        return drive.properties.insert({
-                            "fileId": file.id,
-                            "resource": {
-                              "key": "assignment",
-                              "value": id,
-                              "visibility": "PUBLIC"
-                            }
-                          }).then(function(_) {
-                            return drive.properties.insert({
-                                "fileId": file.id,
-                                "resource": {
-                                  "key": "examplar",
-                                  "value": "yes",
-                                  "visibility": "PUBLIC"
-                                }});
-                          }).then(function(_) {
-                            return drive.permissions.insert({
-                                  "fileId": file.id,
-                                  "emailMessage": "TEST MESSAGE",
-                                  "sendNotificationEmails": "true",
-                                  "resource": {
-                                    "role": "reader",
-                                    "type": "user",
-                                    "value": "pyret.examplar@gmail.com"
-                                  }
-                              });
-                        }).then(function(_) {
-                          return file;
-                        });
-                      });
-                  });
-                }
-              }).then(fileBuilder);
-            });
+                let maybe_code = results.find(result => result.title.includes('code'));
+                let maybe_tests = results.find(result => result.title.includes('tests'));
+                return ls("not trashed and '"+ id + "' in parents and title contains 'arr'").then(function(results) {
+                  let maybe_code_template = results.find(result => result.title.includes('code'));
+                  let maybe_tests_template = results.find(result => result.title.includes('tests'));
 
+                  let code =
+                    (maybe_code != null
+                      ? drive.files.get({"fileId": maybe_code.id})
+                      : (maybe_code_template != null
+                          ? copy_template_to_drive(bc, maybe_code_template)
+                          : Q(null))).then(fileBuilder);
+
+                  let tests =
+                    (maybe_tests != null
+                      ? drive.files.get({"fileId": maybe_tests.id})
+                      : (maybe_tests_template != null
+                          ? copy_template_to_drive(bc, maybe_tests_template)
+                          : Q(null))).then(fileBuilder);
+
+                  return Q.all([code, tests]).then(function([code, tests]) {
+                    return {assignment_id: id, code: code, tests: tests};
+                  });
+                });
+              });
+            });
         return sweepFromDrive;
       },
       getFiles: function(c) {
