@@ -259,51 +259,6 @@ $(function() {
   });
 
   storageAPI = storageAPI.then(function(api) { return api.api; });
-  $("#connectButton").click(function() {
-    $("#connectButton").text("Connecting...");
-    $("#connectButton").attr("disabled", "disabled");
-    $('#connectButtonli').attr('disabled', 'disabled');
-    $("#connectButton").attr("tabIndex", "-1");
-    //$("#topTierUl").attr("tabIndex", "0");
-    getTopTierMenuitems();
-    storageAPI = createProgramCollectionAPI("code.pyret.org", false);
-    storageAPI.then(function(api) {
-      api.collection.then(function() {
-        $(".loginOnly").show();
-        $(".logoutOnly").hide();
-        document.activeElement.blur();
-        $("#bonniemenubutton").focus();
-        setUsername($("#username"));
-        if(params["get"] && params["get"]["program"]) {
-          var toLoad = api.api.getFileById(params["get"]["program"]);
-          console.log("Logged in and has program to load: ", toLoad);
-          loadProgram(toLoad);
-          programToSave = toLoad;
-          $(window).unbind("beforeunload");
-          window.location.reload();
-        } else if(params["get"] && params["get"]["template"]) {
-          var toLoad = api.api.getTemplateFileById(params["get"]["template"]);
-          loadProgram(toLoad);
-          programToSave = toLoad;
-          $(window).unbind("beforeunload");
-          window.location.reload();
-        } else {
-          window.location.href = "/";
-          programToSave = Q.fcall(function() { return null; });
-        }
-      });
-      api.collection.fail(function() {
-        $("#connectButton").text("Connect to Google Drive");
-        $("#connectButton").attr("disabled", false);
-        $('#connectButtonli').attr('disabled', false);
-        //$("#connectButton").attr("tabIndex", "0");
-        document.activeElement.blur();
-        $("#connectButton").focus();
-        //$("#topTierUl").attr("tabIndex", "-1");
-      });
-    });
-    storageAPI = storageAPI.then(function(api) { return api.api; });
-  });
 
   /*
     initialProgram holds a promise for a Drive File object or null
