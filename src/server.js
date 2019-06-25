@@ -312,11 +312,14 @@ function start(config, onServerReady) {
   });
 
   app.get("/editor", function(req, res) {
-    res.render("editor.html", {
-      BASE_URL: config.baseUrl,
-      GOOGLE_API_KEY: config.google.apiKey,
-      CSRF_TOKEN: req.csrfToken(),
-      CURRENT_VERSION: config.version
+    var u = requireLogin(req, res);
+    u.then(function(user) {
+      res.render("editor.html", {
+        BASE_URL: config.baseUrl,
+        GOOGLE_API_KEY: config.google.apiKey,
+        CSRF_TOKEN: req.csrfToken(),
+        CURRENT_VERSION: config.version
+      });
     });
   });
 
