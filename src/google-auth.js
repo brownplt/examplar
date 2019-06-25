@@ -47,7 +47,8 @@ function makeAuth(config) {
         // for it so that we don't have to do another popup on the client.
         // #notpola
         scope: OAUTH_SCOPES.join(' '),
-        state: afterUrl
+        state: afterUrl,
+        hd: "brown.edu",
       });
     },
     serveRedirect: function(req, callback) {
