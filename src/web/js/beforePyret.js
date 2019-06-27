@@ -261,14 +261,14 @@ $(function() {
   storageAPI = storageAPI.then(function(api) { return api.api; });
 
   /*
-    initialProgram holds a promise for a Drive File object or null
+    initialPrograms holds a promise for a Drive File object or null
 
     It's null if the page doesn't have a #share or #program url
 
     If the url does have a #program or #share, the promise is for the
     corresponding object.
   */
-  var initialProgram = storageAPI.then(function(api) {
+  var initialPrograms = storageAPI.then(function(api) {
     var programLoad = null;
     if(params["get"] && params["get"]["program"]) {
       enableFileOptions();
@@ -340,22 +340,36 @@ $(function() {
   }
 
   function updateName(p) {
-    filename = p.getName();
+    if (p.assignment_name != null) {
+      filename = p.assignment_name;
+    } else {
+      filename = p.getName();
+    }
     $("#filename").text(" (" + truncateName(filename) + ")");
     setTitle(filename);
     showShareContainer(p);
   }
 
-  function loadProgram(p) {
-    p = p.then(p => p.tests);
+  function loadPrograms(p) {
     programToSave = p;
     return p.then(function(prog) {
       if(prog !== null) {
+        window.swap = function() {
+          Q.all([prog.tests, prog.code]).then(function([tests, code]) {
+            Q.all([tests.getDoc(), code.getDoc()]).then(function([tests, code]){
+              if (CPO.editor.cm.getDoc() == tests) {
+                CPO.editor.cm.swapDoc(code);
+              } else {
+                CPO.editor.cm.swapDoc(tests);
+              }
+            });
+          });
+        };
         updateName(prog);
         if(prog.shared) {
           window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
         }
-        return prog.getContents();
+        return prog.tests.getDoc();
       }
     });
   }
@@ -486,10 +500,10 @@ $(function() {
     //console.log('(cf)docactelt=', document.activeElement);
   }
 
-  var programLoaded = loadProgram(initialProgram);
+  var programLoaded = loadPrograms(initialPrograms);
   window.programLoaded = programLoaded;
 
-  var programToSave = programLoaded.then(function(){ return initialProgram });
+  var programToSave = programLoaded.then(function(){ return initialPrograms });
 
   window.assignment_id = programToSave.then(function(p) { return p.assignment_id });
   window.program_id = programToSave.then(function(p) { return p.tests.getUniqueId(); });
@@ -1117,31 +1131,10 @@ $(function() {
     }
   });
 
-  programLoaded.then(function(c) {
-    CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
+  programLoaded.then(function(doc) {
+    CPO.documents.set("definitions://", doc);
     CPO.editor.cm.setOption('readOnly', false);
-
-    // NOTE(joe): Clearing history to address https://github.com/brownplt/pyret-lang/issues/386,
-    // in which undo can revert the program back to empty
-    CPO.editor.cm.setValue(c);
-    CPO.editor.cm.clearHistory();
-
-    // Freeze the document contents up to the following border
-    var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";
-    var border_end_index = c.indexOf(border) + border.length;
-    var border_end_pos = CPO.editor.cm.posFromIndex(border_end_index);
-
-    let marker =
-      CPO.editor.cm.doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
-        { inclusiveLeft: true,
-          inclusiveRight: false,
-          addToHistory: false,
-          readOnly: true,
-          className: "import-marker" });
-
-    marker.lines.slice(0, -1).forEach(function(line) {
-      CPO.editor.cm.doc.addLineClass(line, "wrap", "import-line-background");
-    });
+    CPO.editor.cm.swapDoc(doc);
   });
 
   programLoaded.fail(function(error) {
@@ -1227,7 +1220,7 @@ $(function() {
   CPO.save = save;
   CPO.updateName = updateName;
   CPO.showShareContainer = showShareContainer;
-  CPO.loadProgram = loadProgram;
+  CPO.loadProgram = loadPrograms;
   CPO.cycleFocus = cycleFocus;
   CPO.say = say;
   CPO.sayAndForget = sayAndForget;

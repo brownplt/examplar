@@ -55,6 +55,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     }
 
     function makeFile(googFileObject, mimeType, fileExtension) {
+      let cm_doc = null;
       return {
         shared: false,
         getName: function() {
@@ -95,6 +96,34 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             }).then(function(response) {
               return response.text();
             });
+        },
+        getDoc: function() {
+          if (cm_doc == null) {
+            return this.getContents().then(function(contents){
+              cm_doc = CodeMirror.Doc(contents, "pyret");
+
+              // Freeze the document contents up to the following border
+              var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";
+              var border_end_index = contents.indexOf(border) + border.length;
+              var border_end_pos = cm_doc.posFromIndex(border_end_index);
+
+              let marker =
+                cm_doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
+                  { inclusiveLeft: true,
+                    inclusiveRight: false,
+                    addToHistory: false,
+                    readOnly: true,
+                    className: "import-marker" });
+
+              marker.lines.slice(0, -1).forEach(function(line) {
+                cm_doc.addLineClass(line, "wrap", "import-line-background");
+              });
+
+              return cm_doc;
+            });
+          } else {
+            return Q(cm_doc);
+          }
         },
         rename: function(newName) {
           return drive.files.update({
@@ -327,30 +356,32 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
         var sweepFromDrive =
           baseCollection.then(function(bc){
-            return ls("not trashed and '" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PUBLIC' }")
-              .then(function(results) {
-                let maybe_code = results.find(result => result.title.includes('code'));
-                let maybe_tests = results.find(result => result.title.includes('tests'));
-                return ls("not trashed and '"+ id + "' in parents and title contains 'arr'").then(function(results) {
-                  let maybe_code_template = results.find(result => result.title.includes('code'));
-                  let maybe_tests_template = results.find(result => result.title.includes('tests'));
+            return drive.files.get({"fileId": id}).then(function(template) {
+              return ls("not trashed and '" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PUBLIC' }")
+                .then(function(results) {
+                  let maybe_code = results.find(result => result.title.includes('code'));
+                  let maybe_tests = results.find(result => result.title.includes('tests'));
+                  return ls("not trashed and '"+ id + "' in parents and title contains 'arr'").then(function(results) {
+                    let maybe_code_template = results.find(result => result.title.includes('code'));
+                    let maybe_tests_template = results.find(result => result.title.includes('tests'));
 
-                  let code =
-                    (maybe_code != null
-                      ? drive.files.get({"fileId": maybe_code.id})
-                      : (maybe_code_template != null
-                          ? copy_template_to_drive(bc, maybe_code_template)
-                          : Q(null))).then(fileBuilder);
+                    let code =
+                      (maybe_code != null
+                        ? drive.files.get({"fileId": maybe_code.id})
+                        : (maybe_code_template != null
+                            ? copy_template_to_drive(bc, maybe_code_template)
+                            : Q(null))).then(fileBuilder);
 
-                  let tests =
-                    (maybe_tests != null
-                      ? drive.files.get({"fileId": maybe_tests.id})
-                      : (maybe_tests_template != null
-                          ? copy_template_to_drive(bc, maybe_tests_template)
-                          : Q(null))).then(fileBuilder);
+                    let tests =
+                      (maybe_tests != null
+                        ? drive.files.get({"fileId": maybe_tests.id})
+                        : (maybe_tests_template != null
+                            ? copy_template_to_drive(bc, maybe_tests_template)
+                            : Q(null))).then(fileBuilder);
 
-                  return Q.all([code, tests]).then(function([code, tests]) {
-                    return {assignment_id: id, code: code, tests: tests};
+                    return Q.all([code, tests]).then(function([code, tests]) {
+                      return {assignment_name: template.title, assignment_id: id, code: code, tests: tests};
+                    });
                   });
                 });
               });
