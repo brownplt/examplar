@@ -53,6 +53,7 @@
         return palette.get(n);
       };};
 
+    var last_document;
 
     var Position = function() {
 
@@ -109,8 +110,7 @@
       };
 
       Position.prototype.hint = function hint() {
-        if (this.from === undefined
-            || !(this.doc.getEditor() instanceof CodeMirror)) {
+        if (!CPO.documents.has(this.source)) {
           console.info("This position could not be hinted because it is not in this editor:", this);
         } else {
           hintLoc(this);
@@ -118,13 +118,21 @@
       };
 
       Position.prototype.goto = function goto() {
-        if (this.from === undefined
-            || !(this.doc.getEditor() instanceof CodeMirror)) {
+        if (!CPO.documents.has(this.source)) {
           flashMessage("This code is not open in this tab.");
         } else {
+          var swap = !this.source.startsWith("interactions")
+            && (this.doc != CPO.editor.cm.getDoc() || this.doc != last_document);
+          if (swap) {
+            CPO.editor.cm.swapDoc(this.doc);
+          }
           this.doc.getEditor().getWrapperElement().scrollIntoView(true);
           this.doc.getEditor().scrollIntoView(this.from.line, 50);
+          last_document = null;
           unhintLoc();
+          if (swap) {
+            flashMessage(`Switched to ${this.source}`);
+          }
         }
       };
 
@@ -272,6 +280,12 @@
     function hintLoc(position) {
       $(".warning-upper.hinting, .warning-lower.hinting").removeClass("hinting");
 
+      if (position.doc != CPO.editor.cm.getDoc()) {
+        last_document = CPO.editor.cm.swapDoc(position.doc);
+        $(".replMain").addClass("hinting");
+        flashMessage(`Previewing ${position.source}`);
+      }
+
       var editor = position.doc.getEditor();
 
       if (!(editor instanceof CodeMirror))
@@ -284,7 +298,7 @@
       var viewportMin;
       var viewportMax;
 
-      if (position.source === "definitions://") {
+      if (position.source !== "interactions://") {
         var scrollInfo = editor.getScrollInfo();
         viewportMin = scrollInfo.top;
         viewportMax = scrollInfo.clientHeight + viewportMin;
@@ -315,7 +329,13 @@
     }
 
     function unhintLoc() {
+      if (last_document != null) {
+        CPO.editor.cm.swapDoc(last_document);
+        last_document = null;
+      }
       $(".warning-upper.hinting, .warning-lower.hinting").removeClass("hinting");
+      $(".replMain").removeClass("hinting");
+      clearFlash();
     }
 
     function basename(str) {

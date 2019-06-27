@@ -1150,6 +1150,10 @@ code div {
   transition: opacity 0.5s linear;
 }
 
+.replMain.hinting {
+  opacity: 0.5;
+}
+
 .warning-upper.hinting,
 .warning-lower.hinting {
   transition: opacity 0.1s linear;
