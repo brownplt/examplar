@@ -1209,8 +1209,17 @@
               status_widget.wheat_graph.value = {numerator: passed, denominator: wheats};
 
               if (all_passed) {
-                return window.chaff.then(run_injections).then(renderChaffResults,
-                        displayResult(output, runtime, repl.runtime, true, updateItems));
+                return window.chaff.then(run_injections)
+                  .then(renderChaffResults, displayResult(output, runtime, repl.runtime, true, updateItems))
+                  .then(function(something) {
+                    delete window.injection;
+                    return repl.restartInteractions(src, options);
+                  })
+                  .then(function(run_result) {
+                    return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                  }, function(error_result) {
+                    return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                  });
               } else {
                 afterRun(false);
                 renderWheatFailure(check_results);

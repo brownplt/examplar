@@ -86,7 +86,7 @@ define("cpo/gdrive-locators", [], function() {
 
           function getModule(self) {
             return runtime.pauseStack(function(getModRestart) {
-              contentsP.fail(function(failure) {
+              contentsP.catch(function(failure) {
                 getModRestart.error(runtime.ffi.makeMessageException(contentRequestFailure(failure)));
               });
               contentsP.then(function(pyretString) {
