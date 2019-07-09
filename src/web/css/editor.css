@@ -2177,3 +2177,74 @@ ul.chaff_list {
 .import-line-background {
   background: #ddd;
 }
+
+/* File Tabs */
+
+li#files-tabs-container {
+  display: block;
+  flex: 1;
+}
+
+ul#files-tabs {
+  display: flex;
+  top: unset;
+  height: 100%;
+  width: 100%;
+  flex-direction: row;
+  align-items: center;
+  align-content: center;
+
+}
+
+
+li.tab {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  align-content:center;
+  position: relative;
+  height: 100%;
+  flex: 1;
+  max-width: 10em;;
+}
+
+li.tab:not(.selected):hover {
+  border-top:5px hsla(0, 0%, 40%, 1) solid;
+  background: hsl(0, 0%, 55%);
+}
+
+li.tab:not(.selected)::after {
+  display: inline-block;
+  height: 50%;
+  content: '';
+  border-right: 1px black solid;
+}
+
+li.tab:not(.selected):hover::after {
+  height: 100%;
+}
+
+li.tab.selected {
+   border-top: 5px #317bcf solid;
+   border-left: 1px black solid;
+   border-right: 1px black solid;
+   background: white;
+}
+
+.tab > a {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 100%;
+  width: 100%;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  padding: 0 3px;
+  display: flex;
+  text-decoration: none;
+}
+
+.tab > a:before {
+  content: '🗎';
+}

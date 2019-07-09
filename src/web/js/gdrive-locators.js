@@ -90,7 +90,6 @@ define("cpo/gdrive-locators", [], function() {
                 getModRestart.error(runtime.ffi.makeMessageException(contentRequestFailure(failure)));
               });
               contentsP.then(function(pyretString) {
-                CPO.documents.set(uri, new CodeMirror.Doc(pyretString, "pyret"));
                 var ret = gmf(compileLib, "pyret-string").app(pyretString);
                 getModRestart.resume(ret);
               });

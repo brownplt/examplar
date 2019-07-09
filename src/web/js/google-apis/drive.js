@@ -98,9 +98,11 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             });
         },
         getDoc: function() {
+          let uri = "my-gdrive://" + this.getName();
           if (cm_doc == null) {
             return this.getContents().then(function(contents){
               cm_doc = CodeMirror.Doc(contents, "pyret");
+              CPO.documents.set(uri, cm_doc);
 
               // Freeze the document contents up to the following border
               var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";

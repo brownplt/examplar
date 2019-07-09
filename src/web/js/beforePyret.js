@@ -104,6 +104,49 @@ var Documents = function() {
   return Documents;
 }();
 
+
+var Tab = function() {
+
+  let tab_bar = document.getElementById("files-tabs");
+
+  function Tab(file) {
+    this.file = file;
+    this.doc = file.getDoc();
+
+    let uri = "my-gdrive://" + this.getName();
+    CPO.tabs.set(uri, this.doc);
+
+    let tab = document.createElement("li");
+    this.tab = tab;
+
+    tab.classList.add("tab");
+    let anchor = document.createElement("a");
+    anchor.innerText = file.getName();
+    anchor.href = "#";
+    tab.appendChild(anchor);
+
+    let activate = this.activate.bind(this)
+    tab.addEventListener("click", function(e) {
+      e.preventDefault();
+      activate();
+    });
+
+    tab_bar.appendChild(tab);
+  }
+
+  Tab.prototype.activate = function () {
+    let context = this;
+    context.doc.then(function(doc) {
+      document.querySelectorAll(".selected").forEach(tab => tab.classList.remove("selected"));
+      CPO.editor.cm.swapDoc(doc);
+      context.tab.classList.add("selected");
+    });
+  };
+
+  return Tab;
+}();
+
+
 var VERSION_CHECK_INTERVAL = 120000 + (30000 * Math.random());
 
 function checkVersion() {
@@ -119,7 +162,8 @@ window.setInterval(checkVersion, VERSION_CHECK_INTERVAL);
 window.CPO = {
   save: function() {},
   autoSave: function() {},
-  documents : new Documents()
+  documents : new Documents(),
+  tabs : new Map(),
 };
 $(function() {
   function merge(obj, extension) {
@@ -354,17 +398,8 @@ $(function() {
     programToSave = p;
     return p.then(function(prog) {
       if(prog !== null) {
-        window.swap = function() {
-          Q.all([prog.tests, prog.code]).then(function([tests, code]) {
-            Q.all([tests.getDoc(), code.getDoc()]).then(function([tests, code]){
-              if (CPO.editor.cm.getDoc() == tests) {
-                CPO.editor.cm.swapDoc(code);
-              } else {
-                CPO.editor.cm.swapDoc(tests);
-              }
-            });
-          });
-        };
+        new Tab(prog.tests).activate();
+        new Tab(prog.code);
         updateName(prog);
         if(prog.shared) {
           window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
