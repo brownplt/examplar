@@ -1148,10 +1148,11 @@
         interactionsCount = 0;
         replOutputCount = 0;
         logger.log('run', { name      : "definitions://",
-                            type_check: !!uiOptions["type-check"]
+                            type_check: !!document.getElementById("option-tc").checked,
                           });
         var options = {
-          typeCheck: !!uiOptions["type-check"],
+          typeCheck: !!document.getElementById("option-tc").checked,
+          checkMode: !document.getElementById("option-check-mode").checked,
           checkAll: false // NOTE(joe): this is a good spot to fetch something from the ui options
                           // if this becomes a check box somewhere in CPO
         };
@@ -1193,41 +1194,52 @@
         status_widget.wheat_graph.value = {numerator: "none", denominator: "none"};
         status_widget.chaff_graph.value = {numerator: "none", denominator: "none"};
 
-        window.wheat.then(run_injections)
-          .then(function(r) { maybeShowOutputPending(); return r; })
-          .then(
-            function (check_results) {
-              let wheats = check_results.length;
-              let passed =
-                check_results.filter(
-                  wheat => wheat.every(
-                    block => !block.error
-                      && block.tests.every(test => test.passed))).length;
+        if (!document.getElementById("option-check-mode").checked) {
+          window.wheat.then(run_injections)
+            .then(function(r) { maybeShowOutputPending(); return r; })
+            .then(
+              function (check_results) {
+                let wheats = check_results.length;
+                let passed =
+                  check_results.filter(
+                    wheat => wheat.every(
+                      block => !block.error
+                        && block.tests.every(test => test.passed))).length;
 
-              let all_passed = wheats == passed;
+                let all_passed = wheats == passed;
 
-              status_widget.wheat_graph.value = {numerator: passed, denominator: wheats};
+                status_widget.wheat_graph.value = {numerator: passed, denominator: wheats};
 
-              if (all_passed) {
-                return window.chaff.then(run_injections)
-                  .then(renderChaffResults, displayResult(output, runtime, repl.runtime, true, updateItems))
-                  .then(function(something) {
-                    delete window.injection;
-                    return repl.restartInteractions(src, options);
-                  })
-                  .then(function(run_result) {
-                    return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
-                  }, function(error_result) {
-                    return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
-                  });
-              } else {
-                afterRun(false);
-                renderWheatFailure(check_results);
-              }
-            }, function(run_result) {
-              return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
-            })
-          .fin(afterRun(false));
+                if (all_passed) {
+                  return window.chaff.then(run_injections)
+                    .then(renderChaffResults, displayResult(output, runtime, repl.runtime, true, updateItems))
+                    .then(function(something) {
+                      delete window.injection;
+                      return repl.restartInteractions(src, options);
+                    })
+                    .then(function(run_result) {
+                      return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                    }, function(error_result) {
+                      return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                    });
+                } else {
+                  afterRun(false);
+                  renderWheatFailure(check_results);
+                }
+              }, function(run_result) {
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+              })
+            .fin(afterRun(false));
+        } else {
+            maybeShowOutputPending();
+            repl.restartInteractions(src, options)
+              .then(function(run_result) {
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+              }, function(error_result) {
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+              })
+              .fin(afterRun(false));
+        }
       };
 
       var runner = function(code) {

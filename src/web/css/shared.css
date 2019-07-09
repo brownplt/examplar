@@ -271,7 +271,7 @@ nav > div > ul > li > ul:not([id="run-dropdown-content"]) {
 }
 
 nav > div > ul > li > ul[id="run-dropdown-content"] {
-  left: -150px;
+  right: 0px;
 }
 
 nav > div > ul > li:focus ul {

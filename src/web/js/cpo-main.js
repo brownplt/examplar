@@ -254,6 +254,7 @@
           restartInteractions: function(source, options) {
             var pyOptions = defaultOptions.extendWith({
               "type-check": options.typeCheck,
+              "check-mode": options.checkMode,
               "check-all": options.checkAll,
               "on-compile": onCompile
             });
@@ -343,29 +344,36 @@
       var editor = CPO.editor;
       var currentAction = "run";
 
-      $("#select-run").click(function() {
-        runButton.text("Run");
-        currentAction = "run";
-        doRunAction(editor.cm.getValue());
-        $('#runDropdown').attr('aria-expanded', 'false');
-        $("#run-dropdown-content").attr('aria-hidden', 'true').hide();
-      });
+      document.getElementById("option-tc").addEventListener("change", update_run_button);
+      document.getElementById("option-check-mode").addEventListener("change", update_run_button);
 
-      $("#select-tc-run").click(function() {
-        runButton.text("Type-check and Run");
-        currentAction = "tc-and-run";
-        doRunAction(editor.cm.getValue());
-        $('#runDropdown').attr('aria-expanded', 'false');
-        $("#run-dropdown-content").attr('aria-hidden', 'true').hide();
-      });
-      /*
-      $("#select-scsh").click(function() {
-        highlightMode = "scsh"; $("#run-dropdown-content").hide();});
-      $("#select-scmh").click(function() {
-        highlightMode = "scmh"; $("#run-dropdown-content").hide();});
-      $("#select-mcmh").click(function() {
-        highlightMode = "mcmh"; $("#run-dropdown-content").hide();});
-      */
+      function update_run_button() {
+          var skipTests = document.getElementById("option-check-mode").checked;
+          var typeCheck = document.getElementById("option-tc").checked;
+
+          var runText = "";
+
+          if (skipTests) {
+              runText += "Skip Tests"
+          }
+
+          if (skipTests && typeCheck) {
+              runText += ", ";
+          }
+
+          if (typeCheck) {
+              runText += "Type Check"
+          }
+
+          if (skipTests || typeCheck) {
+              runText += " & ";
+          }
+
+          runText += "Run";
+
+          document.getElementById("runButton").innerText = runText;
+      }
+
       function doRunAction(src) {
         editor.cm.operation(function() {
           editor.cm.clearGutter("test-marker-gutter");

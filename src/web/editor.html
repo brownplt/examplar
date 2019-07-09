@@ -234,23 +234,13 @@
           </div>
           <ul id="run-dropdown-content" class="submenu" role="menu" aria-hidden="true"
             aria-label="Run Options">
-            <li id="select-run-old" >
-              <div id="select-run" >
-                <a class="focusable"
-                  role="menuitem"
-                  aria-label="Run" aria-setsize="2" aria-posinset="1"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Run</a>
-              </div>
+            <li>
+              <input id="option-tc" type="checkbox" name="option-tc-mode" />
+              <label for="option-tc">Type Check</label>
             </li>
-            <li id="select-tc-run-old">
-              <div id="select-tc-run" >
-                <a class="focusable"
-                  role="menuitem"
-                  aria-label="Type-check and run" aria-setsize="2" aria-posinset="2"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Type-check and run<sup>(beta)</sup></a>
-              </div>
+            <li>
+              <input id="option-check-mode" type="checkbox" name="option-check-mode" />
+              <label for="option-check-mode">Skip Tests</label>
             </li>
           </ul>
         </li>
