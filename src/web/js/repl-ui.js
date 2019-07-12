@@ -1143,8 +1143,6 @@
             CPO.documents.delete(name);
         });
 
-        CPO.documents.set("definitions://", uiOptions.cm.getDoc());
-
         interactionsCount = 0;
         replOutputCount = 0;
         logger.log('run', { name      : "definitions://",
@@ -1152,7 +1150,7 @@
                           });
         var options = {
           typeCheck: !!document.getElementById("option-tc").checked,
-          checkMode: !document.getElementById("option-check-mode").checked,
+          checkMode: !!!document.getElementById("option-check-mode").checked,
           checkAll: false // NOTE(joe): this is a good spot to fetch something from the ui options
                           // if this becomes a check box somewhere in CPO
         };
@@ -1161,7 +1159,7 @@
           .done(function([email, id, gdrive_id]) {
             return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
               method: 'PUT',
-              body: JSON.stringify({email: email, assignment: id, gdrive: gdrive_id, submission: CPO.documents.get("definitions://").getValue()}),
+              body: JSON.stringify({email: email, assignment: id, gdrive: gdrive_id, submission: CPO.sourceAPI.get_loaded("definitions://").contents}),
               headers:{
                 'Content-Type': 'application/json'
               }
@@ -1214,7 +1212,10 @@
                   return window.chaff.then(run_injections)
                     .then(renderChaffResults, displayResult(output, runtime, repl.runtime, true, updateItems))
                     .then(function(something) {
+                      // if no inection is specified, the my-gdrive import is resolved normally
                       delete window.injection;
+                      // run students' impl tests
+                      options.checkAll = true;
                       return repl.restartInteractions(src, options);
                     })
                     .then(function(run_result) {
@@ -1264,7 +1265,7 @@
         setWhileRunning();
         interactionsCount++;
         var thisName = 'interactions://' + interactionsCount;
-        CPO.documents.set(thisName, echoCM.getDoc());
+        let source = sourceAPI.from_doc(thisName, echoCM.getDoc());
         logger.log('run', { name: thisName });
         var replResult = repl.run(code, thisName);
 //        replResult.then(afterRun(CM));
@@ -1316,8 +1317,6 @@
       }).cm;
 
       CM.on('beforeChange', function(instance, changeObj){textHandlers.autoCorrect(instance, changeObj, CM);});
-
-      CPO.documents.set('definitions://', CM.getDoc());
 
       var lastNameRun = 'interactions';
       var lastEditorRun = null;

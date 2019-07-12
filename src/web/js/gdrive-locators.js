@@ -65,6 +65,7 @@ define("cpo/gdrive-locators", [], function() {
         // We start by setting up the fetch of the file; lots of methods will
         // close over this.
         var filesP = storageAPI.then(function(storage) {
+          // e.g., "median-code.arr"
           return storage.getFileByName(filename);
         });
         filesP.fail(function(failure) {
@@ -79,10 +80,11 @@ define("cpo/gdrive-locators", [], function() {
         fileP.then(function(file) {
 
           var uri = "my-gdrive://" + filename;
+          let source = sourceAPI.from_file(file);
 
           function needsCompile() { return true; }
 
-          var contentsP = file.getContents();
+          var contentsP = source.then(source => source.contents);
 
           function getModule(self) {
             return runtime.pauseStack(function(getModRestart) {
@@ -193,6 +195,7 @@ define("cpo/gdrive-locators", [], function() {
         // We start by setting up the fetch of the file; lots of methods will
         // close over this.
         var filesP = storageAPI.then(function(storage) {
+          // e.g., 1igUAKOmk6MBBsNqmePy2e1DWnJiRNt6F
           return storage.getSharedFileById(id);
         });
         filesP.fail(function(failure) {
@@ -215,7 +218,6 @@ define("cpo/gdrive-locators", [], function() {
           var contents = fileAndContents[1];
           
           var uri = "shared-gdrive://" + file.getName() + ":" + file.getUniqueId();
-          CPO.documents.set(uri, new CodeMirror.Doc(contents, "pyret"));
 
           function needsCompile() { return true; }
 

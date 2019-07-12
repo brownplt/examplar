@@ -253,9 +253,9 @@
           */
           restartInteractions: function(source, options) {
             var pyOptions = defaultOptions.extendWith({
-              "type-check": options.typeCheck,
-              "check-mode": options.checkMode,
-              "check-all": options.checkAll,
+              "type-check": !!options.typeCheck,
+              "check-mode": !!options.checkMode,
+              "check-all": !!options.checkAll,
               "on-compile": onCompile
             });
             var ret = Q.defer();
@@ -375,23 +375,8 @@
       }
 
       function doRunAction(src) {
-        editor.cm.operation(function() {
-          editor.cm.clearGutter("test-marker-gutter");
-          var marks = editor.cm.getAllMarks();
-          document.getElementById("main").dataset.highlights = "";
-          editor.cm.eachLine(function(lh){
-            editor.cm.removeLineClass(lh, "background");});
-          for(var i = 0; i < marks.length; i++) {
-            if (marks[i].className === "import-marker") {
-              continue;
-            }
-            marks[i].clear();
-          }
-        });
-        var sheet = document.getElementById("highlight-styles").sheet;
-        for(var i=0; i< sheet.cssRules.length; i++) {
-          sheet.deleteRule(i);
-        }
+        CPO.clearEditorDecorations();
+
         switch (currentAction) {
           case "run":
             replWidget.runCode(src, {check: true, cm: editor.cm});
@@ -402,7 +387,7 @@
         }
       }
 
-      runButton.on("click", function() { doRunAction(editor.cm.getValue()); });
+      runButton.on("click", function() { doRunAction(sourceAPI.get_loaded("definitions://").contents); });
 
       $(window).on("keyup", function(e) {
         if(e.keyCode === 27) { // "ESC"
@@ -540,7 +525,7 @@
 
       // run the definitions area
       Mousetrap.bindGlobal('ctrl+enter', function(e){
-        doRunAction(editor.cm.getValue());
+        doRunAction(sourceAPI.get_loaded("definitions://").contents);
         CPO.autoSave();
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -601,7 +586,7 @@
       });
 
       Mousetrap.bindGlobal('f7', function(e) {
-        doRunAction(editor.cm.getValue());
+        doRunAction(sourceAPI.get_loaded("definitions://").contents);
         CPO.autoSave();
         e.stopImmediatePropagation();
         e.preventDefault();

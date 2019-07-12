@@ -121,7 +121,7 @@
         anchor.textContent = text;
         var source = get(loc, "source");
         var handle = undefined;
-        if (documents.has(source)) {
+        if (CPO.sourceAPI.is_loaded(source)) {
           handle = outputUI.Position.fromPyretSrcloc(runtime, srcloc, loc, documents);
           anchor.addEventListener("click", function(e) {
             handle.goto();
@@ -142,15 +142,18 @@
       }
 
       function makeGutterMarker(spanHandle, clickFunc) {
-        var editor = spanHandle.doc.getEditor();
+        let doc = spanHandle.doc;
+        let editor = doc.getEditor() || CPO.editor.cm;
         
         var lineHandle = 
-          editor.addLineClass(
+          doc.addLineClass(
             spanHandle.from.line,
             "gutter",
             "failed-test-marker");
             
         function onClick(cm, line, gutter) {
+          if (cm.getDoc() != doc)
+            return;
           if (cm.getLineNumber(lineHandle) !== line)
             return;
           clickFunc();
@@ -168,8 +171,8 @@
           else if (spanLineNo.line != lineNo) {
             line.off("change", onChange);
             line.off("delete", onDelete);
-            editor.removeLineClass(lineNo, "gutter", "failed-test-marker");
-            lineHandle = editor.addLineClass(spanLineNo.line, "gutter", "failed-test-marker");
+            doc.removeLineClass(lineNo, "gutter", "failed-test-marker");
+            lineHandle = doc.addLineClass(spanLineNo.line, "gutter", "failed-test-marker");
             lineHandle.on("change", onChange);
             lineHandle.on("delete", onDelete);
           }
@@ -180,7 +183,7 @@
           if (spanLineNo === undefined)
             lineHandle = undefined;
           if (lineHandle !== undefined) {
-            lineHandle = editor.addLineClass(spanLineNo.line, "gutter", "failed-test-marker");
+            lineHandle = doc.addLineClass(spanLineNo.line, "gutter", "failed-test-marker");
             lineHandle.on("change", onChange);
             lineHandle.on("delete", onDelete);
           }
@@ -191,7 +194,7 @@
 
         spanHandle.on("clear", function (from, _) {
           editor.off("gutterClick", onClick);
-          editor.removeLineClass(from.line, "gutter", "failed-test-marker");
+          doc.removeLineClass(from.line, "gutter", "failed-test-marker");
         });
 
         spanHandle.on("hide",
@@ -201,13 +204,13 @@
             editor.off("gutterClick", onClick);
             lineHandle.off("change", onChange);
             lineHandle.off("delete", onDelete);
-            editor.removeLineClass(lineHandle.lineNo(), "gutter", "failed-test-marker");
+            doc.removeLineClass(lineHandle.lineNo(), "gutter", "failed-test-marker");
             lineHandle = undefined;
           });
 
         spanHandle.on("unhide",
           function(){
-            lineHandle = editor.addLineClass(spanHandle.from.line, "gutter", "failed-test-marker");
+            lineHandle = doc.addLineClass(spanHandle.from.line, "gutter", "failed-test-marker");
             editor.on("gutterClick", onClick);
             lineHandle.on("change", onChange);
             lineHandle.on("delete", onDelete);
@@ -243,14 +246,11 @@
           container.appendChild(tombstone);
           var thisTest = this;
           var source = get(get(test, "loc"), "source");
-          if (documents.has(source)) {
-            var doc = documents.get(source);
-            var editor   = doc.getEditor();
-            if (editor !== undefined) {
-              makeGutterMarker(handle, function () {
-                thisTest.block.showTest(thisTest);
-              });
-            }
+          if (CPO.sourceAPI.is_loaded(source)) {
+            let doc = CPO.sourceAPI.get_loaded(source).document;
+            makeGutterMarker(handle, function () {
+              thisTest.block.showTest(thisTest);
+            });
           }
           
           if(runtime.hasField(test, "actual-exn")) {

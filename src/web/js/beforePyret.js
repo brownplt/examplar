@@ -109,19 +109,18 @@ var Tab = function() {
 
   let tab_bar = document.getElementById("files-tabs");
 
-  function Tab(file) {
-    this.file = file;
-    this.doc = file.getDoc();
+  function Tab(source) {
+    this.source = source;
 
-    let uri = "my-gdrive://" + this.getName();
-    CPO.tabs.set(uri, this.doc);
+    let uri = "my-gdrive://" + source.name;
+    CPO.tabs.set(source, this);
 
     let tab = document.createElement("li");
     this.tab = tab;
 
     tab.classList.add("tab");
     let anchor = document.createElement("a");
-    anchor.innerText = file.getName();
+    anchor.innerText = source.name;
     anchor.href = "#";
     tab.appendChild(anchor);
 
@@ -135,16 +134,42 @@ var Tab = function() {
   }
 
   Tab.prototype.activate = function () {
-    let context = this;
-    context.doc.then(function(doc) {
-      document.querySelectorAll(".selected").forEach(tab => tab.classList.remove("selected"));
-      CPO.editor.cm.swapDoc(doc);
-      context.tab.classList.add("selected");
-    });
+    document.querySelectorAll(".selected").forEach(tab => tab.classList.remove("selected"));
+    CPO.editor.cm.swapDoc(this.source.document);
+    this.tab.classList.add("selected");
   };
 
   return Tab;
 }();
+
+CodeMirror.defineDocExtension("clearDecorations", function() {
+  let doc = this;
+  let editor = doc.getEditor();
+
+  try {
+    if (editor != null) {
+      editor.startOperation();
+    }
+
+    doc.clearGutter("test-marker-gutter");
+
+    doc.eachLine(function(lh){
+      doc.removeLineClass(lh, "background");});
+
+    let marks = doc.getAllMarks();
+
+    for(var i = 0; i < marks.length; i++) {
+      if (marks[i].className === "import-marker") {
+        continue;
+      }
+      marks[i].clear();
+    }
+  } finally {
+    if (editor != null) {
+      editor.endOperation();
+    }
+  }
+});
 
 
 var VERSION_CHECK_INTERVAL = 120000 + (30000 * Math.random());
@@ -163,8 +188,18 @@ window.CPO = {
   save: function() {},
   autoSave: function() {},
   documents : new Documents(),
-  tabs : new Map(),
+  tabs: new Map(),
 };
+
+CPO.clearEditorDecorations = function() {
+  document.getElementById("main").dataset.highlights = "";
+  sourceAPI.loaded.forEach(source => source.document.clearDecorations());
+  let sheet = document.getElementById("highlight-styles").sheet;
+  for(var i=0; i< sheet.cssRules.length; i++) {
+    sheet.deleteRule(i);
+  }
+};
+
 $(function() {
   function merge(obj, extension) {
     var newobj = {};
@@ -225,8 +260,8 @@ $(function() {
 
     var cmOptions = {
       extraKeys: CodeMirror.normalizeKeyMap({
-        "Shift-Enter": function(cm) { runFun(cm.getValue()); },
-        "Shift-Ctrl-Enter": function(cm) { runFun(cm.getValue()); },
+        "Shift-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://").contents); },
+        "Shift-Ctrl-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://")); },
         "Tab": "indentAuto",
         "Ctrl-I": reindentAllLines,
         "Esc Left": "goBackwardSexp",
@@ -266,7 +301,7 @@ $(function() {
       cm: CM,
       refresh: function() { CM.refresh(); },
       run: function() {
-        runFun(CM.getValue());
+        runFun(sourceAPI.get_loaded("definitions://"));
       },
       focus: function() { CM.focus(); },
       focusCarousel: null //initFocusCarousel
@@ -304,6 +339,8 @@ $(function() {
 
   storageAPI = storageAPI.then(function(api) { return api.api; });
 
+  window.sourceAPI = window.createSourceManager(storageAPI);
+  CPO.sourceAPI = window.sourceAPI;
   /*
     initialPrograms holds a promise for a Drive File object or null
 
@@ -398,13 +435,19 @@ $(function() {
     programToSave = p;
     return p.then(function(prog) {
       if(prog !== null) {
-        new Tab(prog.tests).activate();
-        new Tab(prog.code);
+        let code = sourceAPI.from_file(prog.code);
+        let tests = sourceAPI.from_file(prog.tests);
+        tests.then(tests => sourceAPI.set_definitions(tests));
+        Q.all([tests, code]).then(function ([tests, code]) {
+          new Tab(tests).activate();
+          new Tab(code);
+        });
         updateName(prog);
-        if(prog.shared) {
-          window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
-        }
-        return prog.tests.getDoc();
+        return tests.then(tests => tests.document);
+        //if(prog.shared) {
+        //  window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
+        //}
+        //return prog.tests.getDoc();
       }
     });
   }
@@ -630,7 +673,7 @@ $(function() {
           .then(function(api) { return api.createFile(useName); })
           .then(function(p) {
             // showShareContainer(p); TODO(joe): figure out where to put this
-            history.pushState(null, null, "#program=" + p.getUniqueId());
+            //history.pushState(null, null, "#program=" + p.getUniqueId());
             updateName(p); // sets filename
             enableFileOptions();
             return p;
@@ -1167,7 +1210,6 @@ $(function() {
   });
 
   programLoaded.then(function(doc) {
-    CPO.documents.set("definitions://", doc);
     CPO.editor.cm.setOption('readOnly', false);
     CPO.editor.cm.swapDoc(doc);
   });

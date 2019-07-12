@@ -53,8 +53,6 @@
         return palette.get(n);
       };};
 
-    var last_document;
-
     var Position = function() {
 
       function cached_find(doc, positionCache, textMarker) {
@@ -110,7 +108,7 @@
       };
 
       Position.prototype.hint = function hint() {
-        if (!CPO.documents.has(this.source)) {
+        if (!CPO.sourceAPI.is_loaded(this.source)) {
           console.info("This position could not be hinted because it is not in this editor:", this);
         } else {
           hintLoc(this);
@@ -118,21 +116,16 @@
       };
 
       Position.prototype.goto = function goto() {
-        if (!CPO.documents.has(this.source)) {
+        if (!CPO.sourceAPI.is_loaded(this.source)) {
           flashMessage("This code is not open in this tab.");
         } else {
-          var swap = !this.source.startsWith("interactions")
-            && (this.doc != CPO.editor.cm.getDoc() || this.doc != last_document);
-          if (swap) {
-            CPO.editor.cm.swapDoc(this.doc);
+          let source = CPO.sourceAPI.get_loaded(this.source);
+          if (CPO.tabs.has(source)) {
+            CPO.tabs.get(source).activate();
           }
           this.doc.getEditor().getWrapperElement().scrollIntoView(true);
           this.doc.getEditor().scrollIntoView(this.from.line, 50);
-          last_document = null;
           unhintLoc();
-          if (swap) {
-            flashMessage(`Switched to ${this.source}`);
-          }
         }
       };
 
@@ -189,12 +182,12 @@
              throw new Error("Cannot get Position from builtin location", loc);
           },
           "srcloc": function(source, startL, startC, startCh, endL, endC, endCh) {
-            if (!documents.has(source))
+            if (!CPO.sourceAPI.is_loaded(source))
               throw new Error("No document for this location: ", loc);
             else {
               var extraCharForZeroWidthLocs = endCh === startCh ? 1 : 0;
               return new Position(
-                documents.get(source),
+                CPO.sourceAPI.get_loaded(source).document,
                 source,
                 new CodeMirror.Pos(startL - 1, startC),
                 new CodeMirror.Pos(  endL - 1, endC + extraCharForZeroWidthLocs),
@@ -205,18 +198,18 @@
       };
 
       Position.existsFromSrcArray = function(locarray, documents, options) {
-        return locarray.length === 7 && documents.has(locarray[0]);
+        return locarray.length === 7 && CPO.sourceAPI.is_loaded(locarray[0]);
       }
 
       Position.fromSrcArray = function (locarray, documents, options) {
         if (locarray.length === 7) {
           var extraCharForZeroWidthLocs = locarray[3] === locarray[6] ? 1 : 0;
           var source = locarray[0];
-          if (!documents.has(source)) {
+          if (!CPO.sourceAPI.is_loaded(source)) {
             throw new Error("No document for this location: ", locarray);
           }
           return new Position(
-            documents.get(source),
+            CPO.sourceAPI.get_loaded(source).document,
             source,
             new CodeMirror.Pos(locarray[1] - 1, locarray[2]),
             new CodeMirror.Pos(locarray[4] - 1, locarray[5] + extraCharForZeroWidthLocs),
@@ -281,9 +274,8 @@
       $(".warning-upper.hinting, .warning-lower.hinting").removeClass("hinting");
 
       if (position.doc != CPO.editor.cm.getDoc()) {
-        last_document = CPO.editor.cm.swapDoc(position.doc);
-        $(".replMain").addClass("hinting");
-        flashMessage(`Previewing ${position.source}`);
+        flashMessage(`Cannot preview ${position.source}`);
+        return;
       }
 
       var editor = position.doc.getEditor();
@@ -329,10 +321,6 @@
     }
 
     function unhintLoc() {
-      if (last_document != null) {
-        CPO.editor.cm.swapDoc(last_document);
-        last_document = null;
-      }
       $(".warning-upper.hinting, .warning-lower.hinting").removeClass("hinting");
       $(".replMain").removeClass("hinting");
       clearFlash();
@@ -416,7 +404,7 @@
       }
 
       var src = runtime.unwrap(get(s, "source"));
-      if(!(documents.has(src) && (documents.get(src).getEditor() !== undefined))) {
+      if(!(CPO.sourceAPI.is_loaded(src) && (CPO.sourceAPI.get_loaded(src).document.getEditor() !== undefined))) {
         if(isSharedImport(src)) {
           var sharedId = getSharedId(src);
           var srcUrl = shareAPI.makeShareUrl(sharedId);
@@ -473,7 +461,7 @@
             return runtime.pyretFalse;
           },
           "srcloc": function(filename, _, __, ___, ____, _____, ______) {
-            if (documents.has(filename)) {
+            if (CPO.sourceAPI.is_loaded(filename)) {
               return runtime.pyretTrue;
             } else {
               return runtime.pyretFalse;
@@ -490,8 +478,8 @@
             return runtime.ffi.makeNone();
           },
         "srcloc": function(filename, start_line, start_col, _, end_line, end_col, __) {
-            if(!documents.has(filename)) return runtime.ffi.makeNone();
-            let source = documents.get(filename).getValue()
+            if(!CPO.sourceAPI.is_loaded(filename)) return runtime.ffi.makeNone();
+            let source = CPO.sourceAPI.get_loaded(filename).document.getValue()
 
             // MUST NOT BE CALLED ON PYRET STACK.
             function parse(source, filename) {
@@ -662,7 +650,7 @@
         map(runtime.makeSrcloc).
         filter(isSrcloc).
         map(function (loc) {
-          if (!documents.has(loc.dict.source)) {
+          if (!CPO.sourceAPI.is_loaded(loc.dict.source)) {
             return $('<div>').append(drawSrcloc(documents, runtime, loc).css('display', 'block'));
           } else {
             var position = Position.fromPyretSrcloc(runtime, srcloc, loc, documents);
@@ -1098,7 +1086,7 @@
           "loc-display": function(loc, style, contents) {
             return runtime.safeCall(function () {
               if (runtime.hasField(loc, "source")
-                  && documents.has(runtime.getField(loc, "source"))) {
+                  && CPO.sourceAPI.is_loaded(runtime.getField(loc, "source"))) {
                 return help(runtime.getField(ED, "highlight").app(
                               contents,
                               runtime.ffi.makeList([loc]),

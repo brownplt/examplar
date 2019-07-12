@@ -45,6 +45,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         getName: function() {
           return googFileObject.title;
         },
+        getURI: function() {
+          return "shared-gdrive://" + googFileObject.title + ":" + googFileObject.id;
+        },
         getModifiedTime: function() {
           return googFileObject.modifiedDate;
         },
@@ -60,6 +63,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         shared: false,
         getName: function() {
           return googFileObject.title;
+        },
+        getURI: function() {
+          return "my-gdrive://" + googFileObject.title;
         },
         getModifiedTime: function() {
           return googFileObject.modifiedDate;
@@ -99,6 +105,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         },
         getDoc: function() {
           let uri = "my-gdrive://" + this.getName();
+          // TODO this is a race condition fml
           if (cm_doc == null) {
             return this.getContents().then(function(contents){
               cm_doc = CodeMirror.Doc(contents, "pyret");
