@@ -203,7 +203,7 @@
       }
 
       // this function must NOT be called on the pyret stack
-      return function(result) {
+      return function(result, examplarResults) {
         var doneDisplay = Q.defer();
         var didError = false;
         // Start a new pyret stack.
@@ -260,7 +260,8 @@
                     if(rr.isSuccessResult(runResult)) {
                       return rr.safeCall(function() {
                         return checkUI.drawCheckResults(output, CPO.documents, rr,
-                                                        runtime.getField(runResult.result, "checks"), v);
+                                                        runtime.getField(runResult.result, "checks"), v,
+                                                        examplarResults);
                       }, function(_) {
                         outputPending.remove();
                         outputPendingHidden = true;
@@ -1210,18 +1211,16 @@
 
                 if (all_passed) {
                   return window.chaff.then(run_injections)
-                    .then(renderChaffResults, displayResult(output, runtime, repl.runtime, true, updateItems))
-                    .then(function(something) {
+                    .then(function(chaff_results) {
                       // if no inection is specified, the my-gdrive import is resolved normally
                       delete window.injection;
                       // run students' impl tests
                       options.checkAll = true;
-                      return repl.restartInteractions(src, options);
-                    })
-                    .then(function(run_result) {
-                      return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
-                    }, function(error_result) {
-                      return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                      return repl.restartInteractions(src, options)
+                        .then(function(run_result) {
+                          return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result,
+                            {wheat: check_results, chaff: chaff_results});
+                        });
                     });
                 } else {
                   afterRun(false);

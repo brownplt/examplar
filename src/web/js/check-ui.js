@@ -26,6 +26,21 @@
     function isTestResult(val) { return runtime.unwrap(runtime.getField(CH, "TestResult").app(val)); }
     function isTestSuccess(val) { return runtime.unwrap(runtime.getField(CH, "is-success").app(val)); }
 
+    // https://stackoverflow.com/a/38327540/7501301
+    function groupBy(list, keyGetter) {
+        const map = new Map();
+        list.forEach((item) => {
+             const key = keyGetter(item);
+             const collection = map.get(key);
+             if (!collection) {
+                 map.set(key, [item]);
+             } else {
+                 collection.push(item);
+             }
+        });
+        return map;
+    }
+
     // NOTE: MUST BE CALLED WHILE RUNNING ON runtime's STACK
     function jsonCheckResults(container, documents, runtime, checkResults, result) {
       var ffi = runtime.ffi;
@@ -104,11 +119,123 @@
       }, "check-block-comments: each: contents");
     }
 
+    function drawExamplarResults(check_blocks, examplar_results) {
+
+      let container_elt = document.createElement("div");
+      container_elt.classList.add("file-examplar-summary");
+
+      let validity_elt = document.createElement("div");
+      validity_elt.classList.add("file-examplar-summary-validity");
+
+      let thoroughness_elt = document.createElement("div");
+      thoroughness_elt.classList.add("file-examplar-summary-thoroughness");
+
+      let message_elt = document.createElement("div");
+      message_elt.classList.add("file-examplar-summary-message");
+
+      container_elt.appendChild(validity_elt);
+      container_elt.appendChild(thoroughness_elt);
+      container_elt.appendChild(message_elt);
+
+      if (examplar_results == null) {
+        thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
+        validity_elt.textContent = "MAYBE VALID";
+        validity_elt.classList.add("maybe-valid");
+        message_elt.textContent = "The validity and thoroughness of test cases in this file are unknown.";
+        return container_elt;
+      }
+
+      let wheats = examplar_results.wheat;
+      let chaffs = examplar_results.chaff;
+
+      let num_wheats = wheats.length;
+      let num_passed =
+        wheats.filter(
+          wheat => wheat.every(
+            block => !block.error
+              && block.tests.every(test => test.passed))).length;
+
+      let all_passed = num_wheats == num_passed;
+
+      if (all_passed) {
+        validity_elt.textContent = "VALID";
+        validity_elt.classList.add("valid");
+
+        let num_chaffs = chaffs.length;
+
+        let num_caught =
+          chaffs.filter(
+            chaff => !chaff.every(
+              block => !block.error
+                && block.tests.every(test => test.passed))).length;
+
+        let chaff_catchers =
+          chaffs.map(chaff =>
+              chaff.map(block => block.tests.filter(test => !test.passed)
+                                            .map(test => test.loc))
+                .reduce((acc, val) => acc.concat(val), []));
+
+        let chaff_list = document.createElement('ul');
+        chaff_list.classList.add('chaff_list');
+
+        function render_chaff(catchers) {
+          let chaff = document.createElement('a');
+          chaff.setAttribute('href','#');
+          chaff.classList.add('chaff');
+          chaff.textContent = '🐛';
+
+          if (catchers.length > 0) {
+            chaff.classList.add('caught');
+          }
+
+          chaff.addEventListener('click',function(e) {
+            e.preventDefault();
+          });
+
+          chaff.addEventListener('mouseenter',function() {
+            catchers.forEach(function(loc) { loc.highlight('#91ccec'); });
+          });
+
+          chaff.addEventListener('mouseleave',function() {
+            catchers.forEach(function(loc) { loc.highlight(''); });
+          });
+
+          return chaff;
+        }
+
+
+        chaff_catchers.map(render_chaff)
+          .forEach(function(chaff_widget){
+            let li = document.createElement('li');
+            li.appendChild(chaff_widget);
+            chaff_list.appendChild(li);
+          });
+
+        message_elt.innerHTML = `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
+
+        thoroughness_elt.appendChild(chaff_list);
+
+      } else {
+        // this is unreachable right now :/
+        thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
+        validity_elt.textContent = "INVALID";
+        validity_elt.classList.add("invalid");
+        message_elt.textContent = "This file contains invalid tests.";
+      }
+
+      return container_elt;
+    }
+
     // NOTE: MUST BE CALLED WHILE RUNNING ON runtime's STACK
-    function drawCheckResults(container, documents, runtime, checkResults, result) {
+    function drawCheckResults(container, documents, runtime, checkResults, result, examplarResults) {
+      console.info("examplarResults", examplarResults);
       var ffi = runtime.ffi;
       var cases = ffi.cases;
       var get = runtime.getField;
+
+      let checkErroredSkeletons = new Array();
+      let testsFailedSkeletons  = new Array();
+      let testsPassedSkeletons  = new Array();
       
       var noFramesMaybeStackLoc = 
         runtime.makeFunction(function(n, userFramesOnly) {
@@ -233,7 +360,7 @@
       var lastHighlighted = undefined;
       
       var FailingTestSkeleton = function () {
-        function FailingTestSkeleton(test, testNumber) {
+        function FailingTestSkeleton(block, test, testNumber) {
           var container = document.createElement("div");
           var headerHandle = makeTestHeader(testNumber, get(test, "loc"), false);
           var header = headerHandle.header;
@@ -261,6 +388,7 @@
           } else {
             this.maybeStackLoc = noFramesMaybeStackLoc;
           }
+          this.block = block;
           this.renderable = test;
           this.container = container;
           this.tombstone = tombstone;
@@ -307,7 +435,7 @@
       }();
 
       var PassingTestSkeleton = function () {
-        function PassingTestSkeleton(test, testNumber) {
+        function PassingTestSkeleton(block, test, testNumber) {
           var loc = get(test, "loc");
           var container = document.createElement("div");
           var headerHandle = makeTestHeader(testNumber, loc, true);
@@ -319,6 +447,7 @@
           tombstone.classList.add("test-reason");
           container.appendChild(header);
           container.appendChild(tombstone);
+          this.block = block;
           this.handle = handle;
           this.container = container;
           this.tombstone = tombstone;
@@ -342,11 +471,160 @@
         return PassingTestSkeleton;
       }();
 
+      // the currently expanded check block
       var expandedCheckBlock = undefined;
 
+      var FileSkeleton = function () {
+        function FileSkeleton(name, blocks, examplar_results) {
+          let _this = this;
+          let skeletons = blocks.map(block => new CheckBlockSkeleton(_this, block));
+
+
+          let container = document.createElement("div");
+          container.classList.add("file-test-results");
+
+          let header = document.createElement("header");
+          header.textContent = CPO.sourceAPI.get_loaded(name).file.getName();
+          container.appendChild(header);
+
+          let examplar_summary = drawExamplarResults(blocks, examplar_results);
+          container.appendChild(examplar_summary);
+
+          let summary = document.createElement("span");
+          summary.classList.add("file-test-results-summary");
+
+          // the number of tests that ran
+          let checkTotalAll = skeletons.map(s => s.testsExecuted).reduce((a, b) => a + b, 0);
+          // the number of tests that passed
+          let checkPassedAll = skeletons.map(s => s.testsPassed).reduce((a, b) => a + b, 0);
+          // the number of tests that failed
+          let testsFailedAll = (checkTotalAll - checkPassedAll);
+
+          let checkBlocksErrored = skeletons.filter(s => s.encounteredError).length;
+
+          function TESTS(n){return n == 1 ? "TEST" : "TESTS";}
+
+          let summary_bits = $("<div>").addClass("summary-bits");
+
+          if (checkBlocksErrored > 0 ) {
+            summary_bits
+              .append($("<div>").addClass("summary-bit summary-errored")
+                .html("<span class='summary-count'>" + checkBlocksErrored + "</span> " + "blocks errored."));
+          } else if (testsFailedAll > 0) {
+            summary_bits
+              .append($("<div>").addClass("summary-bit summary-failed")
+                .html("<span class='summary-count'>" + testsFailedAll + "</span> " + TESTS(testsFailedAll) + " FAILED"));
+          } else {
+            summary_bits
+              .append($("<div>").addClass("summary-bit summary-passed")
+                .html("<span class='summary-count'>" + checkPassedAll + "</span> " + TESTS(checkPassedAll) + " PASSED"));
+          }
+
+          let view_button_elt = document.createElement("button");
+          view_button_elt.textContent = "Toggle Results";
+
+          view_button_elt.addEventListener("click", function() {
+            container.classList.toggle("expanded");
+          });
+
+          summary_bits.append(view_button_elt);
+          $(summary).append(summary_bits);
+
+          container.appendChild(summary);
+
+          let blockList = document.createElement("div");
+          blockList.classList.add("test-file-blocks");
+          skeletons.forEach(skeleton => blockList.appendChild(skeleton.container));
+          container.appendChild(blockList);
+          this.check_blocks_elt = blockList;
+
+          //header.addEventListener("click", function (e) {
+          //  if (this.container.classList.contains("expanded"))
+          //    this.hideTests();
+          //  else
+          //    this.showTests();
+          //}.bind(this));
+
+          //summary.addEventListener("click", function (e) {
+          //  if (this.container.classList.contains("expanded"))
+          //    this.hideTests();
+          //  else
+          //    this.showTests();
+          //}.bind(this));
+
+          this.container = container;
+        }
+
+        FileSkeleton.prototype.highlight = function highlight() {
+          
+        };
+
+        FileSkeleton.prototype.refreshSnippets = function refreshSnippets() {
+          
+        };
+
+        FileSkeleton.prototype.showTest = function showTest(test) {
+          console.log("FileSkeleton.showTest", test);
+        };
+
+        FileSkeleton.prototype.showTests = function showTests() {
+          console.log("FileSkeleton.showTests");
+          this.container.classList.add("expanded");
+        };
+
+        FileSkeleton.prototype.hideTests = function hideTests() {
+          console.log("FileSkeleton.hideTests");
+          this.container.classList.remove("expanded");
+        };
+        
+        FileSkeleton.prototype.vivify = function vivify(rendering) {
+          console.error("FileSkeleton.hideTests");
+        };
+
+        return FileSkeleton;
+      }();
+
       var CheckBlockSkeleton = function () {
-        function CheckBlockSkeleton(name, loc, keywordCheck, tests, error) {
+        function CheckBlockSkeleton(file, block) {
           var _this = this;
+
+          // destructure the `block` pyret value
+          let name          = get(block, "name");
+          let loc           = get(block, "loc");
+          let maybeError    = get(block, "maybe-err");
+          let testResults   = get(block, "test-results");
+          let keywordCheck  = get(block, "keyword-check");
+
+          let testsPassing  = 0;
+          let testsExecuted = 0;
+
+          let tests = ffi.toArray(testResults).
+            reverse().
+            map(function(test) {
+              let testSuccess = isTestSuccess(test);
+              testsExecuted++;
+              let skeleton;
+              if (testSuccess) {
+                testsPassing++;
+                skeleton = new PassingTestSkeleton(_this, test, testsExecuted);
+                testsPassedSkeletons.push(skeleton);
+              } else {
+                skeleton = new FailingTestSkeleton(_this, test, testsExecuted);
+                testsFailedSkeletons.push(skeleton);
+              }
+              return skeleton;
+            });
+
+          let endedInError    = get(option, "is-some").app(maybeError);
+          let allTestsPassing = testsPassing === testsExecuted;
+          let error = endedInError ? get(maybeError, "value").val : undefined;
+
+          let passing = testsPassing;
+          let executed = testsExecuted;
+          
+          if (endedInError) {
+            checkErroredSkeletons.push(this);
+          }
 
           var container = document.createElement("div");
           var testList = document.createElement("div");
@@ -354,29 +632,28 @@
           var header = document.createElement("header");
           var summary = document.createElement("span");
 
-          for (var i = 0; i < tests.skeletons.length; i++) {
-            var test = tests.skeletons[i];
-            test.block = this;
-            testFrag.appendChild(test.container);
-          }
+          this.file = file;
+          this.tests = tests;
+
+          tests.forEach(test => testFrag.appendChild(test.container));
 
           if (error !== undefined) {
             summary.textContent =
               "An unexpected error halted the " +
               (keywordCheck ? "check" : "examples") + "-block before Pyret was finished with it. "
               + "Some tests may not have run.";
-            var errorTestsSummary = document.createTextNode("Before the unexpected error, " + tests.executed + (tests.executed === 0 ? " tests " : " test ") + "in this block ran" + (tests.executed > 0 ? " (" + tests.passing + " passed):" : "."));
+            var errorTestsSummary = document.createTextNode("Before the unexpected error, " + testsExecuted + (testsExecuted === 0 ? " tests " : " test ") + "in this block ran" + (testsExecuted > 0 ? " (" + testsPassing + " passed):" : "."));
             testList.appendChild(errorTestsSummary);
           } else {
-            summary.textContent = tests.executed == 1 && tests.passing == 1 ? "The test in this block passed."
+            summary.textContent = testsExecuted == 1 && testsPassing == 1 ? "The test in this block passed."
             // Only one test in block; it fails
-            : tests.executed == 1 && tests.passing == 0 ? "The test in this block failed." : tests.executed == 0 ?
+            : testsExecuted == 1 && testsPassing == 0 ? "The test in this block failed." : testsExecuted == 0 ?
             //  Huh, a block with no tests?
-            "There were no tests in this block!" : tests.executed == tests.passing ?
+            "There were no tests in this block!" : testsExecuted == testsPassing ?
             //  More than one test; all pass.
-            "All " + tests.executed + " tests in this block passed."
+            "All " + testsExecuted + " tests in this block passed."
             //  More than one test; some pass
-            : tests.passing + " out of " + tests.executed + " tests passed in this block.";
+            : testsPassing + " out of " + testsExecuted + " tests passed in this block.";
           }
 
           testList.classList.add("check-block-tests");
@@ -384,10 +661,10 @@
 
           header.classList.add("check-block-header");
           header.title = "Click to view test results.";
-          header.appendChild(makeNameHandle(name, loc, error !== undefined ? "hsl(0, 100%, 85%)" : tests.executed == tests.passing ? "hsl(88, 50%, 76%)" : "hsl(45, 100%, 85%)").anchor);
+          header.appendChild(makeNameHandle(name, loc, error !== undefined ? "hsl(0, 100%, 85%)" : testsExecuted == testsPassing ? "hsl(88, 50%, 76%)" : "hsl(45, 100%, 85%)").anchor);
 
           container.classList.add("check-block");
-          container.classList.add(error !== undefined ? "check-block-errored" : tests.executed == tests.passing ? "check-block-success" : "check-block-failed");
+          container.classList.add(error !== undefined ? "check-block-errored" : testsExecuted == testsPassing ? "check-block-success" : "check-block-failed");
           container.appendChild(header);
           testList.appendChild(testFrag);
           container.appendChild(summary);
@@ -425,6 +702,9 @@
           this.needRefreshing = new Array();
           this.container = container;
           this.tombstone = tombstone;
+          this.testsPassed = passing;
+          this.testsExecuted =  executed;
+          this.encounteredError = endedInError;
         }
 
         CheckBlockSkeleton.prototype.highlight = function highlight() {
@@ -492,13 +772,13 @@
     
       var checkBlocks = ffi.toArray(checkResults);
 
+      let groupedCheckBlocks = groupBy(checkBlocks, function(block) {
+        return get(get(block, "loc"), "source");
+      });
+
       if (checkBlocks.length === 0)
         return;
         
-      var checkErroredSkeletons = new Array();
-      var testsFailedSkeletons  = new Array();
-      var testsPassedSkeletons  = new Array();
-
       var keywordCheck = false;
       var keywordExamples = false;
       for (var i = 0; i < checkBlocks.length; i++) {
@@ -522,49 +802,11 @@
       var checkResultsContainer = document.createElement("div");
       checkResultsContainer.classList.add("test-results");
       try{
-      for(var i = checkBlocks.length - 1; i >= 0; i--) {
-        var checkBlock = checkBlocks[i];
-        var maybeError  = get(checkBlock, "maybe-err");
-        
-        var testsPassing  = 0;
-        var testsExecuted = 0;
 
-        var tests = ffi.toArray(get(checkBlock, "test-results")).
-          reverse().
-          map(function(test) {
-            var testSuccess = isTestSuccess(test);
-            testsExecuted++;
-            var skeleton = undefined;
-            if (testSuccess) {
-              testsPassing++;
-              skeleton = new PassingTestSkeleton(test, testsExecuted);
-              testsPassedSkeletons.push(skeleton);
-            } else {
-              skeleton = new FailingTestSkeleton(test, testsExecuted);
-              testsFailedSkeletons.push(skeleton);
-            }
-            return skeleton;
-          });
-
-        var endedInError    = get(option, "is-some").app(maybeError);
-        var allTestsPassing = testsPassing === testsExecuted;
-        
-        var error = endedInError ? get(maybeError, "value").val : undefined;
-        
-        var skeleton =
-          new CheckBlockSkeleton(
-            get(checkBlock, "name"), 
-            get(checkBlock, "loc"),
-            get(checkBlock, "keyword-check"),
-            { skeletons: tests,
-              passing  : testsPassing,
-              executed : testsExecuted }, error);
-        
-        if (endedInError)
-          checkErroredSkeletons.push(skeleton);
+      for (var [file, blocks] of groupedCheckBlocks) {
+        var skeleton = new FileSkeleton(file, blocks, (file == "definitions://" ? examplarResults : null));
         checkResultsContainer.appendChild(skeleton.container);
       }
-      
       
       var checkPassedAll      = testsPassedSkeletons.length;
       var checkBlocksErrored  = checkErroredSkeletons.length;
@@ -573,34 +815,34 @@
       var summary = $("<div>").addClass("check-block testing-summary");
       // If there was more than one check block, print a message about
       // the grand total of checks and passes.
-      if (checkPassedAll == checkTotalAll && checkBlocksErrored === 0) {
-        if (checkTotalAll > 0) {
-          if (checkTotalAll == 1) {
-            summary.text("Looks shipshape, your test passed, mate!");
-          } else if (checkTotalAll == 2) {
-            summary.text("Looks shipshape, both tests passed, mate!");
-          } else {
-            summary.text("Looks shipshape, all " + checkTotalAll + " tests passed, mate!");
-          }
-        }
-      } else {
-        var testsFailedAll = (checkTotalAll - checkPassedAll);
-        function TESTS(n){return n == 1 ? "TEST" : "TESTS";}
-        summary.append(
-          $("<div>").addClass("summary-bits")
-            .append($("<div>").addClass("summary-bit summary-passed").html("<span class='summary-count'>" + checkPassedAll + "</span> " + TESTS(checkPassedAll) + " PASSED"))
-            .append($("<div>").addClass("summary-bit summary-failed").html("<span class='summary-count'>" + testsFailedAll + "</span> " + TESTS(testsFailedAll) + " FAILED")));
-
-        if (checkBlocksErrored > 0) {
-          summary.append($("<div>").addClass("summary-errored")
-                         .append($("<span class='summary-count'>").text(checkBlocksErrored))
-                         .append($("<span class='summary-text'>")
-                                 .html(" ended in an unexpected error, and <b>some tests in "
-                                       + (checkBlocksErrored == 1 ? "this block":"these blocks")
-                                       + " may not have run</b>.")
-                                 .prepend(blockType.append(checkBlocksErrored == 1 ? " block" : " blocks"))));
-        }
-      }
+      //if (checkPassedAll == checkTotalAll && checkBlocksErrored === 0) {
+      //  if (checkTotalAll > 0) {
+      //    if (checkTotalAll == 1) {
+      //      summary.text("Looks shipshape, your test passed, mate!");
+      //    } else if (checkTotalAll == 2) {
+      //      summary.text("Looks shipshape, both tests passed, mate!");
+      //    } else {
+      //      summary.text("Looks shipshape, all " + checkTotalAll + " tests passed, mate!");
+      //    }
+      //  }
+      //} else {
+      //  var testsFailedAll = (checkTotalAll - checkPassedAll);
+      //  function TESTS(n){return n == 1 ? "TEST" : "TESTS";}
+      //  summary.append(
+      //    $("<div>").addClass("summary-bits")
+      //      .append($("<div>").addClass("summary-bit summary-passed").html("<span class='summary-count'>" + checkPassedAll + "</span> " + TESTS(checkPassedAll) + " PASSED"))
+      //      .append($("<div>").addClass("summary-bit summary-failed").html("<span class='summary-count'>" + testsFailedAll + "</span> " + TESTS(testsFailedAll) + " FAILED")));
+      //
+      //  if (checkBlocksErrored > 0) {
+      //    summary.append($("<div>").addClass("summary-errored")
+      //                   .append($("<span class='summary-count'>").text(checkBlocksErrored))
+      //                   .append($("<span class='summary-text'>")
+      //                           .html(" ended in an unexpected error, and <b>some tests in "
+      //                                 + (checkBlocksErrored == 1 ? "this block":"these blocks")
+      //                                 + " may not have run</b>.")
+      //                           .prepend(blockType.append(checkBlocksErrored == 1 ? " block" : " blocks"))));
+      //  }
+      //}
 
 
       container.append($(checkResultsContainer).prepend(summary));

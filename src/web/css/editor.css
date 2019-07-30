@@ -1569,6 +1569,9 @@ code div {
   flex: 1;
   text-align: center;
   padding: 0.5em;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .summary-count {
@@ -1584,7 +1587,7 @@ code div {
   background: hsl(45, 100%, 85%);
 }
 
-.summary-errored > .summary-count {
+.summary-bit > .summary-count {
   text-align: center;
   margin-right: 0.5rem;
 }
@@ -1592,10 +1595,6 @@ code div {
 .summary-errored {
   background: hsla(0,100%,73%,1);
   color: white;
-  padding: .5em;
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
 }
 
 .summary-text {
@@ -2106,13 +2105,11 @@ button.controller {
 
 ul.wheat_list,
 ul.chaff_list {
+  flex: 1;
   list-style: none;
   display: flex;
   flex-direction: row;
   justify-content: space-around;
-  outline: white 1px solid;
-  background: #eee;
-  box-shadow: inset 0 0 1px rgba(0,0,0,1);
 }
 
 @keyframes shake {
@@ -2245,6 +2242,66 @@ li.tab.selected {
   text-decoration: none;
 }
 
+.file-test-results > header:before,
 .tab > a:before {
   content: '🗎';
 }
+
+.file-test-results {
+  background: #eeeeee;
+  border: .3em #307acf solid;
+  border-radius: 3px;
+  margin-bottom: 1em;
+}
+
+.file-test-results > header {
+  background: #307acf;
+  color: white;
+  padding: 0.5em;
+}
+
+.file-test-results:not(.expanded) > .test-file-blocks {
+  display: none;
+}
+
+.file-examplar-summary {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px black solid;
+  overflow: hidden;
+  border-bottom: #307acf 0.3em solid;
+}
+
+.file-examplar-summary-validity {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  clip-path: polygon(0 0, 100% 0%, calc(100% - 20px) 100%, 0% 100%);
+  padding: 1rem;
+  padding-right: 40px;
+  font-weight: 700;
+  font-size: 1.5em;
+}
+
+.file-examplar-summary-validity.valid {
+  background: #3c9ee5;
+  color: white;
+}
+
+.file-examplar-summary-validity.maybe-valid {
+  background: #aaa;
+}
+
+.file-examplar-summary-thoroughness {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-examplar-summary-message {
+  border-top: 1px black solid;
+  padding: 0.5em;
+  width: 100%;
+}
+
