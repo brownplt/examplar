@@ -67,6 +67,8 @@
       }
 
       function Position(doc, source, from, to, inclusiveLeft, inclusiveRight) {
+        this.str = JSON.stringify([source,from,to]);
+
         if (inclusiveLeft === undefined)
           inclusiveLeft = true;
         if (inclusiveRight === undefined)

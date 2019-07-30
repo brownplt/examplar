@@ -220,7 +220,31 @@
         thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
         validity_elt.textContent = "INVALID";
         validity_elt.classList.add("invalid");
-        message_elt.textContent = "This file contains invalid tests.";
+        container_elt.classList.add("invalid");
+        message_elt.textContent = "This file contains invalid tests:";
+
+        let wheat_catchers =
+          wheats.map(
+            wheat => wheat.map(
+              block => block.error
+                || block.tests.filter(test => !test.passed)
+                              .map(test => test.loc))
+              .reduce((acc, val) => acc.concat(val), []))
+            .reduce((acc, val) => acc.concat(val), []);
+
+        console.log("FAILING WHEATS", wheat_catchers);
+
+        function render_wheat_catcher(position) {
+          console.log("rendering", position);
+          let snippet = new outputUI.Snippet(position);
+          message_elt.appendChild(snippet.container);
+        }
+
+        let dedup = new Object({});
+        wheat_catchers.forEach(p => dedup[p.str] = p);
+        for (var pos of Object.values(dedup)) {
+          render_wheat_catcher(pos);
+        }
       }
 
       return container_elt;
@@ -236,12 +260,12 @@
       let checkErroredSkeletons = new Array();
       let testsFailedSkeletons  = new Array();
       let testsPassedSkeletons  = new Array();
-      
-      var noFramesMaybeStackLoc = 
+
+      var noFramesMaybeStackLoc =
         runtime.makeFunction(function(n, userFramesOnly) {
           return runtime.ffi.makeNone();
         });
-      
+
       function makeNameHandle(text, loc, color) {
         var anchor = document.createElement("a");
         anchor.classList.add("hinted-highlight");
@@ -271,13 +295,13 @@
       function makeGutterMarker(spanHandle, clickFunc) {
         let doc = spanHandle.doc;
         let editor = doc.getEditor() || CPO.editor.cm;
-        
-        var lineHandle = 
+
+        var lineHandle =
           doc.addLineClass(
             spanHandle.from.line,
             "gutter",
             "failed-test-marker");
-            
+
         function onClick(cm, line, gutter) {
           if (cm.getDoc() != doc)
             return;
@@ -304,7 +328,7 @@
             lineHandle.on("delete", onDelete);
           }
         }
-        
+
         function onDelete(line) {
           var spanLineNo = spanHandle.from;
           if (spanLineNo === undefined)
@@ -315,7 +339,7 @@
             lineHandle.on("delete", onDelete);
           }
         }
-        
+
         lineHandle.on("change", onChange);
         lineHandle.on("delete", onDelete);
 
@@ -344,7 +368,7 @@
           });
 
       }
-      
+
       function makeTestHeader(testNumber, loc, isPassing) {
         var header = document.createElement("header");
         var nameHandle   = makeNameHandle("Test " + testNumber, loc,
@@ -356,9 +380,9 @@
         header.appendChild(status);
         return {header : header, handle : handle};
       }
-      
+
       var lastHighlighted = undefined;
-      
+
       var FailingTestSkeleton = function () {
         function FailingTestSkeleton(block, test, testNumber) {
           var container = document.createElement("div");
@@ -379,7 +403,7 @@
               thisTest.block.showTest(thisTest);
             });
           }
-          
+
           if(runtime.hasField(test, "actual-exn")) {
             var stack = get(loadLib, "internal")
               .enrichStack(get(test, "actual-exn").val, get(loadLib, "internal").getModuleResultRealm(result));
@@ -528,7 +552,10 @@
           });
 
           summary_bits.append(view_button_elt);
-          $(summary).append(summary_bits);
+
+          if (!examplar_summary.classList.contains("invalid")) {
+            $(summary).append(summary_bits);
+          }
 
           container.appendChild(summary);
 
@@ -537,30 +564,15 @@
           skeletons.forEach(skeleton => blockList.appendChild(skeleton.container));
           container.appendChild(blockList);
           this.check_blocks_elt = blockList;
-
-          //header.addEventListener("click", function (e) {
-          //  if (this.container.classList.contains("expanded"))
-          //    this.hideTests();
-          //  else
-          //    this.showTests();
-          //}.bind(this));
-
-          //summary.addEventListener("click", function (e) {
-          //  if (this.container.classList.contains("expanded"))
-          //    this.hideTests();
-          //  else
-          //    this.showTests();
-          //}.bind(this));
-
           this.container = container;
         }
 
         FileSkeleton.prototype.highlight = function highlight() {
-          
+
         };
 
         FileSkeleton.prototype.refreshSnippets = function refreshSnippets() {
-          
+
         };
 
         FileSkeleton.prototype.showTest = function showTest(test) {
@@ -576,7 +588,7 @@
           console.log("FileSkeleton.hideTests");
           this.container.classList.remove("expanded");
         };
-        
+
         FileSkeleton.prototype.vivify = function vivify(rendering) {
           console.error("FileSkeleton.hideTests");
         };
@@ -621,7 +633,7 @@
 
           let passing = testsPassing;
           let executed = testsExecuted;
-          
+
           if (endedInError) {
             checkErroredSkeletons.push(this);
           }
@@ -672,15 +684,15 @@
 
           var tombstone = undefined;
           if (error !== undefined) {
-            tombstone = document.createElement("div"); 
-            tombstone.classList.add("check-block-error"); 
+            tombstone = document.createElement("div");
+            tombstone.classList.add("check-block-error");
             tombstone.addEventListener("click", function (e) {
               _this.highlight();
             });
             this.renderable = error.exn;
             container.appendChild(tombstone);
             var richStack = get(loadLib, "internal")
-              .enrichStack(error, get(loadLib, "internal").getModuleResultRealm(result)); 
+              .enrichStack(error, get(loadLib, "internal").getModuleResultRealm(result));
             this.maybeStackLoc = outputUI.makeMaybeStackLoc(runtime, documents, srcloc, richStack);
             this.pyretStack = richStack;
           }
@@ -708,7 +720,7 @@
         }
 
         CheckBlockSkeleton.prototype.highlight = function highlight() {
-          if (this.tombstone === undefined) 
+          if (this.tombstone === undefined)
             return;
           outputUI.clearEffects();
           lastHighlighted = this;
@@ -727,7 +739,7 @@
         };
 
         CheckBlockSkeleton.prototype.showTest = function showTest(test) {
-          if (expandedCheckBlock !== undefined) 
+          if (expandedCheckBlock !== undefined)
             expandedCheckBlock.hideTests();
           expandedCheckBlock = this;
           this.container.classList.add("expanded");
@@ -737,7 +749,7 @@
         };
 
         CheckBlockSkeleton.prototype.showTests = function showTests() {
-          if (expandedCheckBlock !== undefined) 
+          if (expandedCheckBlock !== undefined)
             expandedCheckBlock.hideTests();
           expandedCheckBlock = this;
           this.container.classList.add("expanded");
@@ -752,7 +764,7 @@
           outputUI.clearEffects();
           lastHighlighted = undefined;
         };
-        
+
         /* Replace the placeholder for the error with the error rendering */
         CheckBlockSkeleton.prototype.vivify = function vivify(rendering) {
           if (this.tombstone === undefined) return;
@@ -769,7 +781,7 @@
 
         return CheckBlockSkeleton;
       }();
-    
+
       var checkBlocks = ffi.toArray(checkResults);
 
       let groupedCheckBlocks = groupBy(checkBlocks, function(block) {
@@ -778,7 +790,7 @@
 
       if (checkBlocks.length === 0)
         return;
-        
+
       var keywordCheck = false;
       var keywordExamples = false;
       for (var i = 0; i < checkBlocks.length; i++) {
@@ -798,7 +810,7 @@
       } else {
         blockType = $("<span>").append($("<code>").text("check"));
       }
-      
+
       var checkResultsContainer = document.createElement("div");
       checkResultsContainer.classList.add("test-results");
       try{
@@ -807,48 +819,16 @@
         var skeleton = new FileSkeleton(file, blocks, (file == "definitions://" ? examplarResults : null));
         checkResultsContainer.appendChild(skeleton.container);
       }
-      
+
       var checkPassedAll      = testsPassedSkeletons.length;
       var checkBlocksErrored  = checkErroredSkeletons.length;
       var checkTotalAll       = checkPassedAll + testsFailedSkeletons.length;
 
       var summary = $("<div>").addClass("check-block testing-summary");
-      // If there was more than one check block, print a message about
-      // the grand total of checks and passes.
-      //if (checkPassedAll == checkTotalAll && checkBlocksErrored === 0) {
-      //  if (checkTotalAll > 0) {
-      //    if (checkTotalAll == 1) {
-      //      summary.text("Looks shipshape, your test passed, mate!");
-      //    } else if (checkTotalAll == 2) {
-      //      summary.text("Looks shipshape, both tests passed, mate!");
-      //    } else {
-      //      summary.text("Looks shipshape, all " + checkTotalAll + " tests passed, mate!");
-      //    }
-      //  }
-      //} else {
-      //  var testsFailedAll = (checkTotalAll - checkPassedAll);
-      //  function TESTS(n){return n == 1 ? "TEST" : "TESTS";}
-      //  summary.append(
-      //    $("<div>").addClass("summary-bits")
-      //      .append($("<div>").addClass("summary-bit summary-passed").html("<span class='summary-count'>" + checkPassedAll + "</span> " + TESTS(checkPassedAll) + " PASSED"))
-      //      .append($("<div>").addClass("summary-bit summary-failed").html("<span class='summary-count'>" + testsFailedAll + "</span> " + TESTS(testsFailedAll) + " FAILED")));
-      //
-      //  if (checkBlocksErrored > 0) {
-      //    summary.append($("<div>").addClass("summary-errored")
-      //                   .append($("<span class='summary-count'>").text(checkBlocksErrored))
-      //                   .append($("<span class='summary-text'>")
-      //                           .html(" ended in an unexpected error, and <b>some tests in "
-      //                                 + (checkBlocksErrored == 1 ? "this block":"these blocks")
-      //                                 + " may not have run</b>.")
-      //                           .prepend(blockType.append(checkBlocksErrored == 1 ? " block" : " blocks"))));
-      //  }
-      //}
+      container.append($(checkResultsContainer));
 
-
-      container.append($(checkResultsContainer).prepend(summary));
-      
       }catch(e){console.error(e);}
-      
+
       // must be called on the pyret stack
       function vivifySkeleton(skeleton) {
         var error_to_html = errorUI.error_to_html;

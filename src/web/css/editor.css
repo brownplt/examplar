@@ -300,6 +300,7 @@ div.spy-block > table > th { display: none; }
 
 #output, .prompt-container {
   padding-left: 1em;
+  padding-top: 1em;
 }
 
 .check {
@@ -2305,3 +2306,26 @@ li.tab.selected {
   width: 100%;
 }
 
+.file-examplar-summary-validity.invalid {
+  background:black;
+  color:white;
+}
+
+.file-examplar-summary.invalid,
+.file-examplar-summary-validity.invalid
+  ~ .file-examplar-summary-thoroughness
+{
+  background: #444;
+}
+
+.file-examplar-summary-validity.invalid
+  ~ .file-examplar-summary-thoroughness
+{
+  color: white;
+}
+
+.file-examplar-summary.invalid
+  > .file-examplar-summary-message
+{
+  background: hsla(0,100%,73%,1);
+}

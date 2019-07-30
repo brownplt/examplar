@@ -95,34 +95,6 @@
       }
     }
 
-    class StatusWidget {
-      constructor() {
-        let element = document.createElement('div');
-        element.classList.add("examplar_status_widget");
-
-        let wheat_side = document.createElement('div');
-        wheat_side.classList.add("examplar_status");
-        let wheat_graph = new Graph();
-        wheat_side.innerHTML = "Wheats<br>Accepted";
-        wheat_side.prepend(wheat_graph.element);
-
-        let chaff_side = document.createElement('div');
-        chaff_side.classList.add("examplar_status");
-        chaff_side.innerHTML = "Chaffs<br>Rejected";
-        let chaff_graph = new Graph();
-        chaff_side.prepend(chaff_graph.element);
-
-        this.wheat_side = element.appendChild(wheat_side);
-        this.chaff_side = element.appendChild(chaff_side);
-        this.element = element;
-
-        this.wheat_graph = wheat_graph;
-        this.chaff_graph = chaff_graph;
-      }
-    }
-
-    var status_widget = new StatusWidget();
-
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
     function merge(obj, extension) {
@@ -763,7 +735,6 @@
 
       var breakButton = options.breakButton;
       var stopLi = $('#stopli');
-      container[0].appendChild(status_widget.element);
       container.append(output);
       container.append(output).append(promptContainer);
 
@@ -838,7 +809,7 @@
           //output.get(0).scrollTop = output.get(0).scrollHeight;
           showPrompt();
           setTimeout(function(){
-            $("#output > .compile-error .cm-future-snippet").each(function(){this.cmrefresh();});
+            $(".CodeMirror").each(function(){this.CodeMirror.refresh();});
           }, 200);
         }
       }
@@ -982,152 +953,6 @@
         }, "CPO-onSpy");
       });
 
-      function renderWheatFailure(check_results) {
-        let wheats = check_results.length;
-        let failed =
-          check_results.filter(
-            wheat => wheat.some(
-              block => block.error
-                || block.tests.some(test => !test.passed))).length;
-
-        let wheat_catchers =
-          check_results.map(
-            wheat => wheat.map(
-              block => block.error
-                || block.tests.filter(test => !test.passed)
-                              .map(test => test.loc))
-              .reduce((acc, val) => acc.concat(val), []));
-
-        function render_wheat(catchers) {
-          let wheat = document.createElement('a');
-          wheat.setAttribute('href','#');
-          wheat.classList.add('wheat');
-          wheat.textContent = '⚙';
-
-          if (catchers.length > 0) {
-            wheat.classList.add('failed');
-          }
-
-          wheat.addEventListener('click',function(e) {
-            e.preventDefault();
-          });
-
-          wheat.addEventListener('mouseenter',function() {
-            catchers.forEach(function(loc) { loc.highlight('#FF0000'); });
-          });
-
-          wheat.addEventListener('mouseleave',function() {
-            catchers.forEach(function(loc) { loc.highlight(''); });
-          });
-
-          return wheat;
-        }
-
-        status_widget.wheat_graph.value = {numerator: wheats - failed, denominator: wheats};
-
-        let wheat_info = document.createElement('div');
-        wheat_info.classList.add('wheat_info');
-
-        let intro = document.createElement('p');
-        intro.textContent = `Your tests rejected ${failed} out of ${wheats} wheats:`;
-        wheat_info.appendChild(intro);
-
-        let wheat_list = document.createElement('ul');
-        wheat_list.classList.add('wheat_list');
-
-        wheat_catchers.map(render_wheat)
-          .forEach(function(wheat_widget){
-            let li = document.createElement('li');
-            li.appendChild(wheat_widget);
-            wheat_list.appendChild(li);
-          });
-
-        wheat_info.appendChild(wheat_list);
-
-        let outro = document.createElement('p');
-        outro.textContent = "The wheats your tests rejected are highlighted above in red. Mouseover a wheat to see which of your tests rejected it. Are these tests consistent with the problem specification?";
-
-        if (failed != wheats) {
-          outro.textContent += " Do they test unspecified behavior?";
-        }
-
-        wheat_info.appendChild(outro);
-        output.append(wheat_info);
-      }
-
-      function renderChaffResults(check_results) {
-        let chaffs = check_results.length;
-        let caught =
-          check_results.filter(
-            chaff => !chaff.every(
-              block => !block.error
-                && block.tests.every(test => test.passed))).length;
-
-        let chaff_catchers =
-          check_results.map(chaff =>
-              chaff.map(block => block.tests.filter(test => !test.passed)
-                                            .map(test => test.loc))
-                .reduce((acc, val) => acc.concat(val), []));
-
-        function render_chaff(catchers) {
-          let chaff = document.createElement('a');
-          chaff.setAttribute('href','#');
-          chaff.classList.add('chaff');
-          chaff.textContent = '🐛';
-
-          if (catchers.length > 0) {
-            chaff.classList.add('caught');
-          }
-
-          chaff.addEventListener('click',function(e) {
-            e.preventDefault();
-          });
-
-          chaff.addEventListener('mouseenter',function() {
-            catchers.forEach(function(loc) { loc.highlight('#91ccec'); });
-          });
-
-          chaff.addEventListener('mouseleave',function() {
-            catchers.forEach(function(loc) { loc.highlight(''); });
-          });
-
-          return chaff;
-        }
-
-        status_widget.chaff_graph.value = {numerator: caught, denominator: chaffs};
-
-        let chaff_info = document.createElement('div');
-        chaff_info.classList.add('chaff_info');
-
-        let intro = document.createElement('p');
-        intro.textContent = `You caught ${caught} out of ${chaffs} chaffs:`;
-        chaff_info.appendChild(intro);
-
-        let chaff_list = document.createElement('ul');
-        chaff_list.classList.add('chaff_list');
-
-        chaff_catchers.map(render_chaff)
-          .forEach(function(chaff_widget){
-            let li = document.createElement('li');
-            li.appendChild(chaff_widget);
-            chaff_list.appendChild(li);
-          });
-
-        chaff_info.appendChild(chaff_list);
-
-        let outro = document.createElement('p');
-        outro.textContent = "The chaffs you caught are highlighted above in blue. Mouseover a chaff to see which of your tests caught it.";
-        chaff_info.appendChild(outro);
-
-        output.append(chaff_info);
-
-        if (caught == chaffs) {
-          let reminder = document.createElement('p');
-          reminder.textContent = "Nice work! Remember, the set of chaffs in Examplar is only a subset of what we'll run your final test submission against, so keep writing tests! You can continue to use Examplar to ensure that your tests accept the wheats.";
-          chaff_info.appendChild(reminder);
-        }
-      }
-
       var runMainCode = function(src, uiOptions) {
         if(running) { return; }
         running = true;
@@ -1190,53 +1015,72 @@
           }
         }
 
-        status_widget.wheat_graph.value = {numerator: "none", denominator: "none"};
-        status_widget.chaff_graph.value = {numerator: "none", denominator: "none"};
-
         if (!document.getElementById("option-check-mode").checked) {
-          window.wheat.then(run_injections)
-            .then(function(r) { maybeShowOutputPending(); return r; })
+          // TODO fix repl behavior when wheat fails.
+          // repl should happen in context of impl file if wheat fails
+
+          // first, run the wheat
+          let wheat_results = window.wheat.then(run_injections);
+
+          let wheats_pass = wheat_results.then(
+            function(check_results) {
+              console.log("wheats_pass", check_results);
+              let wheats = check_results.length;
+              let passed =
+                check_results.filter(
+                  wheat => wheat.every(
+                    block => !block.error
+                      && block.tests.every(test => test.passed))).length;
+              let all_passed = wheats == passed;
+
+              if (all_passed) {
+                return check_results;
+              } else {
+                throw check_results;
+              }
+            });
+
+          // if the wheats pass, then run the chaffs
+          let chaff_results = wheats_pass
             .then(
-              function (check_results) {
-                let wheats = check_results.length;
-                let passed =
-                  check_results.filter(
-                    wheat => wheat.every(
-                      block => !block.error
-                        && block.tests.every(test => test.passed))).length;
+              function(_){
+                console.log("chaff_results:ok");
+                return window.chaff.then(run_injections);
+              },
+              function(e){
+                console.log("chaff_results::err", e);
+                return null;
+              });
 
-                let all_passed = wheats == passed;
+          // lastly, run the student's tests
+          let test_results = chaff_results.then(
+            function(){
+              console.log("test_results");
+              delete window.injection;
+              // run students' impl tests, too
+              options.checkAll = true;
+              return repl.restartInteractions(src, options);
+            });
 
-                status_widget.wheat_graph.value = {numerator: passed, denominator: wheats};
+          // then display the result
+          let display_result =
+            Q.all([wheat_results, chaff_results, test_results]).then(
+              function([wheat_results, chaff_results, test_results]) {
+                console.log("display_result", wheat_results, chaff_results, test_results);
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results,
+                                     {wheat: wheat_results, chaff: chaff_results});
+              }, function(error_result) {
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result);
+              });
 
-                if (all_passed) {
-                  return window.chaff.then(run_injections)
-                    .then(function(chaff_results) {
-                      // if no inection is specified, the my-gdrive import is resolved normally
-                      delete window.injection;
-                      // run students' impl tests
-                      options.checkAll = true;
-                      return repl.restartInteractions(src, options)
-                        .then(function(run_result) {
-                          return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result,
-                            {wheat: check_results, chaff: chaff_results});
-                        });
-                    });
-                } else {
-                  afterRun(false);
-                  renderWheatFailure(check_results);
-                }
-              }, function(run_result) {
-                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
-              })
-            .fin(afterRun(false));
+          display_result.fin(afterRun(false));
         } else {
             maybeShowOutputPending();
             repl.restartInteractions(src, options)
               .then(function(run_result) {
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
               }, function(error_result) {
-                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result);
               })
               .fin(afterRun(false));
         }
