@@ -341,55 +341,15 @@ $(function() {
 
   window.sourceAPI = window.createSourceManager(storageAPI);
   CPO.sourceAPI = window.sourceAPI;
-  /*
-    initialPrograms holds a promise for a Drive File object or null
 
-    It's null if the page doesn't have a #share or #program url
+  let assignment;
 
-    If the url does have a #program or #share, the promise is for the
-    corresponding object.
-  */
-  var initialPrograms = storageAPI.then(function(api) {
-    var programLoad = null;
-    if(params["get"] && params["get"]["program"]) {
-      enableFileOptions();
-      programLoad = api.getFileById(params["get"]["program"]);
-      programLoad.then(function(p) { showShareContainer(p); });
-    } else if(params["get"] && params["get"]["share"]) {
-      programLoad = api.getSharedFileById(params["get"]["share"]);
-      programLoad.then(function(file) {
-        // NOTE(joe): If the current user doesn't own or have access to this file
-        // (or isn't logged in) this will simply fail with a 401, so we don't do
-        // any further permission checking before showing the link.
-        file.getOriginal().then(function(response) {
-          console.log("Response for original: ", response);
-          var original = $("#open-original").show().off("click");
-          var id = response.result.value;
-          original.removeClass("hidden");
-          original.click(function() {
-            window.open(window.APP_BASE_URL + "/editor#program=" + id, "_blank");
-          });
-        });
-      });
-    } else if(params["get"] && params["get"]["template"]) {
-      logger.log('template-program-load',
-        {
-          id: params["get"]["template"]
-        });
-      programLoad = api.getTemplateFileById(params["get"]["template"]);
-    } else {
-      window.location.href = "/";
-    }
-    if(programLoad) {
-      programLoad.fail(function(err) {
-        console.error(err);
-        window.stickError("The program failed to load. Please connect to Google Drive.");
-      });
-      return programLoad;
-    } else {
-      return null;
-    }
-  });
+  if (params["get"] && params["get"]["template"]) {
+    assignment = storageAPI.then(api => api.getTemplateFileById(params["get"]["template"]));
+  } else {
+    // Redirect to main page.
+    window.location.href = "/";
+  }
 
   function setTitle(progName) {
     document.title = progName + " - code.pyret.org";
@@ -429,27 +389,6 @@ $(function() {
     $("#filename").text(" (" + truncateName(filename) + ")");
     setTitle(filename);
     showShareContainer(p);
-  }
-
-  function loadPrograms(p) {
-    programToSave = p;
-    return p.then(function(prog) {
-      if(prog !== null) {
-        let code = sourceAPI.from_file(prog.code);
-        let tests = sourceAPI.from_file(prog.tests);
-        tests.then(tests => sourceAPI.set_definitions(tests));
-        Q.all([tests, code]).then(function ([tests, code]) {
-          new Tab(tests).activate();
-          new Tab(code);
-        });
-        updateName(prog);
-        return tests.then(tests => tests.document);
-        //if(prog.shared) {
-        //  window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
-        //}
-        //return prog.tests.getDoc();
-      }
-    });
   }
 
   function say(msg, forget) {
@@ -578,16 +517,43 @@ $(function() {
     //console.log('(cf)docactelt=', document.activeElement);
   }
 
-  var programLoaded = loadPrograms(initialPrograms);
-  window.programLoaded = programLoaded;
-
-  var programToSave = programLoaded.then(function(){ return initialPrograms });
-
-  window.assignment_id = programToSave.then(function(p) { return p.assignment_id });
-  window.program_id = programToSave.then(function(p) { return p.tests.getUniqueId(); });
-
   window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
+  window.assignment_id = assignment.then(function(assn) { return assn.assignment_id });
 
+  let assignment_tests = assignment.then(assn => sourceAPI.from_file(assn.tests));
+  let assignment_common = assignment.then(assn => sourceAPI.from_file(assn.common));
+
+  // set `definitions://` to the test document
+  assignment_tests.then(tests => sourceAPI.set_definitions(tests));
+
+  window.programLoaded =
+    Q.all([assignment_common, assignment_tests])
+    .then(function ([common, tests]) {
+      new Tab(common);
+      new Tab(tests).activate();
+      CPO.editor.cm.setOption('readOnly', false);
+    });
+
+  assignment.then(assn => assn.code).then(function(code) {
+    if (code instanceof Function) {
+      let begin_button = document.createElement("button");
+      begin_button.textContent = "+ Begin Implementation";
+
+      begin_button.addEventListener("click", function() {
+        code().then(function(code) {
+          begin_button.remove();
+          sourceAPI.from_file(code).then(code => new Tab(code));
+        });
+      });
+
+      document.getElementById("files-tabs-container")
+        .appendChild(begin_button);
+    } else {
+      sourceAPI.from_file(code).then(code => new Tab(code));
+    }
+  });
+
+  // load the wheats
   window.wheat =
     assignment_id.then(function(id) {
       return storageAPI.then(function(api) {
@@ -595,6 +561,7 @@ $(function() {
       });
     });
 
+  // load the chaff
   window.chaff =
     assignment_id.then(function(id) {
       return storageAPI.then(function(api) {
@@ -1209,14 +1176,14 @@ $(function() {
     }
   });
 
-  programLoaded.then(function(doc) {
-    CPO.editor.cm.setOption('readOnly', false);
-    CPO.editor.cm.swapDoc(doc);
-  });
-
-  programLoaded.fail(function(error) {
-    window.stickError("Unable to load program.", error.toString());
-  });
+  //programLoaded.then(function(doc) {
+  //  CPO.editor.cm.setOption('readOnly', false);
+  //  CPO.editor.cm.swapDoc(doc);
+  //});
+  //
+  //programLoaded.fail(function(error) {
+  //  window.stickError("Unable to load program.", error.toString());
+  //});
 
   var pyretLoad = document.createElement('script');
   console.log(process.env.PYRET);
@@ -1289,15 +1256,14 @@ $(function() {
 
   });
 
-  programLoaded.fin(function() {
-    CPO.editor.focus();
-  });
+  //programLoaded.fin(function() {
+  //  CPO.editor.focus();
+  //});
 
   CPO.autoSave = autoSave;
   CPO.save = save;
   CPO.updateName = updateName;
   CPO.showShareContainer = showShareContainer;
-  CPO.loadProgram = loadPrograms;
   CPO.cycleFocus = cycleFocus;
   CPO.say = say;
   CPO.sayAndForget = sayAndForget;

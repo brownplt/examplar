@@ -2179,21 +2179,19 @@ ul.chaff_list {
 /* File Tabs */
 
 li#files-tabs-container {
-  display: block;
+  display: flex;
   flex: 1;
+  width: 100%;
 }
 
 ul#files-tabs {
   display: flex;
   top: unset;
   height: 100%;
-  width: 100%;
   flex-direction: row;
   align-items: center;
   align-content: center;
-
 }
-
 
 li.tab {
   box-sizing: border-box;

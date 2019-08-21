@@ -670,10 +670,10 @@
 
                 window.CPO.showShareContainer(p);
                 history.pushState(null, null, "#program=" + id);
-                window.CPO.loadProgram(p).then(function(contents) {
-                  window.CPO.editor.cm.setValue(contents);
-                  window.CPO.editor.cm.clearHistory();
-                });
+                //window.CPO.loadProgram(p).then(function(contents) {
+                //  window.CPO.editor.cm.setValue(contents);
+                //  window.CPO.editor.cm.clearHistory();
+                //});
               })
               .fail(function(err) {
                 window.flashMessage("Currently unable to save, try opening that file in a new tab");

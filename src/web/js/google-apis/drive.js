@@ -370,16 +370,18 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                 .then(function(results) {
                   let maybe_code = results.find(result => result.title.includes('code'));
                   let maybe_tests = results.find(result => result.title.includes('tests'));
+                  let maybe_common = results.find(result => result.title.includes('common'));
                   return ls("not trashed and '"+ id + "' in parents and title contains 'arr'").then(function(results) {
                     let maybe_code_template = results.find(result => result.title.includes('code'));
                     let maybe_tests_template = results.find(result => result.title.includes('tests'));
+                    let maybe_common_template = results.find(result => result.title.includes('common'));
 
                     let code =
                       (maybe_code != null
-                        ? drive.files.get({"fileId": maybe_code.id})
-                        : (maybe_code_template != null
-                            ? copy_template_to_drive(bc, maybe_code_template)
-                            : Q(null))).then(fileBuilder);
+                        ? drive.files.get({"fileId": maybe_code.id}).then(fileBuilder)
+                        : function(){return (maybe_code_template != null
+                            ? copy_template_to_drive(bc, maybe_code_template).then(fileBuilder)
+                            : Q(null).then(fileBuilder));});
 
                     let tests =
                       (maybe_tests != null
@@ -388,8 +390,15 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                             ? copy_template_to_drive(bc, maybe_tests_template)
                             : Q(null))).then(fileBuilder);
 
-                    return Q.all([code, tests]).then(function([code, tests]) {
-                      return {assignment_name: template.title, assignment_id: id, code: code, tests: tests};
+                    let common =
+                      (maybe_common != null
+                        ? drive.files.get({"fileId": maybe_common.id})
+                        : (maybe_common_template != null
+                            ? copy_template_to_drive(bc, maybe_common_template)
+                            : Q(null))).then(fileBuilder);
+
+                    return Q.all([code, tests, common]).then(function([code, tests, common]) {
+                      return {assignment_name: template.title, assignment_id: id, code: code, tests: tests, common: common};
                     });
                   });
                 });

@@ -981,11 +981,12 @@
                           // if this becomes a check box somewhere in CPO
         };
 
-        Q.all([window.user, window.assignment_id, window.program_id])
+        Q.all([window.user, window.assignment_id])
           .done(function([email, id, gdrive_id]) {
             return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
               method: 'PUT',
-              body: JSON.stringify({email: email, assignment: id, gdrive: gdrive_id, submission: CPO.sourceAPI.get_loaded("definitions://").contents}),
+              // TODO make this logging better!
+              body: JSON.stringify({email: email, assignment: id, submission: CPO.sourceAPI.get_loaded("definitions://").contents}),
               headers:{
                 'Content-Type': 'application/json'
               }
@@ -1018,6 +1019,8 @@
         if (!document.getElementById("option-check-mode").checked) {
           // TODO fix repl behavior when wheat fails.
           // repl should happen in context of impl file if wheat fails
+          // TODO improve wheat failure error message behavior
+          // e.g.,: print(raise(median([list:1])))
 
           // first, run the wheat
           let wheat_results = window.wheat.then(run_injections);

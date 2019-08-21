@@ -257,7 +257,6 @@ nav > div > ul > li {
 }
 
 nav > div > ul > li  ul {
-  position: absolute;
   top: 2.5em;
   margin: 0;
   padding: 0;
