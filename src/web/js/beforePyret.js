@@ -523,6 +523,8 @@ $(function() {
   let assignment_tests = assignment.then(assn => sourceAPI.from_file(assn.tests));
   let assignment_common = assignment.then(assn => sourceAPI.from_file(assn.common));
 
+  window.dummy_impl = assignment.then(assn => assn.dummy_impl);
+
   // set `definitions://` to the test document
   assignment_tests.then(tests => sourceAPI.set_definitions(tests));
 
@@ -568,6 +570,8 @@ $(function() {
         return api.getGrainFilesByTemplate(id,'chaff');
       });
     });
+
+  var programToSave = Q(null);
 
   function showShareContainer(p) {
     //console.log('called showShareContainer');

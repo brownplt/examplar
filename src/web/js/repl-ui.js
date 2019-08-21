@@ -1001,6 +1001,9 @@
           let rest = injections.slice(1);
           if (first !== undefined) {
             window.injection = first;
+            options.checkAll = false;
+            options.checkMode = true;
+            runtime.setStdout(function() {});
             return repl.restartInteractions(src, options)
               .then(jsonResult(output, runtime, repl.runtime, true))
               .then(
@@ -1055,14 +1058,36 @@
                 return null;
               });
 
-          // lastly, run the student's tests
-          let test_results = chaff_results.then(
-            function(){
-              console.log("test_results");
-              delete window.injection;
-              // run students' impl tests, too
-              options.checkAll = true;
-              return repl.restartInteractions(src, options);
+          // true if a student implementation exists and is loaded
+
+          // lastly, run the student's tests, if they've begun their implementation.
+          let test_results = Q.all([window.dummy_impl, chaff_results]).then(
+            function([dummy_impl, _]){
+              let impl_exists = sourceAPI.loaded.some(function(f) {
+                if (f.file && f.file.getName) {
+                  return f.file.getName().includes("code");
+                } else {
+                  return false;
+                }
+              });
+
+              runtime.setStdout(function(str){
+                output.append($("<pre>").addClass("replPrint").text(str));
+              });
+
+              if (impl_exists) {
+                console.log("test_results");
+                delete window.injection;
+                // run students' impl tests, too
+                options.checkAll = true;
+                options.checkMode = true;
+                return repl.restartInteractions(src, options);
+              } else {
+                // run the dummy impl
+                window.injection = dummy_impl;
+                options.checkMode = false;
+                return repl.restartInteractions(src, options);
+              }
             });
 
           // then display the result
@@ -1073,7 +1098,8 @@
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results,
                                      {wheat: wheat_results, chaff: chaff_results});
               }, function(error_result) {
-                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result);
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result,
+                  {error: true});
               });
 
           display_result.fin(afterRun(false));

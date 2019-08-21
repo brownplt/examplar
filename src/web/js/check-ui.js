@@ -143,6 +143,14 @@
         validity_elt.classList.add("maybe-valid");
         message_elt.textContent = "The validity and thoroughness of test cases in this file are unknown.";
         return container_elt;
+      } else if (examplar_results.error) {
+        thoroughness_elt.textContent = "ERROR ENCOUNTERED";
+        validity_elt.textContent = "INVALID";
+        validity_elt.classList.add("invalid");
+        container_elt.classList.add("invalid");
+        message_elt.textContent = "kaboom.";
+
+        return container_elt;
       }
 
       let wheats = examplar_results.wheat;
@@ -503,7 +511,6 @@
           let _this = this;
           let skeletons = blocks.map(block => new CheckBlockSkeleton(_this, block));
 
-
           let container = document.createElement("div");
           container.classList.add("file-test-results");
 
@@ -553,11 +560,13 @@
 
           summary_bits.append(view_button_elt);
 
-          if (!examplar_summary.classList.contains("invalid")) {
+          if (!examplar_summary.classList.contains("invalid") || checkBlocksErrored > 0) {
             $(summary).append(summary_bits);
           }
 
-          container.appendChild(summary);
+          if (checkTotalAll > 0 || checkBlocksErrored > 0) {
+            container.appendChild(summary);
+          }
 
           let blockList = document.createElement("div");
           blockList.classList.add("test-file-blocks");
@@ -647,7 +656,9 @@
           this.file = file;
           this.tests = tests;
 
-          tests.forEach(test => testFrag.appendChild(test.container));
+          if (!endedInError) {
+            tests.forEach(test => testFrag.appendChild(test.container));
+          }
 
           if (error !== undefined) {
             summary.textContent =
@@ -788,8 +799,12 @@
         return get(get(block, "loc"), "source");
       });
 
-      if (checkBlocks.length === 0)
-        return;
+      if (!groupedCheckBlocks.has("definitions://")) {
+        groupedCheckBlocks.set("definitions://", []);
+      }
+
+      //if (checkBlocks.length === 0)
+      //  return;
 
       var keywordCheck = false;
       var keywordExamples = false;

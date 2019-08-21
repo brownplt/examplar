@@ -51,7 +51,7 @@ define("cpo/gdrive-locators", [], function() {
         return "Could not load file with name " + filename;
       }
 
-      if (typeof window.injection !== 'undefined') {
+      if (typeof window.injection !== 'undefined' && filename.includes("code")) {
         if (window.injection.getName().endsWith('.arr')) {
           return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
         } else if (window.injection.getName().endsWith('.js')) {

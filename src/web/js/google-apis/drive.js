@@ -372,9 +372,14 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                   let maybe_tests = results.find(result => result.title.includes('tests'));
                   let maybe_common = results.find(result => result.title.includes('common'));
                   return ls("not trashed and '"+ id + "' in parents and title contains 'arr'").then(function(results) {
+                    let maybe_dummy_impl = results.find(result => result.title.includes('dummy'));
                     let maybe_code_template = results.find(result => result.title.includes('code'));
                     let maybe_tests_template = results.find(result => result.title.includes('tests'));
                     let maybe_common_template = results.find(result => result.title.includes('common'));
+
+                    let dummy_impl =
+                      drive.files.get({"fileId": maybe_dummy_impl.id})
+                        .then(file => makeSharedFile(file,true));
 
                     let code =
                       (maybe_code != null
@@ -397,8 +402,8 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                             ? copy_template_to_drive(bc, maybe_common_template)
                             : Q(null))).then(fileBuilder);
 
-                    return Q.all([code, tests, common]).then(function([code, tests, common]) {
-                      return {assignment_name: template.title, assignment_id: id, code: code, tests: tests, common: common};
+                    return Q.all([code, tests, common, dummy_impl]).then(function([code, tests, common, dummy_impl]) {
+                      return {assignment_name: template.title, assignment_id: id, code: code, tests: tests, common: common, dummy_impl: dummy_impl};
                     });
                   });
                 });
