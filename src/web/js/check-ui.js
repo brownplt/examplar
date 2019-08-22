@@ -137,7 +137,7 @@
       container_elt.appendChild(thoroughness_elt);
       container_elt.appendChild(message_elt);
 
-      if (examplar_results == null) {
+      if (examplar_results == null || examplar_results.wheat.length == 0) {
         thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
         validity_elt.textContent = "MAYBE VALID";
         validity_elt.classList.add("maybe-valid");
