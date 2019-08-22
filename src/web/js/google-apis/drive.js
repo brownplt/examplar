@@ -289,7 +289,11 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
         return ls("'"+ id + "' in parents and title = '" + type + "'")
           .then(function(results) {
-            return ls("'"+ results[0].id + "' in parents")
+            if (results.length > 0) {
+              return ls("'"+ results[0].id + "' in parents");
+            } else {
+              return Promise.resolve([]);
+            }
           })
           .then(function(chaff) {
             return chaff.reduce((promiseChain, file) => {

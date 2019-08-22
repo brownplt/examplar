@@ -528,33 +528,6 @@ $(function() {
   // set `definitions://` to the test document
   assignment_tests.then(tests => sourceAPI.set_definitions(tests));
 
-  window.programLoaded =
-    Q.all([assignment_common, assignment_tests])
-    .then(function ([common, tests]) {
-      new Tab(common);
-      new Tab(tests).activate();
-      CPO.editor.cm.setOption('readOnly', false);
-    });
-
-  assignment.then(assn => assn.code).then(function(code) {
-    if (code instanceof Function) {
-      let begin_button = document.createElement("button");
-      begin_button.textContent = "+ Begin Implementation";
-
-      begin_button.addEventListener("click", function() {
-        code().then(function(code) {
-          begin_button.remove();
-          sourceAPI.from_file(code).then(code => new Tab(code));
-        });
-      });
-
-      document.getElementById("files-tabs-container")
-        .appendChild(begin_button);
-    } else {
-      sourceAPI.from_file(code).then(code => new Tab(code));
-    }
-  });
-
   // load the wheats
   window.wheat =
     assignment_id.then(function(id) {
@@ -570,6 +543,49 @@ $(function() {
         return api.getGrainFilesByTemplate(id,'chaff');
       });
     });
+
+  let common_and_tests_tabs = 
+    Q.all([assignment_common, assignment_tests])
+      .then(function ([common, tests]) {
+        new Tab(common);
+        new Tab(tests).activate();
+        CPO.editor.cm.setOption('readOnly', false);
+      });
+
+  let maybe_code =
+    Q.all([assignment.then(assn => assn.code), window.wheat]).then(function([code, wheat]) {
+      if (wheat.length == 0) {
+        // if no wheats, eagerly instantiate the code tab
+        if (code instanceof Function) {
+          code()
+            .then(code => sourceAPI.from_file(code))
+            .then(code => new Tab(code));
+        } else {
+          sourceAPI.from_file(code)
+            .then(code => new Tab(code));
+        }
+      } else {
+        // otherwise, lazy load
+        if (code instanceof Function) {
+          let begin_button = document.createElement("button");
+          begin_button.textContent = "+ Begin Implementation";
+
+          begin_button.addEventListener("click", function() {
+            code().then(function(code) {
+              begin_button.remove();
+              sourceAPI.from_file(code).then(code => new Tab(code));
+            });
+          });
+
+          document.getElementById("files-tabs-container")
+            .appendChild(begin_button);
+        } else {
+          sourceAPI.from_file(code).then(code => new Tab(code));
+        }
+      }
+    });
+
+  window.programLoaded = Q.all([common_and_tests_tabs, maybe_code]);
 
   var programToSave = Q(null);
 
