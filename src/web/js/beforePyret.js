@@ -557,11 +557,11 @@ $(function() {
       if (wheat.length == 0) {
         // if no wheats, eagerly instantiate the code tab
         if (code instanceof Function) {
-          code()
+          return code()
             .then(code => sourceAPI.from_file(code))
             .then(code => new Tab(code));
         } else {
-          sourceAPI.from_file(code)
+          return sourceAPI.from_file(code)
             .then(code => new Tab(code));
         }
       } else {
@@ -579,15 +579,18 @@ $(function() {
 
           document.getElementById("files-tabs-container")
             .appendChild(begin_button);
+          return Q();
         } else {
-          sourceAPI.from_file(code).then(code => new Tab(code));
+          return sourceAPI.from_file(code).then(code => new Tab(code));
         }
       }
     });
 
-  window.programLoaded = Q.all([common_and_tests_tabs, maybe_code]);
-
-  var programToSave = Q(null);
+  window.programLoaded = Q.all([common_and_tests_tabs, maybe_code])
+    .then(function (p) {
+      enableFileOptions();
+      return p;
+    });
 
   function showShareContainer(p) {
     //console.log('called showShareContainer');
@@ -603,9 +606,7 @@ $(function() {
     return filename || "Untitled";
   }
   function autoSave() {
-    programToSave.then(function(p) {
-      if(p !== null && !p.shared) { save(); }
-    });
+    return save();
   }
 
   function enableFileOptions() {
@@ -636,123 +637,21 @@ $(function() {
     set the name to "Untitled".
 
   */
-  function save(newFilename) {
-    var useName, create;
-    if(newFilename !== undefined) {
-      useName = newFilename;
-      create = true;
-    }
-    else if(filename === false) {
-      filename = "Untitled";
-      create = true;
-    }
-    else {
-      useName = filename; // A closed-over variable
-      create = false;
-    }
+  function save() {
     window.stickMessage("Saving...");
-    var savedProgram = programToSave.then(function(p) {
-      if(p !== null && p.shared && !create) {
-        return p; // Don't try to save shared files
-      }
-      if(create) {
-        programToSave = storageAPI
-          .then(function(api) { return api.createFile(useName); })
-          .then(function(p) {
-            // showShareContainer(p); TODO(joe): figure out where to put this
-            //history.pushState(null, null, "#program=" + p.getUniqueId());
-            updateName(p); // sets filename
-            enableFileOptions();
-            return p;
-          });
-        return programToSave.then(function(p) {
-          return save();
-        });
-      }
-      else {
-        return programToSave.then(function(p) {
-          if(p === null) {
-            return null;
-          }
-          else {
-            return p.save(CPO.editor.cm.getValue(), false);
-          }
-        }).then(function(p) {
-          if(p !== null) {
-            window.flashMessage("Program saved as " + p.getName());
-          }
-          return p;
-        });
-      }
-    });
-    savedProgram.fail(function(err) {
-      window.stickError("Unable to save", "Your internet connection may be down, or something else might be wrong with this site or saving to Google.  You should back up any changes to this program somewhere else.  You can try saving again to see if the problem was temporary, as well.");
-      console.error(err);
-    });
-    return savedProgram;
-  }
-
-  function saveAs() {
-    if(menuItemDisabled("saveas")) { return; }
-    programToSave.then(function(p) {
-      var name = p === null ? "Untitled" : p.getName();
-      var saveAsPrompt = new modalPrompt({
-        title: "Save a copy",
-        style: "text",
-        options: [
-          {
-            message: "The name for the copy:",
-            defaultValue: name
-          }
-        ]
-      });
-      return saveAsPrompt.show().then(function(newName) {
-        if(newName === null) { return null; }
-        window.stickMessage("Saving...");
-        return save(newName);
-      }).
-      fail(function(err) {
-        console.error("Failed to rename: ", err);
-        window.flashError("Failed to rename file");
-      });
-    });
-  }
-
-  function rename() {
-    programToSave.then(function(p) {
-      var renamePrompt = new modalPrompt({
-        title: "Rename this file",
-        style: "text",
-        options: [
-          {
-            message: "The new name for the file:",
-            defaultValue: p.getName()
-          }
-        ]
-      });
-      // null return values are for the "cancel" path
-      return renamePrompt.show().then(function(newName) {
-        if(newName === null) {
-          return null;
-        }
-        window.stickMessage("Renaming...");
-        programToSave = p.rename(newName);
-        return programToSave;
-      })
-      .then(function(p) {
-        if(p === null) {
-          return null;
-        }
-        updateName(p);
-        window.flashMessage("Program saved as " + p.getName());
-      })
-      .fail(function(err) {
-        console.error("Failed to rename: ", err);
-        window.flashError("Failed to rename file");
-      });
-    })
-    .fail(function(err) {
-      console.error("Unable to rename: ", err);
+    return Promise.all(
+      sourceAPI.loaded
+        .filter(s => !s.ephemeral && !s.shared)
+        .map(s => s.save()))
+    .then(function(s) {
+      window.flashMessage("Programs saved!");
+      return s;
+    }, function(e) {
+      let message =
+        (e && e.response && e.response.error && e.response.error.message) ? e.response.error.message : "Your internet connection may be down, or something else might be wrong with this site or saving to Google.  You should back up any changes to this program somewhere else.  You can try saving again to see if the problem was temporary, as well.";
+      window.stickError("Unable to save", message);
+      console.error("Unable to save:", e);
+      throw e;
     });
   }
 
@@ -760,10 +659,7 @@ $(function() {
     CPO.autoSave();
   });
 
-  $("#new").click(newEvent);
   $("#save").click(saveEvent);
-  $("#rename").click(rename);
-  $("#saveas").click(saveAs);
 
   var focusableElts = $(document).find('#header .focusable');
   //console.log('focusableElts=', focusableElts)

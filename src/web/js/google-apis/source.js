@@ -10,6 +10,10 @@ window.createSourceManager = function createSourceManager(storageAPI) {
       this.document = CodeMirror.Doc(contents || "", "pyret");
     }
 
+    get ephemeral() {
+      return false;
+    }
+
     get name() {
       return this.file.getName();
     }
@@ -19,7 +23,12 @@ window.createSourceManager = function createSourceManager(storageAPI) {
     }
 
     save() {
-      return this.file.save(this.contents, false);
+      let _this = this;
+      return this.file.save(this.contents, false)
+        .then(function (f) {
+          _this.file = f;
+          return;
+        });
     }
   }
 
@@ -27,6 +36,10 @@ window.createSourceManager = function createSourceManager(storageAPI) {
     constructor(name, doc) {
       this._name = name;
       this.document = doc;
+    }
+
+    get ephemeral() {
+      return true;
     }
 
     get name() {
