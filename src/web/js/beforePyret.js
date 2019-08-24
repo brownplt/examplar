@@ -2,6 +2,8 @@
 
 var shareAPI = makeShareAPI(process.env.CURRENT_PYRET_RELEASE);
 
+var FileSaver = require('file-saver');
+var JSZip = require("jszip");
 var url = require('url.js');
 var modalPrompt = require('./modal-prompt.js');
 window.modalPrompt = modalPrompt;
@@ -359,18 +361,16 @@ $(function() {
   var filename = false;
 
   $("#download a").click(function() {
-    var downloadElt = $("#download a");
-    var contents = CPO.editor.cm.getValue();
-    var downloadBlob = window.URL.createObjectURL(new Blob([contents], {type: 'text/plain'}));
-    if(!filename) { filename = 'untitled_program.arr'; }
-    if(filename.indexOf(".arr") !== (filename.length - 4)) {
-      filename += ".arr";
-    }
-    downloadElt.attr({
-      download: filename,
-      href: downloadBlob
-    });
-    $("#download").append(downloadElt);
+    var zip = new JSZip();
+
+    sourceAPI.loaded
+      .filter(s => !s.ephemeral && !s.shared)
+      .forEach(s => zip.file(s.name, s.contents));
+
+    Promise.all([zip.generateAsync({type:"blob"}), window.assignment_name])
+      .then(function ([blob, name]) {
+          FileSaver.saveAs(blob, name + ".zip");
+      });
   });
 
   var TRUNCATE_LENGTH = 20;
@@ -519,6 +519,7 @@ $(function() {
 
   window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
   window.assignment_id = assignment.then(function(assn) { return assn.assignment_id });
+  window.assignment_name = assignment.then(function(assn) { return assn.assignment_name });
 
   let assignment_tests = assignment.then(assn => sourceAPI.from_file(assn.tests));
   let assignment_common = assignment.then(assn => sourceAPI.from_file(assn.common));
