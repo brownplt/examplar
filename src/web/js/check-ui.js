@@ -137,7 +137,11 @@
       container_elt.appendChild(thoroughness_elt);
       container_elt.appendChild(message_elt);
 
-      if (examplar_results == null || examplar_results.wheat.length == 0) {
+      if (examplar_results == null ||
+          ( examplar_results != null &&
+            examplar_results.wheat != null &&
+            examplar_results.wheat.length == 0))
+      {
         thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
         validity_elt.textContent = "MAYBE VALID";
         validity_elt.classList.add("maybe-valid");
@@ -803,8 +807,8 @@
         groupedCheckBlocks.set("definitions://", []);
       }
 
-      //if (checkBlocks.length === 0)
-      //  return;
+      if (checkBlocks.length === 0 && examplarResults == null)
+        return;
 
       var keywordCheck = false;
       var keywordExamples = false;
