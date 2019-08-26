@@ -65,6 +65,41 @@ class GoogleAPI {
     return window.gapi.client.request(reqOpts);
   }
 
+  getRecentAssignments = (appName) => {
+    function ls(q, fields) {
+      fields = "nextPageToken,incompleteSearch," + (fields || "");
+      var ret = Q.defer();
+      var retrievePageOfFiles = function(request, result) {
+        request.execute(function(resp) {
+          result = result.concat(resp.result.files);
+          var nextPageToken = resp.nextPageToken;
+          if (resp.incompleteSearch && nextPageToken) {
+            request = gapi.client.drive.files.list({
+              'q': q,
+              'fields': fields,
+              'pageToken': nextPageToken
+            });
+            retrievePageOfFiles(request, result);
+          } else {
+            ret.resolve(result);
+          }
+        });
+      }
+      var initialRequest = gapi.client.drive.files.list({'q': q, 'fields': fields});
+      retrievePageOfFiles(initialRequest, []);
+      return ret.promise;
+    }
+
+    return this.getAppFolderID(appName).then(response => {
+      const appFolderId = response.result.files[0].id;
+      const files = ls(`not trashed and "${appFolderId}" in parents`,
+        "files(properties(assignment))");
+      return files.then(r => Promise.all([...new Set(r.map(f => f.properties.assignment))]
+        .map(a => gapi.client.drive.files.get({'fileId':a})
+          .then(r => new Object({'name': r.result.name, 'id': r.result.id})))));
+    });
+  }
+
   getRecentFilesByExtAndAppName = (appName, ext) => {
     return Q.all([this.getAppFolderID(appName), this.getAppSharedFolderID(appName)])
       .then((resp) => {

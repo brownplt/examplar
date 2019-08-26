@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import GoogleAPI from './GoogleAPI.js';
-import {CLIENT_ID, FILE_EXT, APP_NAME, API_KEY} from './config.js';
-import File from './File';
+import {CLIENT_ID, FILE_EXT, APP_NAME, COLLECTION_NAME, API_KEY} from './config.js';
+import Assignment from './Assignment';
 
 const NOT_SIGNED_IN = 1;
 const WAITING_FOR_SIGNIN = 2;
@@ -18,9 +18,8 @@ class StudentDashboard extends Component {
 
     this.state = {
       signedIn: INITIAL_LOAD,
-      files: [],
-      activeTab: 'recent-files',
-      newFileName: '',
+      activeTab: 'recent-assignments',
+      assignments: [],
       userName: false
     };
 
@@ -29,7 +28,7 @@ class StudentDashboard extends Component {
     apiLoaded.then((resp) => {
       if(resp.hasAuth()) {
         this.setState({signedIn: SIGNED_IN});
-        this.updateRecentFiles();
+        this.updateRecentAssignments();
         this.api.getUsername().then((userInfo) => {
           this.setState({ userName: userInfo.emails[0].value });
         });
@@ -54,7 +53,7 @@ class StudentDashboard extends Component {
       this.api.getUsername().then((userInfo) => {
         this.setState({ userName: userInfo.emails[0].value });
       });
-      this.updateRecentFiles();
+      this.updateRecentAssignments();
     })
     .fail((resp) => {
       this.setState({ signedIn: NOT_SIGNED_IN });
@@ -68,73 +67,20 @@ class StudentDashboard extends Component {
 
   handleTabClick = (event) => {
     this.setState({activeTab: event.target.id});
-    if (event.target.id === 'recent-files') {
-      this.updateRecentFiles();
+    if (event.target.id === 'recent-assignments') {
+      this.updateRecentAssignments();
     }
   }
 
-  updateRecentFiles = () => {
-    this.setState({files: WAITING_FOR_FILES});
-    this.api.getRecentFilesByExtAndAppName(APP_NAME, FILE_EXT).then((resp) => {
-      this.setState({files: resp.result.files});
+  updateRecentAssignments = () => {
+    this.setState({assignments: WAITING_FOR_FILES});
+    this.api.getRecentAssignments(COLLECTION_NAME).then((resp) => {
+      this.setState({assignments: resp});
     })
   }
 
   handleNewFilenameChange = (event) => {
     this.setState({newFileName: event.target.value});
-  }
-
-  handleCreateNewFile = (event) => {
-    event.preventDefault();
-    var w = window.open("about:blank", "_blank");
-    if (this.state.newFileName) {
-      this.api.getAppFolderID(APP_NAME).then((resp) => {
-        var files = resp.result.files;
-
-        // App Folder did not yet exist
-        if (files.length === 0) {
-          this.api.createAppFolder(APP_NAME).then((resp) => {
-            return this.api.createNewFile(resp.result.id, this.state.newFileName + '.arr').then((resp)=> {
-              w.location = EDITOR_REDIRECT_URL + resp.result.id;
-//              window.open(EDITOR_REDIRECT_URL + resp.result.id, '_newtab');
-            });
-          });
-        }
-
-        // App Folder already existed
-        else {
-          return this.api.createNewFile(files[0].id, this.state.newFileName + '.arr').then((resp) => {
-            w.location = EDITOR_REDIRECT_URL + resp.result.id;
-//            window.open(EDITOR_REDIRECT_URL + resp.result.id, '_newtab');
-          });
-        }
-      });
-    }
-  }
-
-  handleSelectFileClick = (event) => {
-    var w = window.open("about:blank", "_blank");
-    this.api.getAppFolderID(APP_NAME).then((resp) => {
-      var files = resp.result.files;
-      if(files.length === 0) {
-        var urlToOpen = "https://drive.google.com/drive/u/0/";
-      }
-      else {
-        var urlToOpen = "https://drive.google.com/drive/u/0/folders/" + files[0].id;
-      }
-      w.location = urlToOpen;
-    }).fail((err) => {
-      w.close();
-    });
-    /*
-    this.api.createPicker(APP_NAME, (data) => {
-      if (data.action === window.google.picker.Action.PICKED) {
-        var fileId = data.docs[0].id;
-        window.open(EDITOR_REDIRECT_URL + fileId, "_blank");
-        window.picker.setVisible(false);
-      }
-    });
-    */
   }
 
   // A simple callback implementation.
@@ -187,35 +133,23 @@ class StudentDashboard extends Component {
         </div>
         <div id='file-picker-modal' className={'modal-wrap container ' + (this.state.signedIn === SIGNED_IN ? '' : 'hidden')}>
           <div id='file-picker-modal-tabs' className='cf'>
-            <h2 id='recent-files' className={'tab floatable left ' + ((this.state.activeTab === 'recent-files') ? 'active' : '')} onClick={this.handleTabClick}>Recent Files</h2>
-            <h2 id='new-file' className={'tab floatable left ' + ((this.state.activeTab === 'new-file') ? 'active' : '')} onClick={this.handleTabClick}>New File</h2>
-            <div className='button-wrapper right'>
-              <button id='select-file' onClick={this.handleSelectFileClick} >View in Google Drive</button>
-            </div>
+            <h2 id='recent-assignments' className={'tab floatable left ' + ((this.state.activeTab === 'recent-assignments') ? 'active' : '')} onClick={this.handleTabClick}>Recent Assignments</h2>
           </div>
-          <div id='file-picker-modal-body' className={'modal-body ' + ((this.state.activeTab === 'new-file') ? 'hidden' : '')}>
+          <div id='file-picker-modal-body' className={'modal-body ' + ((this.state.activeTab === 'recent-assignments') ? '' : 'hidden')}>
             {
-              this.state.files === WAITING_FOR_FILES ?
+              this.state.assignments === WAITING_FOR_FILES ?
               (<div id='loading-spinner'>
-                <h2>Loading files...</h2>
+                <h2>Loading assignments...</h2>
                 <i className='fa fa-circle-o-notch fast-spin fa-3x fa-fw'></i>
               </div>)
               :
-                this.state.files.length > 0 ?
+                this.state.assignments.length > 0 ?
                     (<div className='file-list cf'>
-                      {this.state.files.map((f) => {return <File key={f.id} id={f.id} name={f.name} modifiedTime={f.modifiedTime} />;})}
+                      {this.state.assignments.map((f) => {return <Assignment key={f.id} id={f.id} name={f.name} />;})}
                     </div>)
                   :
-                    <p><em>No Pyret files yet, use New File above to create one.</em></p>
+                    <p><em>No Pyret assignments yet.</em></p>
             }
-          </div>
-          <div className={'modal-body ' + ((this.state.activeTab === 'new-file') ? '' : 'hidden')}>
-            <form onSubmit={this.handleCreateNewFile}>
-              <label className='input-label'>New file name:</label>
-              <input className='form' type='text' value={this.state.newFileName} onChange={this.handleNewFilenameChange} />
-              <span className='arr-ext'>.arr</span>
-              <input id='new-file' className='button ' type='submit' value='Create' />
-            </form>
           </div>
         </div>
         <div className='footer middle'>
