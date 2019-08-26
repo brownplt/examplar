@@ -59,6 +59,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
     function makeFile(googFileObject, mimeType, fileExtension) {
       let cm_doc = null;
+      let contents = null;
       return {
         shared: false,
         getName: function() {
@@ -93,15 +94,21 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             });
         },
         getContents: function(cache_mode) {
-          return fetch(googFileObject.downloadUrl,
-            { method: "get",
-              cache: cache_mode || "no-cache",
-              headers: new Headers([
-                  ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
-                ])
-            }).then(function(response) {
-              return response.text();
-            });
+          let id = this.getUniqueId();
+          if (contents != null) {
+            return contents;
+          } else {
+            return fetch(googFileObject.downloadUrl,
+              { method: "get",
+                cache: cache_mode || "no-cache",
+                headers: new Headers([
+                    ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
+                  ])
+              }).then(function(response) {
+                contents = response.text();
+                return contents;
+              });
+          }
         },
         getDoc: function() {
           let uri = "my-gdrive://" + this.getName();
