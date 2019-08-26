@@ -346,8 +346,8 @@ $(function() {
 
   let assignment;
 
-  if (params["get"] && params["get"]["template"]) {
-    assignment = storageAPI.then(api => api.getTemplateFileById(params["get"]["template"]));
+  if (params["get"] && params["get"]["assignment"]) {
+    assignment = storageAPI.then(api => api.getTemplateFileById(params["get"]["assignment"]));
   } else {
     // Redirect to main page.
     window.location.href = "/";
