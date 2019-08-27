@@ -545,7 +545,7 @@ $(function() {
       });
     });
 
-  let common_and_tests_tabs = 
+  let common_and_tests_tabs =
     Q.all([assignment_common, assignment_tests])
       .then(function ([common, tests]) {
         new Tab(common);
@@ -685,6 +685,8 @@ $(function() {
   }
 
   function updateEditorHeight() {
+    // Hide expanded menus so they don't factor into height
+    hideAllTopMenuitems();
     var toolbarHeight = document.getElementById('topTierUl').scrollHeight;
     // gets bumped to 67 on initial resize perturbation, but actual value is indeed 40
     if (toolbarHeight < 80) toolbarHeight = 40;
