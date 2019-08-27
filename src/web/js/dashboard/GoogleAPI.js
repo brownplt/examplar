@@ -91,8 +91,11 @@ class GoogleAPI {
     }
 
     return this.getAppFolderID(appName).then(response => {
-      const appFolderId = response.result.files[0].id;
-      const files = ls(`not trashed and "${appFolderId}" in parents`,
+      const appFolder = response.result.files[0];
+      // Check for nonexistent drive folder
+      if (!appFolder) return Promise.resolve([]);
+
+      const files = ls(`not trashed and "${appFolder.id}" in parents`,
         "files(properties(assignment))");
       return files.then(r => Promise.all([...new Set(r.map(f => f.properties.assignment))]
         .map(a => gapi.client.drive.files.get({'fileId':a})
