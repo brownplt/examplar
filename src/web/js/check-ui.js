@@ -143,7 +143,7 @@
             examplar_results.wheat.length == 0))
       {
         thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
-        validity_elt.textContent = "MAYBE VALID";
+        validity_elt.textContent = "VALIDITY UNKNOWN";
         validity_elt.classList.add("maybe-valid");
         message_elt.textContent = "The validity and thoroughness of test cases in this file are unknown.";
         return container_elt;
