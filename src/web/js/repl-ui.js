@@ -982,11 +982,26 @@
         };
 
         Q.all([window.user, window.assignment_id])
-          .done(function([email, id, gdrive_id]) {
+          .then(function([email, id]) {
             return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
-              method: 'PUT',
+              method: 'POST',
               // TODO make this logging better!
-              body: JSON.stringify({email: email, assignment: id, submission: CPO.sourceAPI.get_loaded("definitions://").contents}),
+              body: JSON.stringify({
+                email: email,
+                assignment: id,
+                submission:
+                  [...new Set(sourceAPI.loaded.filter(s => !s.ephemeral && !s.shared))]
+                    .map(s => new Object({
+                      name: s.name,
+                      id: s.file.getUniqueId(),
+                      role
+                        : s.name.includes("code") ? "code"
+                        : s.name.includes("tests") ? "tests"
+                        : s.name.includes("common") ? "common"
+                        : undefined,
+                      contents: s.contents,
+                    }))
+              }),
               headers:{
                 'Content-Type': 'application/json'
               }
