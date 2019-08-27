@@ -62,6 +62,17 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       let contents = null;
       return {
         shared: false,
+        edited: function() {
+          return drive.properties.patch({
+            "fileId": googFileObject.id,
+            "propertyKey": "edited",
+            "visibility": "PUBLIC",
+            "resource": {
+              "key": "edited",
+              "value": true,
+            }
+          });
+        },
         getName: function() {
           return googFileObject.title;
         },
@@ -206,7 +217,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     // The primary purpose of this is to have some sort of fallback for
     // any situation in which the file object has somehow lost its info
     function fileBuilder(googFileObject) {
-      if (fileBuilder == null ) {
+      if (googFileObject == null ) {
         return null;
       } else if ((googFileObject.mimeType === 'text/plain' && !googFileObject.fileExtension)
           || googFileObject.fileExtension === 'arr') {
@@ -336,42 +347,35 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         }
 
         function copy_template_to_drive(bc, template) {
-          return drive.files.copy({
+          let copy = drive.files.copy({
             "fileId": template.id,
             "resource": {
               "parents": [{"id": bc.id}]
-            }})
-            .then(function(file) {
-              return drive.properties.insert({
-                  "fileId": file.id,
-                  "resource": {
-                    "key": "assignment",
-                    "value": id,
-                    "visibility": "PUBLIC"
-                  }
-                }).then(function(_) {
-                  return drive.properties.insert({
-                      "fileId": file.id,
-                      "resource": {
-                        "key": "examplar",
-                        "value": "yes",
-                        "visibility": "PUBLIC"
-                      }});
-                }).then(function(_) {
-                  return drive.permissions.insert({
-                        "fileId": file.id,
-                        "emailMessage": "TEST MESSAGE",
-                        "sendNotificationEmails": "true",
-                        "resource": {
-                          "role": "reader",
-                          "type": "user",
-                          "value": "pyret.examplar@gmail.com"
-                        }
-                    });
-              }).then(function(_) {
-                return file;
-              });
-            });
+            }});
+
+          let assignment = copy.then(file =>
+            drive.properties.insert({
+              "fileId": file.id,
+              "resource": {
+                "key": "assignment",
+                "value": id,
+                "visibility": "PUBLIC"
+              }
+            }));
+
+          let share = Promise.all([copy, assignment]).then(([file, _]) =>
+            drive.permissions.insert({
+              "fileId": file.id,
+              "emailMessage": "TEST MESSAGE",
+              "sendNotificationEmails": "true",
+              "resource": {
+                "role": "reader",
+                "type": "user",
+                "value": "pyret.examplar@gmail.com"
+              }
+            }));
+
+          return copy;
         }
 
         var sweepFromDrive =
@@ -393,21 +397,34 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                         .then(file => makeSharedFile(file,true));
 
                     let code =
-                      (maybe_code != null
-                        ? drive.files.get({"fileId": maybe_code.id}).then(fileBuilder)
-                        : function(){return (maybe_code_template != null
-                            ? copy_template_to_drive(bc, maybe_code_template).then(fileBuilder)
-                            : Q(null).then(fileBuilder));});
+                      (maybe_code
+                        ? drive.files.get({"fileId": maybe_code.id})
+                        : (maybe_code_template != undefined
+                            ? copy_template_to_drive(bc, maybe_code_template)
+                                .then(file =>
+                                  drive.properties.insert({
+                                    "fileId": file.id,
+                                    "resource": {
+                                      "key": "edited",
+                                      "value": false,
+                                      "visibility": "PUBLIC"
+                                    }
+                                  }).then(function(properties) {
+                                    // TODO: this is awful
+                                    file.properties = [properties.result];
+                                    return file;
+                                  }))
+                            : Q(null))).then(fileBuilder);
 
                     let tests =
-                      (maybe_tests != null
+                      (maybe_tests
                         ? drive.files.get({"fileId": maybe_tests.id})
                         : (maybe_tests_template != null
                             ? copy_template_to_drive(bc, maybe_tests_template)
                             : Q(null))).then(fileBuilder);
 
                     let common =
-                      (maybe_common != null
+                      (maybe_common
                         ? drive.files.get({"fileId": maybe_common.id})
                         : (maybe_common_template != null
                             ? copy_template_to_drive(bc, maybe_common_template)

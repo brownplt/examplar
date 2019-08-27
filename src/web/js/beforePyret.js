@@ -545,49 +545,39 @@ $(function() {
       });
     });
 
-  let common_and_tests_tabs =
-    Q.all([assignment_common, assignment_tests])
-      .then(function ([common, tests]) {
-        new Tab(common);
-        new Tab(tests).activate();
-        CPO.editor.cm.setOption('readOnly', false);
-      });
-
-  let maybe_code =
-    Q.all([assignment.then(assn => assn.code), window.wheat]).then(function([code, wheat]) {
-      if (wheat.length == 0) {
-        // if no wheats, eagerly instantiate the code tab
-        if (code instanceof Function) {
-          return code()
-            .then(code => sourceAPI.from_file(code))
-            .then(code => new Tab(code));
-        } else {
-          return sourceAPI.from_file(code)
-            .then(code => new Tab(code));
-        }
+  let assignment_code = assignment.then(assn => assn.code)
+    .then(code => {
+      if (code._googObj.properties.find(p => p.key == "edited").value == "true") {
+        return sourceAPI.from_file(code);
       } else {
-        // otherwise, lazy load
-        if (code instanceof Function) {
-          let begin_button = document.createElement("button");
-          begin_button.textContent = "+ Begin Implementation";
-
-          begin_button.addEventListener("click", function() {
-            code().then(function(code) {
-              begin_button.remove();
-              sourceAPI.from_file(code).then(code => new Tab(code));
-            });
+        let begin_button = document.createElement("button");
+        begin_button.textContent = "+ Begin Implementation";
+        let clicked = false;
+        begin_button.addEventListener("click", function() {
+          if (clicked) return; clicked = true;
+          code.edited().then(function (_) {
+            begin_button.remove();
+            sourceAPI.from_file(code).then(code => new Tab(code));
           });
-
-          document.getElementById("files-tabs-container")
-            .appendChild(begin_button);
-          return Q();
-        } else {
-          return sourceAPI.from_file(code).then(code => new Tab(code));
-        }
+        });
+        document.getElementById("files-tabs-container")
+          .appendChild(begin_button);
+        return null;
       }
     });
 
-  window.programLoaded = Q.all([common_and_tests_tabs, maybe_code])
+  let common_and_tests_tabs = 
+    Q.all([assignment_common, assignment_tests, assignment_code])
+      .then(function ([common, tests, code]) {
+        new Tab(common);
+        new Tab(tests).activate();
+        CPO.editor.cm.setOption('readOnly', false);
+        if (code != null) {
+          new Tab(code);
+        }
+      });
+
+  window.programLoaded = Q.all([common_and_tests_tabs])
     .then(function (p) {
       enableFileOptions();
       return p;
