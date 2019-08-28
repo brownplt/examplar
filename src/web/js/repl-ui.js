@@ -290,9 +290,11 @@
       var rr = resultRuntime;
 
       // this function must NOT be called on the pyret stack
-      return function(result) {
+      return function(result)
+      {
         var base_result = result;
         var doneDisplay = Q.defer();
+
         // Start a new pyret stack.
         // this returned function must not be called on the pyret stack
         // b/c `callingRuntime.runThunk` must not be called on the pyret stack
@@ -340,14 +342,24 @@
             return false;
           }
         }, function(r) {
-          if (r.result === false) {
+          console.info("SFSDFSDFDSF", r);
+          if (r.result instanceof Array) {
+            doneDisplay.resolve(r.result);
+          } else if (r.result === false) {
             doneDisplay.reject(base_result);
           } else {
-            doneDisplay.resolve(r.result);
+            console.err("ERROR ENCOUNTERED", r.result);
+            doneDisplay.reject(r.result);
           }
-          return base_result;
+          
+          //if (r.result === false) {
+          //  doneDisplay.reject(base_result);
+          //} else {
+          //  doneDisplay.resolve(r.result);
+          //}
         });
-      return doneDisplay.promise;
+  
+        return doneDisplay.promise;
       }
     }
 
@@ -1069,7 +1081,7 @@
                 return window.chaff.then(run_injections);
               },
               function(e){
-                console.log("chaff_results::err", e);
+                console.error("chaff_results::err", e);
                 return null;
               });
 

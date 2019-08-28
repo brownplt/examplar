@@ -1,3 +1,40 @@
+class Batch {
+  constructor() {
+    this.batch = gapi.client.newBatch();
+  }
+
+  get(name, path, params) {
+    this.batch.add(gapi.client.request({
+      path: path,
+      params: params,
+    }), {'id': name});
+  }
+
+  post(name, path, params) {
+    this.batch.add(gapi.client.request({
+      path: path,
+      method: "POST",
+      body: params,
+    }), {'id': name});
+  }
+
+  run() {
+    return this.batch.then(function(result) {
+      let results = {};
+      for (let [name, response] of Object.entries(result.result)) {
+        if (response.status != 200) {
+          delete response.body;
+          console.error({request: name, response: response});
+          throw {request: name, response: response};
+        } else {
+          results[name] = response.result;
+        }
+      }
+      return results;
+    })
+  }
+}
+
 window.createProgramCollectionAPI = function createProgramCollectionAPI(collectionName, immediate) {
   function DriveError(err) {
     this.err = err;
@@ -183,31 +220,16 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           else {
             var params = {};
           }
-          const boundary = '-------314159265358979323846';
-          const delimiter = "\r\n--" + boundary + "\r\n";
-          const close_delim = "\r\n--" + boundary + "--";
-          var metadata = {
-            'mimeType': mimeType,
-            'fileExtension': fileExtension
-          };
-          var multipartRequestBody =
-              delimiter +
-              'Content-Type: application/json\r\n\r\n' +
-              JSON.stringify(metadata) +
-              delimiter +
-              'Content-Type: text/plain\r\n' +
-              '\r\n' +
-              contents +
-              close_delim;
 
           var request = gwrap.request({
             'path': '/upload/drive/v2/files/' + googFileObject.id,
             'method': 'PUT',
-            'params': {'uploadType': 'multipart'},
+            'params': {'uploadType': 'media'},
             'headers': {
-              'Content-Type': 'multipart/mixed; boundary="' + boundary + '"'
+              'Content-Type': 'text/plain',
+              'Content-Length': new Blob([contents]).size,
             },
-            'body': multipartRequestBody});
+            'body': contents});
           return request.then(fileBuilder);
         },
         _googObj: googFileObject
@@ -282,163 +304,95 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         });
         return result;
       },
-      getGrainFilesByTemplate: function(id, type) {
-        function ls(q) {
-          var ret = Q.defer();
-          var retrievePageOfFiles = function(request, result) {
-            request.execute(function(resp) {
-              result = result.concat(resp.items);
-              var nextPageToken = resp.nextPageToken;
-              if (nextPageToken) {
-                request = gapi.client.drive.files.list({
-                  'q': q,
-                  'pageToken': nextPageToken
-                });
-                retrievePageOfFiles(request, result);
-              } else {
-                ret.resolve(result);
-              }
-            });
-          }
-          var initialRequest = gapi.client.drive.files.list({'q': q});
-          retrievePageOfFiles(initialRequest, []);
-          return ret.promise;
-        }
-
-        return ls("'"+ id + "' in parents and title = '" + type + "'")
-          .then(function(results) {
-            if (results.length > 0) {
-              return ls("'"+ results[0].id + "' in parents");
-            } else {
-              return Promise.resolve([]);
-            }
-          })
-          .then(function(chaff) {
-            return chaff.reduce((promiseChain, file) => {
-                return promiseChain.then(chainResults =>
-                    drive.files.get({"fileId": file.id}).then(file =>
-                        [ ...chainResults, makeSharedFile(file,true) ]
-                    )
-                );
-            }, Promise.resolve([]))
-          });
-      },
       getTemplateFileById: function(id) {
-        function ls(q) {
-          var ret = Q.defer();
-          var retrievePageOfFiles = function(request, result) {
-            request.execute(function(resp) {
-              result = result.concat(resp.items);
-              var nextPageToken = resp.nextPageToken;
-              if (nextPageToken) {
-                request = gapi.client.drive.files.list({
-                  'q': q,
-                  'pageToken': nextPageToken
-                });
-                retrievePageOfFiles(request, result);
-              } else {
-                ret.resolve(result);
-              }
-            });
-          }
-          var initialRequest = gapi.client.drive.files.list({'q': q});
-          retrievePageOfFiles(initialRequest, []);
-          return ret.promise;
-        }
 
-        function copy_template_to_drive(bc, template) {
-          let copy = drive.files.copy({
-            "fileId": template.id,
-            "resource": {
-              "parents": [{"id": bc.id}]
-            }});
+        let user_and_template_files =
+          baseCollection.then(function (bc) {
+            var batch = new Batch();
 
-          let assignment = copy.then(file =>
-            drive.properties.insert({
-              "fileId": file.id,
-              "resource": {
-                "key": "assignment",
-                "value": id,
-                "visibility": "PUBLIC"
-              }
-            }));
-
-          let share = Promise.all([copy, assignment]).then(([file, _]) =>
-            drive.permissions.insert({
-              "fileId": file.id,
-              "emailMessage": "TEST MESSAGE",
-              "sendNotificationEmails": "true",
-              "resource": {
-                "role": "reader",
-                "type": "user",
-                "value": "pyret.examplar@gmail.com"
-              }
-            }));
-
-          return copy;
-        }
-
-        var sweepFromDrive =
-          baseCollection.then(function(bc){
-            return drive.files.get({"fileId": id}).then(function(template) {
-              return ls("not trashed and '" + bc.id + "' in parents and properties has { key='assignment' and value='" + id + "' and visibility='PUBLIC' }")
-                .then(function(results) {
-                  let maybe_code = results.find(result => result.title.includes('code'));
-                  let maybe_tests = results.find(result => result.title.includes('tests'));
-                  let maybe_common = results.find(result => result.title.includes('common'));
-                  return ls("not trashed and '"+ id + "' in parents and title contains 'arr'").then(function(results) {
-                    let maybe_dummy_impl = results.find(result => result.title.includes('dummy'));
-                    let maybe_code_template = results.find(result => result.title.includes('code'));
-                    let maybe_tests_template = results.find(result => result.title.includes('tests'));
-                    let maybe_common_template = results.find(result => result.title.includes('common'));
-
-                    let dummy_impl =
-                      drive.files.get({"fileId": maybe_dummy_impl.id})
-                        .then(file => makeSharedFile(file,true));
-
-                    let code =
-                      (maybe_code
-                        ? drive.files.get({"fileId": maybe_code.id})
-                        : (maybe_code_template != undefined
-                            ? copy_template_to_drive(bc, maybe_code_template)
-                                .then(file =>
-                                  drive.properties.insert({
-                                    "fileId": file.id,
-                                    "resource": {
-                                      "key": "edited",
-                                      "value": false,
-                                      "visibility": "PUBLIC"
-                                    }
-                                  }).then(function(properties) {
-                                    // TODO: this is awful
-                                    file.properties = [properties.result];
-                                    return file;
-                                  }))
-                            : Q(null))).then(fileBuilder);
-
-                    let tests =
-                      (maybe_tests
-                        ? drive.files.get({"fileId": maybe_tests.id})
-                        : (maybe_tests_template != null
-                            ? copy_template_to_drive(bc, maybe_tests_template)
-                            : Q(null))).then(fileBuilder);
-
-                    let common =
-                      (maybe_common
-                        ? drive.files.get({"fileId": maybe_common.id})
-                        : (maybe_common_template != null
-                            ? copy_template_to_drive(bc, maybe_common_template)
-                            : Q(null))).then(fileBuilder);
-
-                    return Q.all([code, tests, common, dummy_impl]).then(function([code, tests, common, dummy_impl]) {
-                      return {assignment_name: template.title, assignment_id: id, code: code, tests: tests, common: common, dummy_impl: dummy_impl};
-                    });
-                  });
-                });
+            batch.get('user_files', 'drive/v2/files',
+              {
+                'q': `not trashed and "${bc.id}" in parents and properties has {key="assignment" and value="${id}" and visibility="PUBLIC"}`
               });
+
+            batch.get('template_files', 'drive/v2/files',
+              {
+                'q': `not trashed and "${id}" in parents`
+              });
+
+            return batch.run().then(function (result) {
+              result["bc"] = bc;
+              return result;
             });
-        return sweepFromDrive;
+          });
+
+        /* query wheats and chaffs */
+        let user_and_wheat_and_chaff =
+          user_and_template_files.then(function({bc, user_files, template_files}) {
+            // if necessary, copy the template file of `name` to the user gdrive
+            function maybe_copy_template(name, batch, template_files, user_files) {
+              let user_file = user_files.find(file => file.title.includes(name));
+
+              if (!user_file) {
+                let template_file = template_files.find(file => file.title.includes(name));
+
+                batch.post(name, `drive/v2/files/${template_file.id}/copy`, {
+                  "parents": [{"id": bc.id}],
+                  "properties": [
+                    {
+                      "key": "assignment",
+                      "value": id,
+                      "visibility": "PUBLIC",
+                    },
+                    {
+                      "key": "edited",
+                      "value": "false",
+                      "visibility": "PUBLIC",
+                    }
+                  ],
+                });
+              }
+            }
+
+            var batch = new Batch();
+
+            let wheat = template_files.items.find(file => file.title == "wheat").id;
+            let chaff = template_files.items.find(file => file.title == "chaff").id;
+
+            batch.get('wheat', 'drive/v2/files',
+              { 'q': `not trashed and "${wheat}" in parents` });
+
+            batch.get('chaff', 'drive/v2/files',
+              { 'q': `not trashed and "${chaff}" in parents` });
+
+            maybe_copy_template('code',    batch, template_files.items, user_files.items);
+            maybe_copy_template('common',  batch, template_files.items, user_files.items);
+            maybe_copy_template('tests',   batch, template_files.items, user_files.items);
+
+            return batch.run().then(function({wheat, chaff, code, common, tests}) {
+              if (!code) { code = user_files.items.find(file => file.title.includes("code")); }
+              if (!common) { common = user_files.items.find(file => file.title.includes("common")); }
+              if (!tests) { tests = user_files.items.find(file => file.title.includes("tests")); }
+              return {wheat, chaff, code, common, tests,
+                dummy_impl: template_files.items.find(file => file.title == "dummy-impl.arr"),
+              };
+            });
+          });
+
+        return user_and_wheat_and_chaff.then(function({wheat, chaff, code, common, tests, dummy_impl}) {
+          return {
+            assignment_name: "BLAH",
+            assignment_id: id,
+            wheat: wheat.items.map(file => makeSharedFile(file, true)),
+            chaff: chaff.items.map(file => makeSharedFile(file, true)),
+            code: fileBuilder(code),
+            tests: fileBuilder(tests),
+            common: fileBuilder(common),
+            dummy_impl: makeSharedFile(dummy_impl, true),
+          };
+        });
       },
+
       getFiles: function(c) {
         return c.then(function(bc) {
           return drive.files.list({ q: "trashed=false and '" + bc.id + "' in parents" })

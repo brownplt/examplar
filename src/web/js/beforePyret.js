@@ -346,8 +346,8 @@ $(function() {
 
   let assignment;
 
-  if (params["get"] && params["get"]["assignment"]) {
-    assignment = storageAPI.then(api => api.getTemplateFileById(params["get"]["assignment"]));
+  if (ASSIGNMENT_ID) {
+    assignment = storageAPI.then(api => api.getTemplateFileById(ASSIGNMENT_ID));
   } else {
     // Redirect to main page.
     window.location.href = "/";
@@ -527,23 +527,14 @@ $(function() {
   window.dummy_impl = assignment.then(assn => assn.dummy_impl);
 
   // set `definitions://` to the test document
-  assignment_tests.then(tests => sourceAPI.set_definitions(tests));
-
-  // load the wheats
-  window.wheat =
-    assignment_id.then(function(id) {
-      return storageAPI.then(function(api) {
-        return api.getGrainFilesByTemplate(id,'wheat');
-      });
+  assignment_tests.then(tests => {
+    sourceAPI.set_definitions(tests);
+    console.log(tests);
     });
 
-  // load the chaff
-  window.chaff =
-    assignment_id.then(function(id) {
-      return storageAPI.then(function(api) {
-        return api.getGrainFilesByTemplate(id,'chaff');
-      });
-    });
+  // load the wheats & chaff
+  window.wheat = assignment.then(assn => assn.wheat);
+  window.chaff = assignment.then(assn => assn.chaff);
 
   let assignment_code = assignment.then(assn => assn.code)
     .then(code => {
@@ -631,7 +622,7 @@ $(function() {
   function save() {
     window.stickMessage("Saving...");
     return Promise.all(
-      sourceAPI.loaded
+      sourceAPI.unique_loaded
         .filter(s => !s.ephemeral && !s.shared)
         .map(s => s.save()))
     .then(function(s) {

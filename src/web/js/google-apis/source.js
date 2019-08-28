@@ -94,6 +94,10 @@ window.createSourceManager = function createSourceManager(storageAPI) {
       return Array.from(sources_by_filename.values())
     },
 
+    get unique_loaded() {
+      return Array.from(new Set(this.loaded));
+    },
+
     is_loaded: function(name) {
       console.info("is_loaded", name);
       return sources_by_filename.has(name);
