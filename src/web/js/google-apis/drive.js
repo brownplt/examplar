@@ -374,7 +374,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               if (!common) { common = user_files.items.find(file => file.title.includes("common")); }
               if (!tests) { tests = user_files.items.find(file => file.title.includes("tests")); }
               return {wheat, chaff, code, common, tests,
-                dummy_impl: template_files.items.find(file => file.title == "dummy-impl.arr"),
+                dummy_impl: template_files.items.find(file => file.title.includes("dummy")),
               };
             });
           });
