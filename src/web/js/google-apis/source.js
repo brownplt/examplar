@@ -67,7 +67,7 @@ window.createSourceManager = function createSourceManager(storageAPI) {
 
     // consumes a File and produces a promise for a FileSource
     from_file: function(file) {
-      console.info("from_file", file);
+      console.info("from_file", file.getName(), file);
 
       let uri = file.getURI();
 

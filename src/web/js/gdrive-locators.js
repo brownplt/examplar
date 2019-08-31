@@ -51,11 +51,12 @@ define("cpo/gdrive-locators", [], function() {
         return "Could not load file with name " + filename;
       }
 
+      // TODO this is very sensitive wrt wheat/chaff naming
       if (typeof window.injection !== 'undefined' && filename.includes("code")) {
-        if (window.injection.getName().endsWith('.arr')) {
-          return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
-        } else if (window.injection.getName().endsWith('.js')) {
+        if (window.injection.getName().includes('.js')) {
           return makeGDriveJSLocator(window.injection.getName(), window.injection.getUniqueId());
+        } else if (window.injection.getName().includes('.arr')) {
+          return makeSharedGDriveLocator(window.injection.getName(), window.injection.getUniqueId());
         }
       }
 

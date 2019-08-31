@@ -176,6 +176,44 @@
 
       // this function must NOT be called on the pyret stack
       return function(result, examplarResults) {
+        let run_result_log = Q.defer();
+        Q.all([window.user, window.assignment_id, run_result_log.promise])
+          .then(function([email, id, run_result_log]) {
+            let examplarResults = examplarResults || {};
+            fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
+              method: 'POST',
+              mode: "no-cors",
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: email,
+                assignment: id,
+                payload : {
+                  sources:
+                    [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
+                      .map(s => new Object({
+                        name: s.name,
+                        id: s.file.getUniqueId(),
+                        role
+                          : s.name.includes("code") ? "code"
+                          : s.name.includes("tests") ? "tests"
+                          : s.name.includes("common") ? "common"
+                          : null,
+                        contents: s.contents,
+                      })),
+                  results: {
+                    error: examplarResults.error || false,
+                    wheat: examplarResults.wheat || null,
+                    chaff: examplarResults.chaff || null,
+                    result: run_result_log || null,
+                  },
+                },
+              }),
+            })
+          });
+
+        console.info("DISPLAY RESULT", result, examplarResults);
         var doneDisplay = Q.defer();
         var didError = false;
         // Start a new pyret stack.
@@ -188,6 +226,8 @@
             // Parse Errors
             // `renderAndDisplayError` must be called on the pyret stack
             // this application runs in the context of the above `callingRuntime.runThunk`
+            console.log("!! parse", result.exn.exn);
+            run_result_log.resolve({type: "parse", error: result.exn.exn});
             return renderAndDisplayError(callingRuntime, result.exn.exn, undefined, true, result);
           }
           else if(callingRuntime.isSuccessResult(result)) {
@@ -210,9 +250,11 @@
                   function() {
                     // eachLoop must be called in the context of the pyret stack
                     // this application runs in the context of the above `callingRuntime.runThunk`
+                    run_result_log.resolve({type: "compile", errors: errors});
                     return callingRuntime.eachLoop(runtime.makeFunction(function(i) {
                       // `renderAndDisplayError` must be called in the context of the
                       // pyret stack.
+                      console.log("!! compile", result.exn.exn);
                       return renderAndDisplayError(callingRuntime, errors[i], [], true, result);
                     }), 0, errors.length);
                   }, function (result) {
@@ -231,6 +273,9 @@
                     console.log("Time to run compiled program:", JSON.stringify(runResult.stats));
                     if(rr.isSuccessResult(runResult)) {
                       return rr.safeCall(function() {
+                        run_result_log.resolve({type: "success",
+                          checks: runtime.getField(runResult.result, "checks")});
+                        console.log("!! checkresults", runtime.getField(runResult.result, "checks"));
                         return checkUI.drawCheckResults(output, CPO.documents, rr,
                                                         runtime.getField(runResult.result, "checks"), v,
                                                         examplarResults);
@@ -245,6 +290,8 @@
                       // `renderAndDisplayError` must be called in the context of the pyret stack.
                       // this application runs in the context of the above `rr.runThunk`.
                       //updateItems?
+                      run_result_log.resolve({type: "runtime", error: runResult.exn.exn});
+                      console.log("!! runtime error", runResult.exn.exn);
                       return renderAndDisplayError(resultRuntime, runResult.exn.exn,
                                                    runResult.exn.pyretStack, true, runResult);
                     }
@@ -997,26 +1044,28 @@
           .then(function([email, id]) {
             return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
               method: 'POST',
-              // TODO make this logging better!
+              mode: "no-cors",
+              headers: {
+                'Content-Type': 'application/json',
+              },
               body: JSON.stringify({
                 email: email,
                 assignment: id,
-                submission:
-                  [...new Set(sourceAPI.loaded.filter(s => !s.ephemeral && !s.shared))]
-                    .map(s => new Object({
-                      name: s.name,
-                      id: s.file.getUniqueId(),
-                      role
-                        : s.name.includes("code") ? "code"
-                        : s.name.includes("tests") ? "tests"
-                        : s.name.includes("common") ? "common"
-                        : undefined,
-                      contents: s.contents,
-                    }))
+                payload: {
+                  submission:
+                    [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
+                      .map(s => new Object({
+                        name: s.name,
+                        id: s.file.getUniqueId(),
+                        role
+                          : s.name.includes("code") ? "code"
+                          : s.name.includes("tests") ? "tests"
+                          : s.name.includes("common") ? "common"
+                          : null,
+                        contents: s.contents,
+                      }))
+                },
               }),
-              headers:{
-                'Content-Type': 'application/json'
-              }
             })
           }, function (err) {
             console.error("Failed to submit sweep.", err);

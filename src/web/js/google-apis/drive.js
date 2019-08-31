@@ -1,9 +1,11 @@
 class Batch {
   constructor() {
+    this.empty = true;
     this.batch = gapi.client.newBatch();
   }
 
   get(name, path, params) {
+    this.empty = false;
     this.batch.add(gapi.client.request({
       path: path,
       params: params,
@@ -11,6 +13,7 @@ class Batch {
   }
 
   post(name, path, params) {
+    this.empty = false;
     this.batch.add(gapi.client.request({
       path: path,
       method: "POST",
@@ -19,6 +22,9 @@ class Batch {
   }
 
   run() {
+    if (this.empty) {
+      return Promise.resolve({});
+    }
     return this.batch.then(function(result) {
       let results = {};
       for (let [name, response] of Object.entries(result.result)) {
@@ -336,34 +342,38 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               if (!user_file) {
                 let template_file = template_files.find(file => file.title.includes(name));
 
-                batch.post(name, `drive/v2/files/${template_file.id}/copy`, {
-                  "parents": [{"id": bc.id}],
-                  "properties": [
-                    {
-                      "key": "assignment",
-                      "value": id,
-                      "visibility": "PUBLIC",
-                    },
-                    {
-                      "key": "edited",
-                      "value": "false",
-                      "visibility": "PUBLIC",
-                    }
-                  ],
-                });
+                if (template_file) {
+                  batch.post(name, `drive/v2/files/${template_file.id}/copy`, {
+                    "parents": [{"id": bc.id}],
+                    "properties": [
+                      {
+                        "key": "assignment",
+                        "value": id,
+                        "visibility": "PUBLIC",
+                      },
+                      {
+                        "key": "edited",
+                        "value": "false",
+                        "visibility": "PUBLIC",
+                      }
+                    ],
+                  });
+                }
               }
             }
 
             var batch = new Batch();
 
-            let wheat = template_files.items.find(file => file.title == "wheat").id;
-            let chaff = template_files.items.find(file => file.title == "chaff").id;
+            let wheat = template_files.items.find(file => file.title == "wheat");
+            let chaff = template_files.items.find(file => file.title == "chaff");
 
-            batch.get('wheat', 'drive/v2/files',
-              { 'q': `not trashed and "${wheat}" in parents` });
+            if (wheat && chaff) {
+              batch.get('wheat', 'drive/v2/files',
+                { 'q': `not trashed and "${wheat.id}" in parents` });
 
-            batch.get('chaff', 'drive/v2/files',
-              { 'q': `not trashed and "${chaff}" in parents` });
+              batch.get('chaff', 'drive/v2/files',
+                { 'q': `not trashed and "${chaff.id}" in parents` });
+            }
 
             maybe_copy_template('code',    batch, template_files.items, user_files.items);
             maybe_copy_template('common',  batch, template_files.items, user_files.items);
@@ -373,6 +383,10 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               if (!code) { code = user_files.items.find(file => file.title.includes("code")); }
               if (!common) { common = user_files.items.find(file => file.title.includes("common")); }
               if (!tests) { tests = user_files.items.find(file => file.title.includes("tests")); }
+
+              if (!wheat) { wheat = []; } else { wheat = wheat.items; }
+              if (!chaff) { chaff = []; } else { chaff = chaff.items; }
+
               return {wheat, chaff, code, common, tests,
                 dummy_impl: template_files.items.find(file => file.title.includes("dummy")),
               };
@@ -383,8 +397,8 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           return {
             assignment_name: "BLAH",
             assignment_id: id,
-            wheat: wheat.items.map(file => makeSharedFile(file, true)),
-            chaff: chaff.items.map(file => makeSharedFile(file, true)),
+            wheat: wheat.map(file => makeSharedFile(file, true)),
+            chaff: chaff.map(file => makeSharedFile(file, true)),
             code: fileBuilder(code),
             tests: fileBuilder(tests),
             common: fileBuilder(common),

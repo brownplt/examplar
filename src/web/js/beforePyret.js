@@ -521,24 +521,27 @@ $(function() {
   window.assignment_id = assignment.then(function(assn) { return assn.assignment_id });
   window.assignment_name = assignment.then(function(assn) { return assn.assignment_name });
 
-  let assignment_tests = assignment.then(assn => sourceAPI.from_file(assn.tests));
-  let assignment_common = assignment.then(assn => sourceAPI.from_file(assn.common));
+  let assignment_tests = assignment.then(assn => {if (assn.tests){return sourceAPI.from_file(assn.tests)}});
+  let assignment_common = assignment.then(assn => {if(assn.common){return sourceAPI.from_file(assn.common)}});
 
   window.dummy_impl = assignment.then(assn => assn.dummy_impl);
 
   // set `definitions://` to the test document
   assignment_tests.then(tests => {
+    if (!tests) return;
     sourceAPI.set_definitions(tests);
-    console.log(tests);
-    });
+  });
 
   // load the wheats & chaff
   window.wheat = assignment.then(assn => assn.wheat);
   window.chaff = assignment.then(assn => assn.chaff);
 
-  let assignment_code = assignment.then(assn => assn.code)
-    .then(code => {
-      if (code._googObj.properties.find(p => p.key == "edited").value == "true") {
+  let assignment_code = Promise.all([assignment_tests, assignment.then(assn => assn.code)])
+    .then(([tests, code]) => {
+      if (!tests) {
+        code.edited();
+        return sourceAPI.from_file(code);
+      } else if (code._googObj.properties.find(p => p.key == "edited").value == "true") {
         return sourceAPI.from_file(code);
       } else {
         let begin_button = document.createElement("button");
@@ -560,11 +563,14 @@ $(function() {
   let common_and_tests_tabs = 
     Q.all([assignment_common, assignment_tests, assignment_code])
       .then(function ([common, tests, code]) {
-        new Tab(common);
-        new Tab(tests).activate();
+        if (common) new Tab(common);
+        if (tests) new Tab(tests).activate();
         CPO.editor.cm.setOption('readOnly', false);
-        if (code != null) {
-          new Tab(code);
+        if (code) {
+          let code_tab = new Tab(code);
+          if (!tests) {
+            code_tab.activate();
+          }
         }
       });
 
