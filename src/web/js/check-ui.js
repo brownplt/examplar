@@ -70,22 +70,12 @@
         function render_result(passed) {
           return function(result) {
             return format(result)
-              .then(function(loc){return {loc: loc, passed: passed};});
+              .then(function(result){return {loc: result.dict.loc, passed: passed};});
           };
         }
         return runtime.ffi.cases(any, "TestResult", testresult, {
-           "success"                         : render_result(true),
-           "failure-not-equal"               : render_result(false),
-           "failure-not-different"           : render_result(false),
-           "failure-not-satisfied"           : render_result(false),
-           "failure-not-dissatisfied"        : render_result(false),
-           "failure-wrong-exn"               : render_result(false),
-           "failure-right-exn"               : render_result(false),
-           "failure-exn"                     : render_result(false),
-           "failure-no-exn"                  : render_result(false),
-           "failure-raise-not-satisfied"     : render_result(false),
-           "failure-raise-not-dissatisfied"  : render_result(false),
-           "error-not-boolean"               : render_result(false)
+           "success"  : render_result(true),
+           "else"     : render_result(false),
         });
       }
 
