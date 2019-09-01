@@ -100,9 +100,9 @@
                       .then(function(rendered) {render.push(rendered);});
                   }), 0, results.length);
               }, render_CheckBlockResult)
-              .then(function(loc) {
+              .then(function(_) {
                 return { name : name,
-                         loc  : loc,
+                         loc  : outputUI.Position.fromPyretSrcloc(runtime, srcloc, loc, documents),
                          error: runtime.ffi.isSome(maybe_err),
                          tests: render }; })
           }});
@@ -183,8 +183,14 @@
 
         let chaff_catchers =
           chaffs.map(chaff =>
-              chaff.map(block => block.tests.filter(test => !test.passed)
-                                            .map(test => test.loc))
+              chaff.map(function(block) {
+                if (block.error) {
+                  return [block.loc];
+                } else {
+                  return block.tests.filter(test => !test.passed)
+                                    .map(test => test.loc)
+                }
+              })
                 .reduce((acc, val) => acc.concat(val), []));
 
         let chaff_list = document.createElement('ul');
@@ -239,8 +245,9 @@
           wheats.map(
             wheat => wheat.map(
               block => block.error
-                || block.tests.filter(test => !test.passed)
-                              .map(test => test.loc))
+                ? block.loc
+                : block.tests.filter(test => !test.passed)
+                             .map(test => test.loc))
               .reduce((acc, val) => acc.concat(val), []))
             .reduce((acc, val) => acc.concat(val), []);
 

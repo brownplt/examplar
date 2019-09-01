@@ -101,6 +101,10 @@
         positionCache.set(doc.changeGeneration(), {from: from, to: to});
       }
 
+      Position.prototype.toJSON = function toJSON() {
+        return JSON.stringify({source: this.source, from: this.from, to: this.to});
+      };
+
       Position.prototype.on = function on(type, f) {
         this._textMarker.on(type, f);
       };
