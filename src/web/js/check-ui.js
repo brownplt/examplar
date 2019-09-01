@@ -69,8 +69,8 @@
       function render_TestResult(testresult) {
         function render_result(passed) {
           return function(result) {
-            return format(result)
-              .then(function(result){return {loc: result.dict.loc, passed: passed};});
+            return format(result.dict.loc)
+              .then(function(loc){return {loc: loc, passed: passed};});
           };
         }
         return runtime.ffi.cases(any, "TestResult", testresult, {
