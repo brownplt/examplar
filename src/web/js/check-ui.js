@@ -142,7 +142,7 @@
         validity_elt.textContent = "INVALID";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
-        message_elt.textContent = "kaboom.";
+        message_elt.textContent = "A check block encountered an error.";
 
         return container_elt;
       }

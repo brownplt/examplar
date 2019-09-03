@@ -176,10 +176,6 @@
 
       // this function must NOT be called on the pyret stack
       return function(result, examplarResults) {
-        let run_result_log = Q.defer();
-        run_result_log.promise
-          .then(run_result => log_run(examplarResults || {}, run_result));
-
         console.info("DISPLAY RESULT", result, examplarResults);
         var doneDisplay = Q.defer();
         var didError = false;
@@ -193,8 +189,6 @@
             // Parse Errors
             // `renderAndDisplayError` must be called on the pyret stack
             // this application runs in the context of the above `callingRuntime.runThunk`
-            console.log("!! parse", result.exn.exn);
-            run_result_log.resolve({type: "parse", error: result.exn.exn});
             return renderAndDisplayError(callingRuntime, result.exn.exn, undefined, true, result);
           }
           else if(callingRuntime.isSuccessResult(result)) {
@@ -217,7 +211,6 @@
                   function() {
                     // eachLoop must be called in the context of the pyret stack
                     // this application runs in the context of the above `callingRuntime.runThunk`
-                    run_result_log.resolve({type: "compile", errors: errors});
                     return callingRuntime.eachLoop(runtime.makeFunction(function(i) {
                       // `renderAndDisplayError` must be called in the context of the
                       // pyret stack.
@@ -239,9 +232,6 @@
                     console.log("Time to run compiled program:", JSON.stringify(runResult.stats));
                     if(rr.isSuccessResult(runResult)) {
                       return rr.safeCall(function() {
-                        run_result_log.resolve({type: "success",
-                          checks: runtime.getField(runResult.result, "checks")});
-                        console.log("!! checkresults", runtime.getField(runResult.result, "checks"));
                         return checkUI.drawCheckResults(output, CPO.documents, rr,
                                                         runtime.getField(runResult.result, "checks"), v,
                                                         examplarResults);
@@ -256,8 +246,6 @@
                       // `renderAndDisplayError` must be called in the context of the pyret stack.
                       // this application runs in the context of the above `rr.runThunk`.
                       //updateItems?
-                      run_result_log.resolve({type: "runtime", error: runResult.exn.exn});
-                      console.log("!! runtime error", runResult.exn.exn);
                       return renderAndDisplayError(resultRuntime, runResult.exn.exn,
                                                    runResult.exn.pyretStack, true, runResult);
                     }
