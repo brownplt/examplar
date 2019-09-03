@@ -570,6 +570,7 @@ $(function() {
           let code_tab = new Tab(code);
           if (!tests) {
             code_tab.activate();
+            sourceAPI.set_definitions(code);
           }
         }
       });

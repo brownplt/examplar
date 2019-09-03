@@ -519,8 +519,12 @@
           header.textContent = CPO.sourceAPI.get_loaded(name).file.getName();
           container.appendChild(header);
 
-          let examplar_summary = drawExamplarResults(blocks, examplar_results);
-          container.appendChild(examplar_summary);
+          let examplar_summary = window.wheat.then(wheat => {
+            if (wheat.length == 0) return document.createElement("div");
+            let examplar_summary = drawExamplarResults(blocks, examplar_results);
+            header.parentNode.insertBefore(examplar_summary, header.nextSibling);
+            return examplar_summary;
+          });
 
           let summary = document.createElement("span");
           summary.classList.add("file-test-results-summary");
@@ -561,9 +565,11 @@
 
           summary_bits.append(view_button_elt);
 
-          if (!examplar_summary.classList.contains("invalid") || checkBlocksErrored > 0) {
-            $(summary).append(summary_bits);
-          }
+          examplar_summary.then(examplar_summary => {
+            if (!examplar_summary.classList.contains("invalid") || checkBlocksErrored > 0) {
+              $(summary).append(summary_bits);
+            }
+          });
 
           if (checkTotalAll > 0 || checkBlocksErrored > 0) {
             container.appendChild(summary);
