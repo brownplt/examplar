@@ -401,7 +401,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
         return user_and_wheat_and_chaff.then(function({wheat, chaff, code, common, tests, dummy_impl}) {
           return {
-            assignment_name: "BLAH",
+            assignment_name: "assignment", // TODO: actually thread in the assignment name
             assignment_id: id,
             wheat: wheat.map(file => makeSharedFile(file, true)),
             chaff: chaff.map(file => makeSharedFile(file, true)),
