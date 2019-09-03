@@ -1171,12 +1171,7 @@
             }).then(jsonResult(output, runtime, repl.runtime, true));
 
           test_results.then(local_result => {
-            payload.local_result = local_result.map(result =>
-                new Object({
-                  name: result.name,
-                  result: result.result.json,
-                })
-              );
+            payload.local_result = local_result.json;
           })
           .then(
             function(_) {send_log.resolve()},
