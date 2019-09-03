@@ -14,6 +14,10 @@ window.createSourceManager = function createSourceManager(storageAPI) {
       return false;
     }
 
+    get shared() {
+      return this.file.shared;
+    }
+
     get name() {
       return this.file.getName();
     }
