@@ -34,7 +34,6 @@
     var ffi = runtime.ffi;
 
     var output = jQuery("<div id='output' aria-hidden='true' class='cm-s-default'>");
-    output.append($("<p class='examplar_info'>Examplar will run your test cases against a set of correct implementations ('wheats'), then against a small set of buggy ones ('chaffs'). Try to catch as many bugs as you can!<p>"));
 
     var outputPending = jQuery("<span>").text("Gathering results...");
     var outputPendingHidden = true;
