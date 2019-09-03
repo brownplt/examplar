@@ -56,6 +56,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
   var PUBLIC_LINK = "pubLink";
 
   function createAPI(baseCollection) {
+    var shareCollection = findOrCreateDirectory(collectionName + ".shared");
+    var cacheCollection = findOrCreateCacheDirectory(collectionName + ".compiled");
+
     function makeSharedFile(googFileObject, fetchFromGoogle) {
       return {
         shared: true,
@@ -269,6 +272,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       getCollectionFolderId: function() {
         return baseCollection.then(function(bc) { return bc.id; });
       },
+      getCacheCollectionFolderId: function() {
+        return cacheCollection.then(function(cc) { return cc.id; });
+      },
       getFileById: function(id) {
         if (file_cache.has(id)) {
           return file_cache.get(id);
@@ -451,9 +457,6 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         return collection.then(function() { return true; });
       }
     };
-
-    var shareCollection = findOrCreateDirectory(collectionName + ".shared");
-    var cacheCollection = findOrCreateCacheDirectory(collectionName + ".compiled");
 
     return {
       api: api,
