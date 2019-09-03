@@ -199,26 +199,22 @@ define("cpo/gdrive-locators", [], function() {
           // e.g., 1igUAKOmk6MBBsNqmePy2e1DWnJiRNt6F
           return storage.getSharedFileById(id);
         });
+
         filesP.fail(function(failure) {
           restarter.error(runtime.ffi.makeMessageException(fileRequestFailure(failure, filename)));
         });
+
         var fileP = filesP.then(function(file) {
           checkFileResponse(file, filename, restarter);
           // checkFileResponse throws if there's an error
-          return file;
+          return sourceAPI.from_file(file);
         });
-        var contentsP = Q.all([fileP, fileP.then(function(file) {
-          return file.getContents();
-        })]);
 
-        contentsP.fail(function(failure) {
-          getModRestart.error(runtime.ffi.makeMessageException(contentRequestFailure(failure)));
-        });
-        contentsP.then(function(fileAndContents) {
-          var file = fileAndContents[0];
-          var contents = fileAndContents[1];
-          
-          var uri = "shared-gdrive://" + file.getName() + ":" + file.getUniqueId();
+        fileP.then(function(file) {
+          var file = file;
+          var contents = file.contents;
+
+          var uri = "shared-gdrive://" + file.name + ":" + file.file.getUniqueId();
 
           function needsCompile() { return true; }
 
