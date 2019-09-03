@@ -176,42 +176,9 @@
 
       // this function must NOT be called on the pyret stack
       return function(result, examplarResults) {
-        examplarResults = examplarResults || {};
         let run_result_log = Q.defer();
-        Q.all([window.user, window.assignment_id, run_result_log.promise])
-          .then(function([email, id, run_result_log]) {
-            fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
-              method: 'POST',
-              mode: "no-cors",
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: email,
-                assignment: id,
-                payload : {
-                  sources:
-                    [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
-                      .map(s => new Object({
-                        name: s.name,
-                        id: s.file.getUniqueId(),
-                        role
-                          : s.name.includes("code") ? "code"
-                          : s.name.includes("tests") ? "tests"
-                          : s.name.includes("common") ? "common"
-                          : null,
-                        contents: s.contents,
-                      })),
-                  results: {
-                    error: examplarResults.error || false,
-                    wheat: examplarResults.wheat || null,
-                    chaff: examplarResults.chaff || null,
-                    result: run_result_log || null,
-                  },
-                },
-              }),
-            })
-          });
+        run_result_log.promise
+          .then(run_result => log_run(examplarResults || {}, run_result));
 
         console.info("DISPLAY RESULT", result, examplarResults);
         var doneDisplay = Q.defer();
@@ -1079,9 +1046,10 @@
               .then(jsonResult(output, runtime, repl.runtime, true))
               .then(
                 function(result) {
+                  let name = window.injection.getName();
                   return run_injections(rest)
                     .then(function(rest_results) {
-                      rest_results.push(result);
+                      rest_results.push({name: name, result: result});
                       return rest_results;
                     });
                 });
@@ -1090,6 +1058,40 @@
           }
         }
 
+        let send_log = Q.defer();
+        let payload = {
+          sources:
+            [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
+              .map(s => new Object({
+                name: s.name,
+                id: s.file.getUniqueId(),
+                role
+                  : s.name.includes("code") ? "code"
+                  : s.name.includes("tests") ? "tests"
+                  : s.name.includes("common") ? "common"
+                  : null,
+                contents: s.contents,
+              }))
+        };
+
+        send_log.promise.then(function(){
+          return Q.all([window.user, window.assignment_id])
+          .then(function([email, id]) {
+            return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
+              method: 'POST',
+              mode: "no-cors",
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                email: email,
+                assignment: id,
+                payload : payload,
+              }),
+            })
+          });
+        });
+
         if (!document.getElementById("option-check-mode").checked) {
           // TODO fix repl behavior when wheat fails.
           // repl should happen in context of impl file if wheat fails
@@ -1097,11 +1099,21 @@
           // e.g.,: print(raise(median([list:1])))
 
           // first, run the wheat
-          let wheat_results = window.wheat.then(run_injections);
+          let wheat_results = window.wheat.then(run_injections)
+            .then(results => {
+              payload.wheat_results = results.map(result =>
+                new Object({
+                  name: result.name,
+                  result: result.result.json,
+                })
+              );
+
+              // strip the names
+              return results.map(result => result.result);
+            }) ;
 
           let wheats_pass = wheat_results.then(
             function(check_results) {
-              console.log("wheats_pass", check_results);
               let wheats = check_results.length;
               let passed =
                 check_results.map(r => r.json).filter(
@@ -1111,8 +1123,10 @@
               let all_passed = wheats == passed;
 
               if (all_passed) {
+                payload.wheat_passed = true;
                 return check_results;
               } else {
+                payload.wheat_passed = false;
                 throw check_results;
               }
             });
@@ -1121,13 +1135,19 @@
           let chaff_results = wheats_pass
             .then(
               function(_){
-                console.log("chaff_results:ok");
-                return window.chaff.then(run_injections);
+                let run_results = window.chaff.then(run_injections);
+                run_results.then(results =>
+                  payload.chaff_results = results.map(result =>
+                      new Object({
+                        name: result.name,
+                        result: result.result.json,
+                      })
+                    ));
+                // strip the names
+                return run_results.then(results => results.map(result => result.result));
               }, function(_){
                 return null;
               });
-
-          // true if a student implementation exists and is loaded
 
           // lastly, run the student's tests, if they've begun their implementation.
           let test_results = Q.all([window.dummy_impl, chaff_results]).then(
@@ -1160,7 +1180,19 @@
             }, function(e) {
               console.error("CHAFF ERROR?", e);
               return null;
-            });
+            }).then(jsonResult(output, runtime, repl.runtime, true));
+
+          test_results.then(local_result => {
+            payload.local_result = local_result.map(result =>
+                new Object({
+                  name: result.name,
+                  result: result.result.json,
+                })
+              );
+          })
+          .then(
+            function(_) {send_log.resolve()},
+            function(e) {send_log.resolve()});
 
           // then display the result
           let display_result =
@@ -1172,15 +1204,14 @@
                                         wheat_block_error.pyret,
                                        {error: true, wheat: wheat_results.map(r => r.json)});
                 }
-
-                console.log("display_result", wheat_results, chaff_results, test_results);
-
                 if (chaff_results) {
                   chaff_results = chaff_results.map(r => r.json)
                 }
-                return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results,
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results.pyret,
                                      {wheat: wheat_results.map(r => r.json), chaff: chaff_results});
               }, function(error_result) {
+                payload.error = true;
+                send_log.resolve();
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result,
                   {error: true});
               });
@@ -1188,10 +1219,13 @@
           display_result.fin(afterRun(false));
         } else {
             maybeShowOutputPending();
+            payload.skip_checks = true;
             repl.restartInteractions(src, options)
               .then(function(run_result) {
+                send_log.resolve();
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
               }, function(error_result) {
+                send_log.resolve();
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result);
               })
               .fin(afterRun(false));

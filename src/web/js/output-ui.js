@@ -102,7 +102,7 @@
       }
 
       Position.prototype.toJSON = function toJSON() {
-        return JSON.stringify({source: this.source, from: this.from, to: this.to});
+        return {source: this.source, from: this.from, to: this.to};
       };
 
       Position.prototype.on = function on(type, f) {
