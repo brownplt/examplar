@@ -838,7 +838,7 @@
       try{
 
       for (var [file, blocks] of groupedCheckBlocks) {
-        if (blocks.length == 0 && (examplarResults != null && file != "definitions://")) continue;
+        if (blocks.length == 0 && ((file == "definitions://" ? examplarResults : null) == null || examplarResults.wheat.length == 0)) continue;
         var skeleton = new FileSkeleton(file, blocks, (file == "definitions://" ? examplarResults : null));
         checkResultsContainer.appendChild(skeleton.container);
       }
