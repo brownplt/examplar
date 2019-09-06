@@ -2244,7 +2244,7 @@ li.tab.selected {
 
 .file-test-results > header:before,
 .tab > a:before {
-  content: '🗎';
+  content: '📄';
 }
 
 .file-test-results {
