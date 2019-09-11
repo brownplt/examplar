@@ -250,7 +250,7 @@ $(function() {
     }
 
     // place a vertical line at character 80 in code editor, and not repl
-    var CODE_LINE_WIDTH = 100;
+    var CODE_LINE_WIDTH = 80;
 
     var rulers, rulersMinCol;
     if (options.simpleEditor) {
@@ -560,7 +560,7 @@ $(function() {
       }
     });
 
-  let common_and_tests_tabs = 
+  let common_and_tests_tabs =
     Q.all([assignment_common, assignment_tests, assignment_code])
       .then(function ([common, tests, code]) {
         if (common) new Tab(common);
