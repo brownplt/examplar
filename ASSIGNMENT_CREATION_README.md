@@ -1,5 +1,9 @@
 # Examplar Assignment Creation:
 
+0. Prepare the wheats and chaffs:
+    * Comment out tests
+    * Explicitly providing only functions required by the spec
+
 1. Make folders for wheats and chaffs that should be included in Examplar,
    note their IDs, and set them (temporarily) to be publicly accessible via link
 
