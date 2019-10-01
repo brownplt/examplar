@@ -65,37 +65,27 @@ define("cpo/gdrive-locators", [], function() {
       return runtime.pauseStack(function(restarter) {
         // We start by setting up the fetch of the file; lots of methods will
         // close over this.
-        var filesP = storageAPI.then(function(storage) {
-          // e.g., "median-code.arr"
-          return storage.getFileByName(filename);
-        });
-        filesP.fail(function(failure) {
+        var uri = "my-gdrive://" + filename;
+        let source = sourceAPI.from_filename(uri);
+
+        source.fail(function(failure) {
           restarter.error(runtime.ffi.makeMessageException(fileRequestFailure(failure, filename)));
         });
-        var fileP = filesP.then(function(files) {
-          checkFileResponse(files, restarter);
-          // checkFileResponse throws if there's an error
-          return files[0];
-        });
 
-        fileP.then(function(file) {
+        //var fileP = filesP.then(function(files) {
+        //  checkFileResponse(files, restarter);
+        //  // checkFileResponse throws if there's an error
+        //  return files[0];
+        //});
 
-          var uri = "my-gdrive://" + filename;
-          let source = sourceAPI.from_file(file);
+        source.then(function(file) {
 
           function needsCompile() { return true; }
 
-          var contentsP = source.then(source => source.contents);
-
           function getModule(self) {
             return runtime.pauseStack(function(getModRestart) {
-              contentsP.catch(function(failure) {
-                getModRestart.error(runtime.ffi.makeMessageException(contentRequestFailure(failure)));
-              });
-              contentsP.then(function(pyretString) {
-                var ret = gmf(compileLib, "pyret-string").app(pyretString);
-                getModRestart.resume(ret);
-              });
+              var ret = gmf(compileLib, "pyret-string").app(file.contents);
+              getModRestart.resume(ret);;
             });
           }
 
@@ -304,6 +294,9 @@ define("cpo/gdrive-locators", [], function() {
         });
       });
     }
+
+    let gdrivejs_cache = {};
+
     function makeGDriveJSLocator(filename, id) {
       function checkFileResponse(file, filename, restarter) {
         var actualName = file.getName();
@@ -311,36 +304,37 @@ define("cpo/gdrive-locators", [], function() {
           restarter.error(runtime.ffi.makeMessageException("Expected file with id " + id + " to have name " + filename + ", but its name was " + actualName));
         }
       }
+
       function contentRequestFailure(failure) {
         return "Could not load file with name " + filename;
       }
 
+      let contents = gdrivejs_cache[id] ? Q(gdrivejs_cache[id]) :
+        fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+          { method: "get",
+            headers: new Headers([
+                ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
+              ])
+          })
+          .then(response => response.text())
+          .then(function(text) {
+            gdrivejs_cache[id] = text;
+            return text;
+          });
+
       // Pause because we'll fetch the Google Drive file object and restart
       // with it to create the actual locator
       return runtime.pauseStack(function(restarter) {
-        // We start by setting up the fetch of the file; lots of methods will
-        // close over this.
-        var filesP = storageAPI.then(function(storage) {
-          return storage.getFileById(id);
-        });
-        filesP.fail(function(failure) {
+
+        contents.catch(function(failure) {
           restarter.error(runtime.ffi.makeMessageException(fileRequestFailure(failure, filename)));
         });
-        var fileP = filesP.then(function(file) {
-          // checkFileResponse(file, filename, restarter);
-          // checkFileResponse throws if there's an error
-          return file;
-        });
-
-        var contentsP = fileP.then(function(file) { return file.getContents('default'); });
 
         var F = runtime.makeFunction;
 
-        Q.spread([contentsP, fileP], function(mod, file) {
-
-          var uri = "gdrive-js://" + file.getUniqueId();
-
-          var rawModule = gmf(builtinModules, "builtin-raw-locator-from-str").app(mod);
+        contents.then(function(contents) {
+          var uri = "gdrive-js://" + id;
+          var rawModule = gmf(builtinModules, "builtin-raw-locator-from-str").app(contents);
           return runtime.safeCall(function() {
             return gmf(cpo, "make-js-locator-from-raw").app(
               rawModule,

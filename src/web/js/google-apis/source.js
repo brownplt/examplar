@@ -126,12 +126,7 @@ window.createSourceManager = function createSourceManager(storageAPI) {
 
       return storageAPI
         .then(api => api.getFileByName(name))
-        .then(function(file) {
-          if (sources_by_filename.has(name)) {
-            return Q(sources_by_filename.get(name));
-          }
-          return file.getContents();
-        })
+        .then(files => files[0])
         .then(this.from_file);
       
     }

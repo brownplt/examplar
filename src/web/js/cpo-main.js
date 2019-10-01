@@ -256,7 +256,7 @@
               "type-check": !!options.typeCheck,
               "check-mode": !!options.checkMode,
               "check-all": !!options.checkAll,
-              "on-compile": onCompile
+              //"on-compile": onCompile
             });
             var ret = Q.defer();
             setTimeout(function() {
