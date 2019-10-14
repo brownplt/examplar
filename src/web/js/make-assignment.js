@@ -7,10 +7,10 @@ function compileFiles(source) {
             `import shared-gdrive("${file.title}", "${file.id}") as _`
         );
         CPO.editor.cm.setValue(imports.join('\n'));
-        return files.map((i, file) => {
+        return files.map(file => {
             return {
                 compiledName: `shared-gdrive://${file.title}:${file.id}`,
-                targetName: `impl${i}.js`,
+                targetName: file.title.split('.arr')[0] + '.js',
             };
         });
     });
