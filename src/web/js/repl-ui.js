@@ -1108,7 +1108,6 @@
                     block => !block.error
                       && block.tests.every(test => test.passed))).length;
               let all_passed = wheats == passed;
-
               if (all_passed) {
                 payload.wheat_passed = true;
                 return check_results;
@@ -1132,8 +1131,15 @@
                     ));
                 // strip the names
                 return run_results.then(results => results.map(result => result.result));
-              }, function(_){
-                return null;
+              }, function(wheat_reject) {
+                if (wheat_reject instanceof Array) {
+                  // don't halt the execution pipeline if the if the wheats
+                  // failed in a well-behaved way (e.g., failing test case)
+                  return null;
+                } else {
+                  // otherwise, don't try to recover
+                  throw wheat_reject;
+                }
               });
 
           // lastly, run the student's tests, if they've begun their implementation.
