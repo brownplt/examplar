@@ -6,12 +6,9 @@ class Batch {
     this.batch = gapi.client.newBatch();
   }
 
-  get(name, path, params) {
+  add(name, req) {
     this.empty = false;
-    this.batch.add(gapi.client.request({
-      path: path,
-      params: params,
-    }), {'id': name});
+    this.batch.add(req, {'id': name});
   }
 
   post(name, path, params) {
@@ -144,10 +141,10 @@ class GoogleAPI {
       return files.then(function (files) {
           files = [...new Set(files.map(f => f.properties.assignment))]
           let batch = new Batch();
-          files.forEach(file => batch.get(file, `drive/v2/files/${file}`, {}));
+          files.forEach(file => batch.add(file, gapi.client.drive.files.get({fileId: file})));
           return batch.run()
         }).then(function (result) {
-          return Object.entries(result).map(([id, info]) => new Object({id: id, name: info.title}));
+          return Object.entries(result).map(([id, info]) => new Object({id: id, name: info.name}));
         });
     });
   }

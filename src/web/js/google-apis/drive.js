@@ -4,7 +4,13 @@ class Batch {
     this.batch = gapi.client.newBatch();
   }
 
+  add(name, req) {
+    this.empty = false;
+    this.batch.add(req, {'id': name});
+  }
+
   get(name, path, params) {
+    console.trace("DEPRECATED");
     this.empty = false;
     this.batch.add(gapi.client.request({
       path: path,
@@ -13,6 +19,7 @@ class Batch {
   }
 
   post(name, path, params) {
+    console.trace("DEPRECATED");
     this.empty = false;
     this.batch.add(gapi.client.request({
       path: path,
@@ -322,15 +329,15 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           baseCollection.then(function (bc) {
             var batch = new Batch();
 
-            batch.get('user_files', 'drive/v2/files',
-              {
+            batch.add('user_files',
+              gapi.client.drive.files.list({
                 'q': `not trashed and "${bc.id}" in parents and properties has {key="assignment" and value="${id}" and visibility="PUBLIC"}`
-              });
+              }));
 
-            batch.get('template_files', 'drive/v2/files',
-              {
+            batch.add('template_files',
+              gapi.client.drive.files.list({
                 'q': `not trashed and "${id}" in parents`
-              });
+              }));
 
             return batch.run().then(function (result) {
               result["bc"] = bc;
@@ -349,21 +356,25 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                 let template_file = template_files.find(file => file.title.includes(name));
 
                 if (template_file) {
-                  batch.post(name, `drive/v2/files/${template_file.id}/copy`, {
-                    "parents": [{"id": bc.id}],
-                    "properties": [
-                      {
-                        "key": "assignment",
-                        "value": id,
-                        "visibility": "PUBLIC",
-                      },
-                      {
-                        "key": "edited",
-                        "value": "false",
-                        "visibility": "PUBLIC",
+                  batch.add(name,
+                    gapi.client.drive.files.copy({
+                      fileId: template_file.id,
+                      resource: {
+                        "parents": [{"id": bc.id}],
+                        "properties": [
+                          {
+                            "key": "assignment",
+                            "value": id,
+                            "visibility": "PUBLIC",
+                          },
+                          {
+                            "key": "edited",
+                            "value": "false",
+                            "visibility": "PUBLIC",
+                          }
+                        ],
                       }
-                    ],
-                  });
+                    }));
                 }
               }
             }
@@ -374,11 +385,14 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             let chaff = template_files.items.find(file => file.title == "chaff");
 
             if (wheat && chaff) {
-              batch.get('wheat', 'drive/v2/files',
-                { 'q': `not trashed and "${wheat.id}" in parents` });
-
-              batch.get('chaff', 'drive/v2/files',
-                { 'q': `not trashed and "${chaff.id}" in parents` });
+              batch.add('wheat',
+                gapi.client.drive.files.list({
+                  'q': `not trashed and "${wheat.id}" in parents`
+                }));
+              batch.add('chaff',
+                gapi.client.drive.files.list({
+                  'q': `not trashed and "${chaff.id}" in parents`
+                }));
             }
 
             maybe_copy_template('code',    batch, template_files.items, user_files.items);
