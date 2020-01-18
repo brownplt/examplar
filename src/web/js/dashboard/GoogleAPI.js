@@ -1,4 +1,48 @@
 var FOLDER_MIME = "application/vnd.google-apps.folder";
+
+class Batch {
+  constructor() {
+    this.empty = true;
+    this.batch = gapi.client.newBatch();
+  }
+
+  get(name, path, params) {
+    this.empty = false;
+    this.batch.add(gapi.client.request({
+      path: path,
+      params: params,
+    }), {'id': name});
+  }
+
+  post(name, path, params) {
+    this.empty = false;
+    this.batch.add(gapi.client.request({
+      path: path,
+      method: "POST",
+      body: params,
+    }), {'id': name});
+  }
+
+  run() {
+    if (this.empty) {
+      return Promise.resolve({});
+    }
+    return this.batch.then(function(result) {
+      let results = {};
+      for (let [name, response] of Object.entries(result.result)) {
+        if (response.status != 200) {
+          delete response.body;
+          console.error({request: name, response: response});
+          throw {request: name, response: response};
+        } else {
+          results[name] = response.result;
+        }
+      }
+      return results;
+    })
+  }
+}
+
 class GoogleAPI {
   /**
    *  Load the client library. Return a promise to allow .then() in caller
@@ -97,9 +141,14 @@ class GoogleAPI {
 
       const files = ls(`not trashed and "${appFolder.id}" in parents`,
         "files(properties(assignment))");
-      return files.then(r => Promise.all([...new Set(r.map(f => f.properties.assignment))]
-        .map(a => gapi.client.drive.files.get({'fileId':a})
-          .then(r => new Object({'name': r.result.name, 'id': r.result.id})))));
+      return files.then(function (files) {
+          files = [...new Set(files.map(f => f.properties.assignment))]
+          let batch = new Batch();
+          files.forEach(file => batch.get(file, `drive/v2/files/${file}`, {}));
+          return batch.run()
+        }).then(function (result) {
+          return Object.entries(result).map(([id, info]) => new Object({id: id, name: info.title}));
+        });
     });
   }
 
