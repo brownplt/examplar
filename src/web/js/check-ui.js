@@ -516,7 +516,8 @@
           container.classList.add("file-test-results");
 
           let header = document.createElement("header");
-          header.textContent = CPO.sourceAPI.get_loaded(name).file.getName();
+          this.name = CPO.sourceAPI.get_loaded(name).file.getName();
+          header.textContent = this.name;
           container.appendChild(header);
 
           let examplar_summary = window.wheat.then(wheat => {
@@ -557,10 +558,15 @@
           }
 
           let view_button_elt = document.createElement("button");
-          view_button_elt.textContent = "Toggle Results";
+          this.view_button_elt = view_button_elt;
+          view_button_elt.textContent = "Show Results";
 
           view_button_elt.addEventListener("click", function() {
-            container.classList.toggle("expanded");
+            if (container.classList.contains("expanded")) {
+              _this.hideTests();
+            } else {
+              _this.showTests();
+            }
           });
 
           summary_bits.append(view_button_elt);
@@ -596,17 +602,19 @@
         };
 
         FileSkeleton.prototype.showTests = function showTests() {
-          console.log("FileSkeleton.showTests");
+          cloud_log("FILE_TESTS_SHOW", {name: this.name});
+          this.view_button_elt.textContent = "Hide Results";
           this.container.classList.add("expanded");
         };
 
         FileSkeleton.prototype.hideTests = function hideTests() {
-          console.log("FileSkeleton.hideTests");
+          cloud_log("FILE_TESTS_HIDE", {name: this.name});
+          this.view_button_elt.textContent = "Show Results";
           this.container.classList.remove("expanded");
         };
 
         FileSkeleton.prototype.vivify = function vivify(rendering) {
-          console.error("FileSkeleton.hideTests");
+          console.log("FileSkeleton.vivify");
         };
 
         return FileSkeleton;
@@ -622,6 +630,9 @@
           let maybeError    = get(block, "maybe-err");
           let testResults   = get(block, "test-results");
           let keywordCheck  = get(block, "keyword-check");
+
+          this.file = file;
+          this.name = name;
 
           let testsPassing  = 0;
           let testsExecuted = 0;
@@ -649,6 +660,8 @@
 
           let passing = testsPassing;
           let executed = testsExecuted;
+
+          this.stats = {passed: passing, executed: executed, errored: endedInError};
 
           if (endedInError) {
             checkErroredSkeletons.push(this);
@@ -767,6 +780,11 @@
         };
 
         CheckBlockSkeleton.prototype.showTests = function showTests() {
+          cloud_log("BLOCK_SHOW_TESTS", {
+            file: this.file.name,
+            block: this.name,
+            stats: this.stats,
+          });
           if (expandedCheckBlock !== undefined)
             expandedCheckBlock.hideTests();
           expandedCheckBlock = this;

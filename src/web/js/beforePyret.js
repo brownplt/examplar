@@ -8,6 +8,57 @@ var url = require('url.js');
 var modalPrompt = require('./modal-prompt.js');
 window.modalPrompt = modalPrompt;
 
+const session_id = logger.guid();
+const cloud_log_d = Q.defer();
+const cloud_log_p = cloud_log_d.promise;
+
+window.cloud_log = function cloud_log(event, payload) {
+  let time = Date.now();
+  cloud_log_p.then(log => log({event, time, payload}));
+};
+
+(function(){
+  let last_time = Date.now();
+
+  lifecycle.addEventListener('statechange', function(event) {
+    let now = Date.now();
+    let type = (function() { try {return event.originalEvent.type;} catch(e) {return null;}})();
+    cloud_log("PERIOD", {
+      type: 'STATE_CHANGE',
+      state: event.oldState,
+      start: last_time,
+      end: now,
+      event: type,
+    });
+    last_time = now;
+  });
+})();
+
+// log when the browser session begins and ends
+const SESSION_START_TIME = Date.now();
+window.addEventListener("pagehide", function (e) {
+  const SESSION_END_TIME = Date.now();
+  cloud_log("PERIOD", {
+    type: "SESSION",
+    start: SESSION_START_TIME,
+    end: SESSION_END_TIME,
+  });
+});
+
+// track sleep/wake
+(function() {
+  try {
+    let worker = new Worker("/js/detect-wake.js");
+    worker.onmessage = function (ev) {
+      if (ev && ev.data) {
+        let start = ev.data.sleep;
+        let end = ev.data.wake;
+        cloud_log("PERIOD", { type: "SLEEP", start, end, });
+      }
+    }
+  } catch(_) {}
+})();
+
 const LOG = true;
 window.ct_log = function(/* varargs */) {
   if (window.console && LOG) {
@@ -106,6 +157,27 @@ var Documents = function() {
   return Documents;
 }();
 
+// track the active tab
+let tab_switched_to = (function() {
+  let last_tab = null;
+  let last_time = null;
+  return function(tab_name) {
+    let end = Date.now();
+    if (last_tab && last_tab != tab_name) {
+      cloud_log("PERIOD", {
+        type: "TAB_FOCUS",
+        tab: last_tab,
+        start: last_time,
+        end,
+      });
+    }
+    last_tab = tab_name;
+    last_time = end;
+  };
+})();
+
+window.addEventListener("pagehide",
+  event => tab_switched_to(null));
 
 var Tab = function() {
 
@@ -136,6 +208,7 @@ var Tab = function() {
   }
 
   Tab.prototype.activate = function () {
+    tab_switched_to(this.source.name);
     document.querySelectorAll(".selected").forEach(tab => tab.classList.remove("selected"));
     CPO.editor.cm.swapDoc(this.source.document);
     this.tab.classList.add("selected");
@@ -521,6 +594,28 @@ $(function() {
   window.assignment_id = assignment.then(function(assn) { return assn.assignment_id });
   window.assignment_name = assignment.then(function(assn) { return assn.assignment_name });
 
+  Q.all([window.user, window.assignment_id])
+    .then(function([email, id]) {
+      function cloud_log_internal({event, time, payload}) {
+        console.info("LOG", {event, time, payload});
+        navigator.sendBeacon("https://us-central1-pyret-examples.cloudfunctions.net/submit", JSON.stringify({
+          email: email,
+          assignment: id,
+          session: session_id,
+          event,
+          time,
+          payload,
+        }));
+      }
+
+      cloud_log_d.resolve(cloud_log_internal);
+
+      window.cloud_log = function cloud_log(event, payload) {
+        let time = Date.now();
+        cloud_log_internal({event, time, payload});
+      };
+  });
+
   let assignment_tests = assignment.then(assn => {if (assn.tests){return sourceAPI.from_file(assn.tests)}});
   let assignment_common = assignment.then(assn => {if(assn.common){return sourceAPI.from_file(assn.common)}});
 
@@ -552,6 +647,7 @@ $(function() {
           code.edited().then(function (_) {
             begin_button.remove();
             sourceAPI.from_file(code).then(code => new Tab(code));
+            cloud_log("BEGIN_IMPLEMENTATION", {});
           });
         });
         document.getElementById("files-tabs-container")
@@ -1048,6 +1144,7 @@ $(function() {
     CPO.editor.cm.setOption("rulers", rulers);
   }
   CPO.editor.cm.on('changes', function(instance, changeObjs) {
+    cloud_log("CHANGES", {changes: changeObjs});
     var minLine = instance.lastLine(), maxLine = 0;
     var rulersMinCol = instance.getOption("rulersMinCol");
     var longLines = instance.getOption("longLines");

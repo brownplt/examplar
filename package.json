@@ -51,6 +51,7 @@
     "mustache-express": "^1.2.1",
     "node-static": "^0.7.3",
     "node-uuid": "^1.4.1",
+    "page-lifecycle": "^0.1.2",
     "pyret-codemirror-mode": "git://github.com/brownplt/pyret-codemirror-mode.git#master",
     "pyret-ide": "git://github.com/pcardune/pyret-ide.git#master",
     "pyret-lang": "git://github.com/brownplt/pyret-lang.git#cb-wf-fix",

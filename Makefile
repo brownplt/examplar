@@ -103,6 +103,9 @@ build/web/js/s-expression-lib.js: node_modules/s-expression/index.js
 build/web/js/colorspaces.js: node_modules/colorspaces/colorspaces.js
 	cp $< $@
 
+build/web/js/lifecycle.js: node_modules/page-lifecycle/dist/lifecycle.es5.js
+	cp $< $@
+
 build/web/js/jszip.js: node_modules/jszip/dist/jszip.min.js
 	cp $< $@
 
@@ -169,6 +172,7 @@ MISC_JS = build/web/js/q.js build/web/js/url.js build/web/js/require.js \
           build/web/js/foldcode.js \
           build/web/js/foldgutter.js \
           build/web/js/colorspaces.js \
+          build/web/js/lifecycle.js \
           build/web/js/jszip.js \
           build/web/js/FileSaver.js \
           build/web/js/es6-shim.js \

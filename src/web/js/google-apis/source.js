@@ -71,8 +71,6 @@ window.createSourceManager = function createSourceManager(storageAPI) {
 
     // consumes a File and produces a promise for a FileSource
     from_file: function(file) {
-      console.info("from_file", file.getName(), file);
-
       let uri = file.getURI();
 
       if (sources_by_filename.has(uri)) {
@@ -103,19 +101,15 @@ window.createSourceManager = function createSourceManager(storageAPI) {
     },
 
     is_loaded: function(name) {
-      console.info("is_loaded", name);
       return sources_by_filename.has(name);
     },
 
     get_loaded: function(name) {
-      console.info("get_loaded", name);
       return sources_by_filename.get(name);
     },
 
     // somethingelse.arr
     from_filename: function(name) {
-      console.info("from_filename", name);
-
       if (sources_by_filename.has(name)) {
         return Q(sources_by_filename.get(name));
       }

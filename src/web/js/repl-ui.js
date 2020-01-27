@@ -338,7 +338,6 @@
             return false;
           }
         }, function(r) {
-          console.info("SFSDFSDFDSF", r);
           if (r.result instanceof Array) {
             doneDisplay.resolve({json: r.result, pyret: base_result});
           } else if (r.result === false) {
@@ -347,12 +346,6 @@
             console.error("ERROR ENCOUNTERED", r.result);
             doneDisplay.reject(r.result);
           }
-          
-          //if (r.result === false) {
-          //  doneDisplay.reject(base_result);
-          //} else {
-          //  doneDisplay.resolve(r.result);
-          //}
         });
   
         return doneDisplay.promise;
@@ -989,37 +982,20 @@
                           // if this becomes a check box somewhere in CPO
         };
 
-        Q.all([window.user, window.assignment_id])
-          .then(function([email, id]) {
-            return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
-              method: 'POST',
-              mode: "no-cors",
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: email,
-                assignment: id,
-                payload: {
-                  submission:
-                    [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
-                      .map(s => new Object({
-                        name: s.name,
-                        id: s.file.getUniqueId(),
-                        role
-                          : s.name.includes("code") ? "code"
-                          : s.name.includes("tests") ? "tests"
-                          : s.name.includes("common") ? "common"
-                          : null,
-                        contents: s.contents,
-                      }))
-                },
-              }),
-            })
-          }, function (err) {
-            console.error("Failed to submit sweep.", err);
-            window.stickError("Failed to submit sweep.");
-          });
+        cloud_log("RUN_START", {
+          submission:
+            [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
+              .map(s => new Object({
+                name: s.name,
+                id: s.file.getUniqueId(),
+                role
+                  : s.name.includes("code") ? "code"
+                  : s.name.includes("tests") ? "tests"
+                  : s.name.includes("common") ? "common"
+                  : null,
+                contents: s.contents,
+              }))
+        });
 
         function run_injections(injections) {
           let first = injections[0];
@@ -1062,21 +1038,7 @@
         };
 
         send_log.promise.then(function(){
-          return Q.all([window.user, window.assignment_id])
-          .then(function([email, id]) {
-            return fetch("https://us-central1-pyret-examples.cloudfunctions.net/submit", {
-              method: 'POST',
-              mode: "no-cors",
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: email,
-                assignment: id,
-                payload : payload,
-              }),
-            })
-          });
+          cloud_log("RUN_END", payload);
         });
 
         if (!document.getElementById("option-check-mode").checked) {
@@ -1244,6 +1206,7 @@
         var thisName = 'interactions://' + interactionsCount;
         let source = sourceAPI.from_doc(thisName, echoCM.getDoc());
         logger.log('run', { name: thisName });
+        cloud_log("REPL_START", {code: code});
         var replResult = repl.run(code, thisName);
 //        replResult.then(afterRun(CM));
         var startRendering = replResult.then(function(r) {
