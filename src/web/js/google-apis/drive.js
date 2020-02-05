@@ -399,6 +399,20 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             maybe_copy_template('common',  batch, template_files.items, user_files.items);
             maybe_copy_template('tests',   batch, template_files.items, user_files.items);
 
+            let share = template_files.items.find(file => file.title == "shares.txt");
+
+            let shares_defer = Q.defer();
+            let shares_promise = shares_defer.promise;
+
+            if (share) {
+              gapi.client.drive.files.get({
+                'fileId': share.id,
+                alt: 'media',
+              }).then(function(shares) {
+                shares_defer.resolve(shares.body.split("\n").filter(e => e.includes("@")));
+              });
+            }
+
             return batch.run().then(function({wheat, chaff, code, common, tests}) {
               if (!code) { code = user_files.items.find(file => file.title.includes("code")); }
               if (!common) { common = user_files.items.find(file => file.title.includes("common")); }
@@ -406,6 +420,30 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
               if (!wheat) { wheat = []; } else { wheat = wheat.items; }
               if (!chaff) { chaff = []; } else { chaff = chaff.items; }
+
+              shares_promise.then(function(shares) {
+                let batch = new Batch();
+                [code, common, tests].filter(f => f).forEach(function (file, i) {
+                  shares.forEach(function(email) {
+                    batch.add(`permissions-${email}-${i}`,
+                      gapi.client.drive.permissions.insert({
+                          "fileId": file.id,
+                          "sendNotificationEmails": "false",
+                          "resource": {
+                            "role": "reader",
+                            "type": "user",
+                            "value": email,
+                          }
+                      }));
+                  });
+                });
+
+                batch.run().then(function(results) {
+                  console.error("PERMISSIONS SET", results);
+                }, function(error) {
+                  console.error("PERMISSIONS ERROR", error);
+                });
+              });
 
               return {wheat, chaff, code, common, tests,
                 dummy_impl: template_files.items.find(file => file.title.includes("dummy")),
