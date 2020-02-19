@@ -162,7 +162,8 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           if (contents != null) {
             return contents;
           } else {
-            return fetch(googFileObject.downloadUrl,
+            let url = "https://www.googleapis.com/drive/v3/files/" + googFileObject.id + "?alt=media&source=download";
+            return fetch(url,
               { method: "get",
                 cache: cache_mode || "no-cache",
                 headers: new Headers([
