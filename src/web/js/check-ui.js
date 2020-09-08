@@ -602,13 +602,11 @@
         };
 
         FileSkeleton.prototype.showTests = function showTests() {
-          cloud_log("FILE_TESTS_SHOW", {name: this.name});
           this.view_button_elt.textContent = "Hide Results";
           this.container.classList.add("expanded");
         };
 
         FileSkeleton.prototype.hideTests = function hideTests() {
-          cloud_log("FILE_TESTS_HIDE", {name: this.name});
           this.view_button_elt.textContent = "Show Results";
           this.container.classList.remove("expanded");
         };
@@ -780,11 +778,6 @@
         };
 
         CheckBlockSkeleton.prototype.showTests = function showTests() {
-          cloud_log("BLOCK_SHOW_TESTS", {
-            file: this.file.name,
-            block: this.name,
-            stats: this.stats,
-          });
           if (expandedCheckBlock !== undefined)
             expandedCheckBlock.hideTests();
           expandedCheckBlock = this;
