@@ -119,7 +119,7 @@ build/web/js/transpile.xml: src/web/js/transpile.xml
 	cp -r $< $@
 
 build/web/js/beforePyret.js: src/web/js/beforePyret.js
-	`npm bin`/webpack
+	./node_modules/.bin/webpack
 
 build/web/js/beforeBlocks.js: src/web/js/beforeBlocks.js
 	`npm bin`/webpack
@@ -131,6 +131,15 @@ build/web/js/s-expression-lib.js: node_modules/s-expression/index.js
 	cp $< $@
 
 build/web/js/colorspaces.js: node_modules/colorspaces/colorspaces.js
+	cp $< $@
+
+build/web/js/lifecycle.js: node_modules/page-lifecycle/dist/lifecycle.es5.js
+	cp $< $@
+
+build/web/js/jszip.js: node_modules/jszip/dist/jszip.min.js
+	cp $< $@
+
+build/web/js/FileSaver.js: node_modules/file-saver/dist/FileSaver.min.js
 	cp $< $@
 
 build/web/js/es6-shim.js: node_modules/es6-shim/es6-shim.min.js
@@ -231,7 +240,11 @@ MISC_JS = build/web/js/q.js \
 	   build/web/js/es6-shim.js \
 	   build/web/js/runmode.js \
 	   build/web/js/mousetrap.min.js \
-	   build/web/js/mousetrap-global-bind.min.js
+	   build/web/js/mousetrap-global-bind.min.js \
+	   build/web/js/lifecycle.js \
+           build/web/js/jszip.js \
+           build/web/js/FileSaver.js
+  
 
 EDITOR_MISC_JS = build/web/js/q.js \
 		  build/web/js/loader.js \
@@ -260,6 +273,7 @@ EDITOR_MISC_JS = build/web/js/q.js \
 		  build/web/js/google-apis/drive.js \
 		  build/web/js/google-apis/picker.js \
 		  build/web/js/google-apis/sheets.js \
+		  build/web/js/google-apis/source.js \
 		  build/web/js/authenticate-storage.js
 
 build/web/js/editor-misc.min.js: $(EDITOR_MISC_JS)

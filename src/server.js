@@ -48,12 +48,12 @@ function start(config, onServerReady) {
 
   // From http://stackoverflow.com/questions/7185074/heroku-nodejs-http-to-https-ssl-forced-redirect
   /* At the top, with other redirect methods before other routes */
-  app.get('*',function(req,res,next){
-    if(req.headers['x-forwarded-proto'] !== 'https' && !config.development)
-      res.redirect(config.baseUrl + req.url);
-    else
-      next(); /* Continue to other routes if we're not redirecting */
-  })
+  //app.get('*',function(req,res,next){
+  //  if(req.headers['x-forwarded-proto'] !== 'https' && !config.development)
+  //    res.redirect(config.baseUrl + req.url);
+  //  else
+  //    next(); /* Continue to other routes if we're not redirecting */
+  //})
 
   app.get("/__pyret-compiler", function(req, res) {
     request.get(config.pyret).pipe(res);
@@ -524,16 +524,35 @@ function start(config, onServerReady) {
   });
 
   app.get("/editor", function(req, res) {
-    res.render("editor.html", {
-      PYRET: process.env.PYRET,
-      BASE_URL: config.baseUrl,
-      GOOGLE_API_KEY: config.google.apiKey,
-      GOOGLE_APP_ID: config.google.appId,
-      CSRF_TOKEN: req.csrfToken(),
-      LOG_URL: config.logURL,
-      GIT_REV : config.gitRev,
-      GIT_BRANCH: config.gitBranch,
-      POSTMESSAGE_ORIGIN: process.env.POSTMESSAGE_ORIGIN
+    var u = requireLogin(req, res);
+    u.then(function(user) {
+      res.render("editor.html", {
+        BASE_URL: config.baseUrl,
+        GOOGLE_API_KEY: config.google.apiKey,
+        CSRF_TOKEN: req.csrfToken(),
+        CURRENT_VERSION: config.version,
+        LOG_URL: config.logURL,
+        GIT_REV : config.gitRev,
+        GIT_BRANCH: config.gitBranch,
+        POSTMESSAGE_ORIGIN: process.env.POSTMESSAGE_ORIGIN
+      });
+    });
+  });
+
+  app.get("/assignment/:id", function(req, res) {
+    var u = requireLogin(req, res);
+    u.then(function(user) {
+      res.render("editor.html", {
+        BASE_URL: config.baseUrl,
+        ASSIGNMENT_ID: req.params.id,
+        GOOGLE_API_KEY: config.google.apiKey,
+        CSRF_TOKEN: req.csrfToken(),
+        CURRENT_VERSION: config.version,
+        LOG_URL: config.logURL,
+        GIT_REV : config.gitRev,
+        GIT_BRANCH: config.gitBranch,
+        POSTMESSAGE_ORIGIN: process.env.POSTMESSAGE_ORIGIN
+      });
     });
   });
 

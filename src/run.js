@@ -36,7 +36,7 @@ var res = Q.fcall(function(db) {
       clientSecret: process.env["GOOGLE_CLIENT_SECRET"],
       redirect: "/oauth2callback"
     },
-    version: process.env["CURRENT_PYRET_RELEASE"],
+    version: new Date().getTime(),
     pyret: process.env["PYRET"]
   }, function(app) {
     console.log("Server ready.");

@@ -15,12 +15,13 @@ em {
 #loader {
   position: fixed;
   right: 0;
-  bottom: 10px;
-  width: calc(50% - 7px);
+  bottom: 0;
+  width: 100%;
   height: 100%;
   z-index: 8700;
-  background: url('/img/pyret-spin.gif') 50% 30% no-repeat rgba(249, 249, 249, 0.5);
-  background-size: 50px 50px;
+  background: url(/img/pyret-spin.gif) 50% 50% no-repeat,
+    url(/img/loading.svg);
+  background-size: auto 20%, 100px 100px;
 }
 
 body.hideDefinitions #loader, body.hideDefinitions .replContainer {
@@ -170,8 +171,11 @@ body.hideDefinitions .replMain, body.hideDefinitions #handle {
 }
 
 #loader p {
+  font-family: 'Gochi Hand', cursive;
+  font-size:2em;
+  margin: 0;
   position: relative;
-  top: calc(30% + 30px);
+  top: 70%;
   text-align: center;
   width: 100%;
 }
@@ -182,7 +186,7 @@ body.hideDefinitions .replMain, body.hideDefinitions #handle {
   top: 0;
   width: 100%;
   height: 40px;
-  background:#fff;
+  background:#0f9d58;
   box-sizing: border-box;
   -moz-box-sizing: border-box;
   /* box-shadow: 0px 1px 4px rgba(0,0,0,0.3);*/
@@ -289,7 +293,6 @@ nav button {
 }
 
 nav > div > ul > li  ul {
-  position: absolute;
   top: 2.5em;
   margin: 0;
   padding: 0;
@@ -300,6 +303,10 @@ nav > div > ul > li  ul {
 
 nav > div > ul > li > ul:not([id="run-dropdown-content"]) {
   left: 0;
+}
+
+nav > div > ul > li > ul[id="run-dropdown-content"] {
+  right: 0px;
 }
 
 nav > div > ul > li:focus ul {
