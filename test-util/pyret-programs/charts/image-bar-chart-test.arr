@@ -22,3 +22,4 @@ check:
   img satisfies is-image
   color-at-position(img, 504, 258) is C.red
 end
+

@@ -2,27 +2,24 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <title>code.pyret.org</title>
-  <link crossorigin="anonymous" rel="preload" href="{{&PYRET}}" as="script">
-  <script>window.PYRET = "{{&PYRET}}";</script>
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/reset.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/smoothness-jquery-ui.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/fira-mono.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/codemirror.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/foldgutter.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/dialog.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/matchesonscrollbar.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/shared.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/editor.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/font-awesome.min.path-fixed.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/default.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/base16.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/material-darker.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/monokai.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/panda-syntax.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/high-contrast-light.css" />
-  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/high-contrast-dark.css" />
-  <link rel="icon" type="image/png" href="{{ &BASE_URL }}/img/pyret-icon.png" />
+  <title>Examplar</title>
+  <link rel="preload" href="{{&PYRET}}" as="script">
+  <link rel="stylesheet" href="/css/reset.css" />
+  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:400,700" />
+  <link rel="stylesheet" href="/css/codemirror.css" />
+  <link rel="stylesheet" href="/css/foldgutter.css" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <link rel="stylesheet" href="/css/editor.css" />
+  <link rel="stylesheet" href="/css/font-awesome.min.path-fixed.css" />
+  <link rel="stylesheet" href="/css/themes/default.css" />
+  <link rel="stylesheet" href="/css/themes/base16.css" />
+  <link rel="stylesheet" href="/css/themes/material-darker.css" />
+  <link rel="stylesheet" href="/css/themes/monokai.css" />
+  <link rel="stylesheet" href="/css/themes/panda-syntax.css" />
+  <link rel="stylesheet" href="/css/themes/high-contrast-light.css" />
+  <link rel="stylesheet" href="/css/themes/high-contrast-dark.css" />
+  <link rel="icon" type="image/png" href="/img/pyret-icon.png" />
   <style id="highlight-styles"></style>
   <script src="{{ &BASE_URL }}/js/vega.min.js"></script>
 <!--  <script src="https://cdnjs.cloudflare.com/ajax/libs/vega-tooltip/1.0.0-alpha.2/vega-tooltip.min.js"></script> -->
@@ -263,12 +260,6 @@
           <ul id="filemenuContents" class="menuContents submenu" role="menu" aria-hidden="true"
             aria-label="File Menu">
             <li role="presentation">
-              <div id="new" class="menuButton">
-                <a class="focusable" role="menuitem" aria-label="New file"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)" >New</a></div>
-            </li>
-            <li role="presentation">
               <div id="programs" class="menuButton">
                 <a  class="focusable" role="menuitem" aria-label="My Programs"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
@@ -283,6 +274,14 @@
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Open Original</a></div>
             </li>
+            <li role="presentation" class="loginOnly">
+              <div id="insert" class="loginOnly menuButton disabled">
+                <a class="loginOnly focusable disabled" role="menuitem" aria-label="Insert"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)">Insert
+                </a>
+              </div>
+            </li>
             <li role="presentation">
               <div id="save" class="menuButton disabled">
                 <a class="focusable disabled" role="menuitem" aria-label="Save file"
@@ -290,34 +289,17 @@
                   tabindex="-1" href="javascript:void(0)">Save</a></div>
             </li>
             <li role="presentation">
-              <div id="saveas" class="menuButton">
-                <a class="focusable" role="menuitem" aria-label="Save a Copy"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Save a copy</a></div>
-            </li>
-            <li role="presentation">
               <div id="download" class="menuButton">
                 <a class="focusable" role="menuitem" aria-label="Download"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Download</a></div>
             </li>
-            <li role="presentation">
-              <div id="rename" class="menuButton disabled">
-                <a class="focusable disabled" role="menuitem" aria-label="Rename file"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Rename</a></div>
-            </li>
           </ul>
         </li>
 
-        <li role="presentation" class="loginOnly topTier" id="insertli">
-          <div id="insertPart" class="loginOnly menu menuitemtitle">
-            <button role="menuitem"
-              aria-describedby="mhelp-menus mhelp-activate mhelp-escape"
-              aria-label="Insert, F11" id="insert" class="focusable blueButton loginOnly"  tabindex="-1">Insert</button>
-          </div>
-          <!-- <button id="saveButton" class="blueButton loginOnly">Save</button> -->
-          <!-- <button id="openFile" class="blueButton loginOnly">Open</button> -->
+        <li role="presentation" class="topTier" id="files-tabs-container">
+          <ul id="files-tabs">
+          </ul>
         </li>
 
         <li role="presentation" class="topTier" id="publishli" style="display: none;">
@@ -347,23 +329,13 @@
           </div>
           <ul id="run-dropdown-content" class="submenu" role="menu" aria-hidden="true"
             aria-label="Run Options">
-            <li id="select-run-old" >
-              <div id="select-run" >
-                <a class="focusable"
-                  role="menuitem"
-                  aria-label="Run" aria-setsize="2" aria-posinset="1"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Run</a>
-              </div>
+            <li>
+              <input id="option-tc" type="checkbox" name="option-tc-mode" />
+              <label for="option-tc">Type Check</label>
             </li>
-            <li id="select-tc-run-old">
-              <div id="select-tc-run" >
-                <a class="focusable"
-                  role="menuitem"
-                  aria-label="Type-check and run" aria-setsize="2" aria-posinset="2"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Type-check and run<sup>(beta)</sup></a>
-              </div>
+            <li>
+              <input id="option-check-mode" type="checkbox" name="option-check-mode" />
+              <label for="option-check-mode">Skip Tests</label>
             </li>
           </ul>
         </li>
@@ -490,13 +462,17 @@ function handleGoogLoad() {
 <script type="text/javascript" src="https://apis.google.com/js/client.js?onload=handleGoogLoad"></script>
 <script>
 var POSTMESSAGE_ORIGIN = "{{{ POSTMESSAGE_ORIGIN }}}";
-console.log(window.performance.now());
+console.log(window.performance.now())
 </script>
-<script src="{{ &BASE_URL }}/js/beforePyret.js"></script>
+<script src="/{{ &BASE_URL }}//js/beforePyret.js"></script>
+<script src="/{{ &BASE_URL }}//js/make-assignment.js"></script>
 <script>
 var IMAGE_PROXY_BYPASS = "{{ &IMAGE_PROXY_BYPASS }}" === "true";
 var APP_BASE_URL = "{{ &BASE_URL }}";
 var CSRF_TOKEN = "{{{ CSRF_TOKEN }}}";
+var CURRENT_VERSION = "{{{ CURRENT_VERSION }}}"
+var ASSIGNMENT_ID = "{{{ ASSIGNMENT_ID }}}"
+
 $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
   var a = document.createElement("a");
   a.href = options.url;

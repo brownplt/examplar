@@ -113,6 +113,7 @@ MISC_CSS = build/web/css/codemirror.css \
 	build/web/css/dialog.css \
 	build/web/css/matchesonscrollbar.css
 
+
 COPY_GIF := $(patsubst src/web/img/%.gif,build/web/img/%.gif,$(wildcard src/web/img/*.gif))
 
 COPY_SVG := $(patsubst src/web/img/%.svg,build/web/img/%.svg,$(wildcard src/web/img/*.svg))
@@ -176,7 +177,16 @@ build/web/js/s-expression-lib.js: $(call NODE_MODULE,s-expression)/index.js
 build/web/js/colorspaces.js: $(call NODE_MODULE,colorspaces)/colorspaces.js
 	cp $< $@
 
-build/web/js/es6-shim.js: $(call NODE_MODULE,es6-shim)/es6-shim.min.js
+build/web/js/lifecycle.js: node_modules/page-lifecycle/dist/lifecycle.es5.js
+	cp $< $@
+
+build/web/js/jszip.js: node_modules/jszip/dist/jszip.min.js
+	cp $< $@
+
+build/web/js/FileSaver.js: node_modules/file-saver/dist/FileSaver.min.js
+	cp $< $@
+
+build/web/js/es6-shim.js: node_modules/es6-shim/es6-shim.min.js
 	cp $< $@
 
 build/web/js/seedrandom.js: $(call NODE_MODULE,seedrandom)/seedrandom.js
@@ -275,8 +285,10 @@ MISC_JS = build/web/js/q.js \
 	   build/web/js/runmode.js \
 	   build/web/js/mousetrap.min.js \
 	   build/web/js/mousetrap-global-bind.min.js \
-	   build/web/js/vega.min.js \
-	   build/web/js/vega-tooltip.min.js
+	   build/web/js/lifecycle.js \
+           build/web/js/jszip.js \
+           build/web/js/FileSaver.js
+  
 
 EDITOR_MISC_JS = build/web/js/q.js \
 		  build/web/js/loader.js \
@@ -305,6 +317,7 @@ EDITOR_MISC_JS = build/web/js/q.js \
 		  build/web/js/google-apis/drive.js \
 		  build/web/js/google-apis/picker.js \
 		  build/web/js/google-apis/sheets.js \
+		  build/web/js/google-apis/source.js \
 		  build/web/js/authenticate-storage.js
 
 build/web/js/editor-misc.min.js: $(EDITOR_MISC_JS)
@@ -363,9 +376,9 @@ $(WEBIMG):
 $(WEBARR):
 	@$(call MKDIR,$(WEBARR))
 
-web-local: $(WEB) $(WEBV) $(WEBJS) $(WEBJSGOOG) $(WEBCSS) $(WEBTHEMES) $(WEBFONTS) $(WEBIMG) $(WEBIMAGES) $(WEBARR) $(OUT_HTML) $(COPY_HTML) $(OUT_CSS) $(COPY_CSS) $(COPY_LIB_CSS) $(COPY_THEMES) $(COPY_FONTS) $(COPY_JS) $(COPY_LIB_JS) $(COPY_LIB_IMAGES) $(COPY_ARR) $(COPY_GIF) $(COPY_SVG) $(COPY_PNG) $(MISC_JS) $(MISC_CSS) $(MISC_IMG) $(COPY_NEW_CSS) $(COPY_NEW_JS) $(COPY_GOOGLE_JS) $(CPOMAIN) $(CPOGZ) build/web/js/editor-misc.min.js build/web/js/snap build/web/js/transpile.xml build/web/editor.html build/web/editor.embed.html 
+web-local: $(WEB) $(WEBV) $(WEBJS) $(WEBJSGOOG) $(WEBCSS) $(WEBTHEMES) $(WEBFONTS) $(WEBIMG) $(WEBIMAGES) $(WEBARR) $(OUT_HTML) $(COPY_HTML) $(OUT_CSS) $(COPY_CSS) $(COPY_LIB_CSS) $(COPY_THEMES) $(COPY_FONTS) $(COPY_JS) $(COPY_LIB_JS) $(COPY_LIB_IMAGES) $(COPY_ARR) $(COPY_GIF) $(COPY_SVG) $(COPY_PNG) $(MISC_JS) $(MISC_CSS) $(MISC_IMG) $(COPY_NEW_CSS) $(COPY_NEW_JS) $(COPY_GOOGLE_JS) $(CPOMAIN) $(CPOGZ) build/web/js/editor-misc.min.js build/web/js/snap build/web/js/transpile.xml build/web/js/snap build/web/js/transpile.xml build/web/editor.html build/web/editor.embed.html 
 
-web: $(WEB) $(WEBV) $(WEBJS) $(WEBJSGOOG) $(WEBCSS) $(WEBTHEMES) $(WEBFONTS) $(WEBIMG) $(WEBIMAGES) $(WEBARR) $(OUT_HTML) $(COPY_HTML) $(OUT_CSS) $(COPY_CSS) $(COPY_LIB_CSS) $(COPY_THEMES) $(COPY_FONTS) $(COPY_JS) $(COPY_LIB_JS) $(COPY_LIB_IMAGES) $(COPY_ARR) $(COPY_GIF) $(COPY_SVG) $(COPY_PNG) $(MISC_JS) $(MISC_CSS) $(MISC_IMG) $(COPY_NEW_CSS) $(COPY_NEW_JS) $(COPY_GOOGLE_JS) build/web/js/editor-misc.min.js build/web/js/snap build/web/js/transpile.xml build/web/editor.html build/web/editor.embed.html
+web: $(WEB) $(WEBV) $(WEBJS) $(WEBJSGOOG) $(WEBCSS) $(WEBTHEMES) $(WEBFONTS) $(WEBIMG) $(WEBIMAGES) $(WEBARR) $(OUT_HTML) $(COPY_HTML) $(OUT_CSS) $(COPY_CSS) $(COPY_LIB_CSS) $(COPY_THEMES) $(COPY_FONTS) $(COPY_JS) $(COPY_LIB_JS) $(COPY_LIB_IMAGES) $(COPY_ARR) $(COPY_GIF) $(COPY_SVG) $(COPY_PNG) $(MISC_JS) $(MISC_CSS) $(MISC_IMG) $(COPY_NEW_CSS) $(COPY_NEW_JS) $(COPY_GOOGLE_JS) build/web/js/editor-misc.min.js build/web/js/snap build/web/js/transpile.xml build/web/js/snap build/web/js/transpile.xml build/web/editor.html build/web/editor.embed.html
 
 link-pyret:
 	ln -s $(PYRET) pyret

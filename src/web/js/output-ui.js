@@ -62,7 +62,6 @@
         return palette.get(n);
       };};
 
-
     var Position = function() {
 
       function cached_find(doc, positionCache, textMarker) {
@@ -77,6 +76,8 @@
       }
 
       function Position(doc, source, from, to, inclusiveLeft, inclusiveRight) {
+        this.str = JSON.stringify([source,from,to]);
+
         if (inclusiveLeft === undefined)
           inclusiveLeft = true;
         if (inclusiveRight === undefined)
@@ -109,6 +110,10 @@
         positionCache.set(doc.changeGeneration(), {from: from, to: to});
       }
 
+      Position.prototype.toJSON = function toJSON() {
+        return {source: this.source, from: this.from, to: this.to};
+      };
+
       Position.prototype.on = function on(type, f) {
         this._textMarker.on(type, f);
       };
@@ -118,8 +123,7 @@
       };
 
       Position.prototype.hint = function hint() {
-        if (this.from === undefined
-            || !(this.doc.getEditor() instanceof CodeMirror)) {
+        if (!CPO.sourceAPI.is_loaded(this.source)) {
           console.info("This position could not be hinted because it is not in this editor:", this);
         } else {
           hintLoc(this);
@@ -127,10 +131,13 @@
       };
 
       Position.prototype.goto = function goto() {
-        if (this.from === undefined
-            || !(this.doc.getEditor() instanceof CodeMirror)) {
+        if (!CPO.sourceAPI.is_loaded(this.source)) {
           flashMessage("This code is not open in this tab.");
         } else {
+          let source = CPO.sourceAPI.get_loaded(this.source);
+          if (CPO.tabs.has(source)) {
+            CPO.tabs.get(source).activate();
+          }
           this.doc.getEditor().getWrapperElement().scrollIntoView(true);
           this.doc.getEditor().scrollIntoView(this.from.line, 50);
           unhintLoc();
@@ -191,12 +198,12 @@
              return new Error("Cannot get Position from builtin location", loc);
           },
           "srcloc": function(source, startL, startC, startCh, endL, endC, endCh) {
-            if (!documents.has(source))
+            if (!sourceAPI.is_loaded("definitions://"))
               return new Error("No document for this location: ", loc);
             else {
               var extraCharForZeroWidthLocs = endCh === startCh ? 1 : 0;
               return new Position(
-                documents.get(source),
+                CPO.sourceAPI.get_loaded(source).document,
                 source,
                 new CodeMirror.Pos(startL - 1, startC),
                 new CodeMirror.Pos(  endL - 1, endC + extraCharForZeroWidthLocs),
@@ -207,18 +214,18 @@
       };
 
       Position.existsFromSrcArray = function(locarray, documents, options) {
-        return locarray.length === 7 && documents.has(locarray[0]);
+        return locarray.length === 7 && CPO.sourceAPI.is_loaded(locarray[0]);
       }
 
       Position.fromSrcArray = function (locarray, documents, options) {
         if (locarray.length === 7) {
           var extraCharForZeroWidthLocs = locarray[3] === locarray[6] ? 1 : 0;
           var source = locarray[0];
-          if (!documents.has(source)) {
+          if (!CPO.sourceAPI.is_loaded(source)) {
             throw new Error("No document for this location: ", locarray);
           }
           return new Position(
-            documents.get(source),
+            CPO.sourceAPI.get_loaded(source).document,
             source,
             new CodeMirror.Pos(locarray[1] - 1, locarray[2]),
             new CodeMirror.Pos(locarray[4] - 1, locarray[5] + extraCharForZeroWidthLocs),
@@ -282,6 +289,11 @@
     function hintLoc(position) {
       $(".warning-upper.hinting, .warning-lower.hinting").removeClass("hinting");
 
+      if (position.doc != CPO.editor.cm.getDoc()) {
+        flashMessage(`Cannot preview ${position.source}`);
+        return;
+      }
+
       var editor = position.doc.getEditor();
 
       if (!(editor instanceof CodeMirror))
@@ -294,7 +306,7 @@
       var viewportMin;
       var viewportMax;
 
-      if (position.source === "definitions://") {
+      if (position.source !== "interactions://") {
         var scrollInfo = editor.getScrollInfo();
         viewportMin = scrollInfo.top;
         viewportMax = scrollInfo.clientHeight + viewportMin;
@@ -326,6 +338,8 @@
 
     function unhintLoc() {
       $(".warning-upper.hinting, .warning-lower.hinting").removeClass("hinting");
+      $(".replMain").removeClass("hinting");
+      clearFlash();
     }
 
     function basename(str) {
@@ -406,7 +420,7 @@
       }
 
       var src = runtime.unwrap(get(s, "source"));
-      if(!(documents.has(src) && (documents.get(src).getEditor() !== undefined))) {
+      if(!(CPO.sourceAPI.is_loaded(src) && (CPO.sourceAPI.get_loaded(src).document.getEditor() !== undefined))) {
         if(isSharedImport(src)) {
           var sharedId = getSharedId(src);
           var srcUrl = shareAPI.makeShareUrl(sharedId);
@@ -463,7 +477,7 @@
             return runtime.pyretFalse;
           },
           "srcloc": function(filename, _, __, ___, ____, _____, ______) {
-            if (documents.has(filename)) {
+            if (CPO.sourceAPI.is_loaded(filename)) {
               return runtime.pyretTrue;
             } else {
               return runtime.pyretFalse;
@@ -480,8 +494,8 @@
             return runtime.ffi.makeNone();
           },
         "srcloc": function(filename, start_line, start_col, _, end_line, end_col, __) {
-            if(!documents.has(filename)) return runtime.ffi.makeNone();
-            let source = documents.get(filename).getValue()
+            if(!CPO.sourceAPI.is_loaded(filename)) return runtime.ffi.makeNone();
+            let source = CPO.sourceAPI.get_loaded(filename).document.getValue()
 
             // MUST NOT BE CALLED ON PYRET STACK.
             function parse(source, filename) {
@@ -652,7 +666,7 @@
         map(runtime.makeSrcloc).
         filter(isSrcloc).
         map(function (loc) {
-          if (!documents.has(loc.dict.source)) {
+          if (!CPO.sourceAPI.is_loaded(loc.dict.source)) {
             return $('<div>').append(drawSrcloc(documents, runtime, loc).css('display', 'block'));
           } else {
             var position = Position.fromPyretSrcloc(runtime, srcloc, loc, documents);
@@ -1121,7 +1135,7 @@
           "loc-display": function(loc, style, contents) {
             return runtime.safeCall(function () {
               if (runtime.hasField(loc, "source")
-                  && documents.has(runtime.getField(loc, "source"))) {
+                  && CPO.sourceAPI.is_loaded(runtime.getField(loc, "source"))) {
                 return help(runtime.getField(ED, "highlight").app(
                               contents,
                               runtime.ffi.makeList([loc]),
