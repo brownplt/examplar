@@ -2,8 +2,8 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <title>code.pyret.org</title>
-  <link rel="stylesheet" href="/css/reset.css" />
+  <title>Examplar</title>
+  <link rel="stylesheet" href="/css/reset.css"></link>
   <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:400,700" />
   <link rel="stylesheet" href="/css/codemirror.css" />
@@ -207,12 +207,6 @@
           <ul id="filemenuContents" class="menuContents submenu" role="menu" aria-hidden="true"
             aria-label="File Menu">
             <li role="presentation">
-              <div id="new" class="menuButton">
-                <a class="focusable" role="menuitem" aria-label="New file"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)" >New</a></div>
-            </li>
-            <li role="presentation">
               <div id="programs" class="menuButton">
                 <a  class="focusable" role="menuitem" aria-label="My Programs"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
@@ -227,6 +221,14 @@
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Open Original</a></div>
             </li>
+            <li role="presentation" class="loginOnly">
+              <div id="insert" class="loginOnly menuButton disabled">
+                <a class="loginOnly focusable disabled" role="menuitem" aria-label="Insert"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)">Insert
+                </a>
+              </div>
+            </li>
             <li role="presentation">
               <div id="save" class="menuButton disabled">
                 <a class="focusable disabled" role="menuitem" aria-label="Save file"
@@ -234,34 +236,17 @@
                   tabindex="-1" href="javascript:void(0)">Save</a></div>
             </li>
             <li role="presentation">
-              <div id="saveas" class="menuButton">
-                <a class="focusable" role="menuitem" aria-label="Save a Copy"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Save a copy</a></div>
-            </li>
-            <li role="presentation">
               <div id="download" class="menuButton">
                 <a class="focusable" role="menuitem" aria-label="Download"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Download</a></div>
             </li>
-            <li role="presentation">
-              <div id="rename" class="menuButton disabled">
-                <a class="focusable disabled" role="menuitem" aria-label="Rename file"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Rename</a></div>
-            </li>
           </ul>
         </li>
 
-        <li role="presentation" class="loginOnly topTier" id="insertli">
-          <div id="insertPart" class="loginOnly menu menuitemtitle">
-            <button role="menuitem"
-              aria-describedby="mhelp-menus mhelp-activate mhelp-escape"
-              aria-label="Insert, F11" id="insert" class="focusable blueButton loginOnly"  tabindex="-1">Insert</button>
-          </div>
-          <!-- <button id="saveButton" class="blueButton loginOnly">Save</button> -->
-          <!-- <button id="openFile" class="blueButton loginOnly">Open</button> -->
+        <li role="presentation" class="topTier" id="files-tabs-container">
+          <ul id="files-tabs">
+          </ul>
         </li>
 
         <li role="presentation" class="topTier" id="publishli" style="display: none;">
@@ -291,23 +276,13 @@
           </div>
           <ul id="run-dropdown-content" class="submenu" role="menu" aria-hidden="true"
             aria-label="Run Options">
-            <li id="select-run-old" >
-              <div id="select-run" >
-                <a class="focusable"
-                  role="menuitem"
-                  aria-label="Run" aria-setsize="2" aria-posinset="1"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Run</a>
-              </div>
+            <li>
+              <input id="option-tc" type="checkbox" name="option-tc-mode" />
+              <label for="option-tc">Type Check</label>
             </li>
-            <li id="select-tc-run-old">
-              <div id="select-tc-run" >
-                <a class="focusable"
-                  role="menuitem"
-                  aria-label="Type-check and run" aria-setsize="2" aria-posinset="2"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Type-check and run<sup>(beta)</sup></a>
-              </div>
+            <li>
+              <input id="option-check-mode" type="checkbox" name="option-check-mode" />
+              <label for="option-check-mode">Skip Tests</label>
             </li>
           </ul>
         </li>
@@ -400,6 +375,7 @@
 <script src="/js/q.js"></script>
 <script src="/js/loader.js"></script>
 <script src="/js/codemirror.js"></script>
+<script src="/js/lifecycle.js"></script>
 <script src="/js/rulers.js"></script>
 <script src="/js/scrollpastend.js"></script>
 <script src="/js/foldcode.js"></script>
@@ -416,6 +392,7 @@
 <script src="/js/share.js"></script>
 <script src="/js/google-apis/api-wrapper.js"></script>
 <script src="/js/google-apis/drive.js"></script>
+<script src="/js/google-apis/source.js"></script>
 <script src="/js/google-apis/picker.js"></script>
 <script src="/js/google-apis/sheets.js"></script>
 <script src="/js/authenticate-storage.js"></script>
@@ -431,10 +408,14 @@ function handleGoogLoad() {
 <!-- GAPI Client -->
 <script type="text/javascript" src="https://apis.google.com/js/client.js?onload=handleGoogLoad"></script>
 <script>console.log(window.performance.now())</script>
-<script src="js/beforePyret.js"></script>
+<script src="/js/beforePyret.js"></script>
+<script src="/js/make-assignment.js"></script>
 <script>
 var APP_BASE_URL = "{{{ BASE_URL }}}";
 var CSRF_TOKEN = "{{{ CSRF_TOKEN }}}";
+var CURRENT_VERSION = "{{{ CURRENT_VERSION }}}"
+var ASSIGNMENT_ID = "{{{ ASSIGNMENT_ID }}}"
+
 $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
   var a = document.createElement("a");
   a.href = options.url;

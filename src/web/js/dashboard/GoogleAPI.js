@@ -1,4 +1,45 @@
 var FOLDER_MIME = "application/vnd.google-apps.folder";
+
+class Batch {
+  constructor() {
+    this.empty = true;
+    this.batch = gapi.client.newBatch();
+  }
+
+  add(name, req) {
+    this.empty = false;
+    this.batch.add(req, {'id': name});
+  }
+
+  post(name, path, params) {
+    this.empty = false;
+    this.batch.add(gapi.client.request({
+      path: path,
+      method: "POST",
+      body: params,
+    }), {'id': name});
+  }
+
+  run() {
+    if (this.empty) {
+      return Promise.resolve({});
+    }
+    return this.batch.then(function(result) {
+      let results = {};
+      for (let [name, response] of Object.entries(result.result)) {
+        if (response.status != 200) {
+          delete response.body;
+          console.error({request: name, response: response});
+          throw {request: name, response: response};
+        } else {
+          results[name] = response.result;
+        }
+      }
+      return results;
+    })
+  }
+}
+
 class GoogleAPI {
   /**
    *  Load the client library. Return a promise to allow .then() in caller
@@ -65,6 +106,49 @@ class GoogleAPI {
     return window.gapi.client.request(reqOpts);
   }
 
+  getRecentAssignments = (appName) => {
+    function ls(q, fields) {
+      fields = "nextPageToken,incompleteSearch," + (fields || "");
+      var ret = Q.defer();
+      var retrievePageOfFiles = function(request, result) {
+        request.execute(function(resp) {
+          result = result.concat(resp.result.files);
+          var nextPageToken = resp.nextPageToken;
+          if (resp.incompleteSearch && nextPageToken) {
+            request = gapi.client.drive.files.list({
+              'q': q,
+              'fields': fields,
+              'pageToken': nextPageToken
+            });
+            retrievePageOfFiles(request, result);
+          } else {
+            ret.resolve(result);
+          }
+        });
+      }
+      var initialRequest = gapi.client.drive.files.list({'q': q, 'fields': fields});
+      retrievePageOfFiles(initialRequest, []);
+      return ret.promise;
+    }
+
+    return this.getAppFolderID(appName).then(response => {
+      const appFolder = response.result.files[0];
+      // Check for nonexistent drive folder
+      if (!appFolder) return Promise.resolve([]);
+
+      const files = ls(`not trashed and "${appFolder.id}" in parents`,
+        "files(properties(assignment))");
+      return files.then(function (files) {
+          files = [...new Set(files.map(f => f.properties.assignment))]
+          let batch = new Batch();
+          files.forEach(file => batch.add(file, gapi.client.drive.files.get({fileId: file})));
+          return batch.run()
+        }).then(function (result) {
+          return Object.entries(result).map(([id, info]) => new Object({id: id, name: info.name}));
+        });
+    });
+  }
+
   getRecentFilesByExtAndAppName = (appName, ext) => {
     return Q.all([this.getAppFolderID(appName), this.getAppSharedFolderID(appName)])
       .then((resp) => {
@@ -77,8 +161,8 @@ class GoogleAPI {
         if(savedFiles.length === 0) { return this.getRecentFilesByExt(ext); }
         else {
           return window.gapi.client.drive.files.list({
-            fields: "files(id, name, modifiedTime)",
-            q: 'not trashed and not (' + isSharedFile + ') and (fileExtension="' + ext + '" or "' + savedFiles[0].id + '" in parents)',
+            fields: "files(id, name)",
+            q: 'not trashed and properties has {key="examplar" and value="yes"} and not (' + isSharedFile + ') and (fileExtension="' + ext + '" or "' + savedFiles[0].id + '" in parents)',
           });
         }
       })
@@ -90,7 +174,7 @@ class GoogleAPI {
   getRecentFilesByExt = (ext) => {
     return window.gapi.client.drive.files.list({
       fields: "files(id, name)",
-      q: 'not trashed and fileExtension="' + ext + '"',
+      q: 'not trashed and properties has {key="examplar" and value="yes"} and fileExtension="' + ext + '"',
     });
   }
 

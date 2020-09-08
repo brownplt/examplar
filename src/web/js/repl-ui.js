@@ -39,10 +39,65 @@
     var ffi = runtime.ffi;
 
     var output = jQuery("<div id='output' aria-hidden='true' class='cm-s-default'>");
+
     var outputPending = jQuery("<span>").text("Gathering results...");
     var outputPendingHidden = true;
     var canShowRunningIndicator = false;
     var running = false;
+
+    class Graph {
+      constructor(value) {
+        let xmlns = "http://www.w3.org/2000/svg";
+        let svg = document.createElementNS(xmlns, "svg");
+
+        svg.setAttributeNS(null, "viewBox", "0 0 36 36");
+        svg.classList.add("circular-chart");
+        svg.classList.add("blue");
+
+        let circle = "M18 2.0845 "
+                   + "a 15.9155 15.9155 0 0 1 0 31.831 "
+                   + "a 15.9155 15.9155 0 0 1 0 -31.831";
+
+        let bg = document.createElementNS(xmlns, "path");
+        bg.classList.add("circle-bg");
+        bg.setAttributeNS(null, 'd', circle);
+
+        let fg = document.createElementNS(xmlns, "path");
+        fg.classList.add("circle");
+        fg.setAttributeNS(null, 'd', circle);
+        fg.setAttributeNS(null, 'stroke-dasharray', "0, 100");
+
+        let text = document.createElementNS(xmlns, "text");
+        text.classList.add("percentage");
+        text.setAttributeNS(null, 'x', "18");
+        text.setAttributeNS(null, 'y', "20.35");
+
+        this.bg = svg.appendChild(bg);
+        this.fg = svg.appendChild(fg);
+        this.text = svg.appendChild(text);
+        this.element = svg;
+
+        let fallback = {numerator: "none", denominator: "none"};
+        this.numerator = (value || fallback).numerator;
+        this.denominator = (value || fallback).denominator;
+        this.value = {numerator: this.numerator, denominator: this.denominator};
+      }
+
+      set value(value){
+        if (typeof value.numerator === "number" &&
+            typeof value.denominator === "number")
+        {
+          this.numerator = value.numerator;
+          this.denominator = value.denominator;
+          this.fg.setAttributeNS(null, 'stroke-dasharray',
+            `${(value.numerator / value.denominator) * 100}, 100`);
+          this.text.innerHTML = `${value.numerator}⁄${value.denominator}`;
+        } else {
+          this.fg.setAttributeNS(null, 'stroke-dasharray', "0, 100");
+          this.text.innerHTML = "?";
+        }
+      }
+    }
 
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
@@ -124,7 +179,8 @@
       }
 
       // this function must NOT be called on the pyret stack
-      return function(result) {
+      return function(result, examplarResults) {
+        console.info("DISPLAY RESULT", result, examplarResults);
         var doneDisplay = Q.defer();
         var didError = false;
         // Start a new pyret stack.
@@ -181,7 +237,8 @@
                     if(rr.isSuccessResult(runResult)) {
                       return rr.safeCall(function() {
                         return checkUI.drawCheckResults(output, CPO.documents, rr,
-                                                        runtime.getField(runResult.result, "checks"), v);
+                                                        runtime.getField(runResult.result, "checks"), v,
+                                                        examplarResults);
                       }, function(_) {
                         outputPending.remove();
                         outputPendingHidden = true;
@@ -228,6 +285,75 @@
           return callingRuntime.nothing;
         });
       return doneDisplay.promise;
+      }
+    }
+
+    // the result of applying `displayResult` is a function that MUST
+    // NOT BE CALLED ON THE PYRET STACK.
+    function jsonResult(output, callingRuntime, resultRuntime, isMain) {
+      var runtime = callingRuntime;
+      var rr = resultRuntime;
+
+      // this function must NOT be called on the pyret stack
+      return function(result)
+      {
+        var base_result = result;
+        var doneDisplay = Q.defer();
+
+        // Start a new pyret stack.
+        // this returned function must not be called on the pyret stack
+        // b/c `callingRuntime.runThunk` must not be called on the pyret stack
+        callingRuntime.runThunk(function() {
+          if(callingRuntime.isFailureResult(result)) {
+            // Parse Errors
+            return false;
+          }
+          else if(callingRuntime.isSuccessResult(result)) {
+            result = result.result;
+            return ffi.cases(ffi.isEither, "is-Either", result, {
+              left: function(compileResultErrors) {
+                return false;
+              },
+              right: function(v) {
+                // TODO(joe): This is a place to consider which runtime level
+                // to use if we have separate compile/run runtimes.  I think
+                // that loadLib will be instantiated with callingRuntime, and
+                // I think that's correct.
+                return callingRuntime.pauseStack(function(restarter) {
+                  rr.runThunk(function() {
+                    var runResult = rr.getField(loadLib, "internal").getModuleResultResult(v);
+                    if(rr.isSuccessResult(runResult)) {
+                      return rr.safeCall(function() {
+                        return checkUI.jsonCheckResults(output, CPO.documents, rr,
+                                                        runtime.getField(runResult.result, "checks"), v);
+                      }, function(result) {
+                        return result;
+                      }, "rr.jsonCheckResults");
+                    } else {
+                      return false;
+                    }
+                  }, function(result) {
+                    restarter.resume(result.result);
+                  });
+                });
+              }
+            });
+          }
+          else {
+            return false;
+          }
+        }, function(r) {
+          if (r.result instanceof Array) {
+            doneDisplay.resolve({json: r.result, pyret: base_result});
+          } else if (r.result === false) {
+            doneDisplay.reject(base_result);
+          } else {
+            console.error("ERROR ENCOUNTERED", r.result);
+            doneDisplay.reject(r.result);
+          }
+        });
+  
+        return doneDisplay.promise;
       }
     }
 
@@ -518,6 +644,7 @@
 
       var breakButton = options.breakButton;
       var stopLi = $('#stopli');
+      container.append(output);
       container.append(output).append(promptContainer);
 
       function speakHistory(n) {
@@ -641,7 +768,7 @@
           //output.get(0).scrollTop = output.get(0).scrollHeight;
           showPrompt();
           setTimeout(function(){
-            $("#output > .compile-error .cm-future-snippet").each(function(){this.cmrefresh();});
+            $(".CodeMirror").each(function(){this.CodeMirror.refresh();});
           }, 200);
         }
       }
@@ -835,27 +962,216 @@
             CPO.documents.delete(name);
         });
 
-        CPO.documents.set("definitions://", uiOptions.cm.getDoc());
-
         interactionsCount = 0;
         replOutputCount = 0;
         logger.log('run', { name      : "definitions://",
-                            type_check: !!uiOptions["type-check"]
+                            type_check: !!document.getElementById("option-tc").checked,
                           });
         var options = {
-          typeCheck: !!uiOptions["type-check"],
+          typeCheck: !!document.getElementById("option-tc").checked,
+          checkMode: !!!document.getElementById("option-check-mode").checked,
           checkAll: false // NOTE(joe): this is a good spot to fetch something from the ui options
                           // if this becomes a check box somewhere in CPO
         };
-        var replResult = repl.restartInteractions(src, options);
-        var startRendering = replResult.then(function(r) {
-          maybeShowOutputPending();
-          return r;
+
+        cloud_log("RUN_START", {
+          submission:
+            [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
+              .map(s => new Object({
+                name: s.name,
+                id: s.file.getUniqueId(),
+                role
+                  : s.name.includes("code") ? "code"
+                  : s.name.includes("tests") ? "tests"
+                  : s.name.includes("common") ? "common"
+                  : null,
+                contents: s.contents,
+              }))
         });
-        var doneRendering = startRendering.then(displayResult(output, runtime, repl.runtime, true, updateItems)).fail(function(err) {
-          console.error("Error displaying result: ", err);
+
+        function run_injections(injections) {
+          let first = injections[0];
+          let rest = injections.slice(1);
+          if (first !== undefined) {
+            window.injection = first;
+            options.checkAll = false;
+            options.checkMode = true;
+            runtime.setStdout(function() {});
+            return repl.restartInteractions(src, options)
+              .then(jsonResult(output, runtime, repl.runtime, true))
+              .then(
+                function(result) {
+                  let name = window.injection.getName();
+                  return run_injections(rest)
+                    .then(function(rest_results) {
+                      rest_results.push({name: name, result: result});
+                      return rest_results;
+                    });
+                });
+          } else {
+            return Q([]);
+          }
+        }
+
+        let send_log = Q.defer();
+        let payload = {
+          sources:
+            [...new Set(sourceAPI.unique_loaded.filter(s => !s.ephemeral && !s.shared))]
+              .map(s => new Object({
+                name: s.name,
+                id: s.file.getUniqueId(),
+                role
+                  : s.name.includes("code") ? "code"
+                  : s.name.includes("tests") ? "tests"
+                  : s.name.includes("common") ? "common"
+                  : null,
+                contents: s.contents,
+              }))
+        };
+
+        send_log.promise.then(function(){
+          cloud_log("RUN_END", payload);
         });
-        doneRendering.fin(afterRun(false));
+
+        if (!document.getElementById("option-check-mode").checked) {
+          // TODO fix repl behavior when wheat fails.
+          // repl should happen in context of impl file if wheat fails
+          // TODO improve wheat failure error message behavior
+          // e.g.,: print(raise(median([list:1])))
+
+          // first, run the wheat
+          let wheat_results = window.wheat.then(run_injections)
+            .then(results => {
+              payload.wheat_results = results.map(result =>
+                new Object({
+                  name: result.name,
+                  result: result.result.json,
+                })
+              );
+
+              // strip the names
+              return results.map(result => result.result);
+            }) ;
+
+          let wheats_pass = wheat_results.then(
+            function(check_results) {
+              let wheats = check_results.length;
+              let passed =
+                check_results.map(r => r.json).filter(
+                  wheat => wheat.every(
+                    block => !block.error
+                      && block.tests.every(test => test.passed))).length;
+              let all_passed = wheats == passed;
+              if (all_passed) {
+                payload.wheat_passed = true;
+                return check_results;
+              } else {
+                payload.wheat_passed = false;
+                throw check_results;
+              }
+            });
+
+          // if the wheats pass, then run the chaffs
+          let chaff_results = wheats_pass
+            .then(
+              function(_){
+                let run_results = window.chaff.then(run_injections);
+                run_results.then(results =>
+                  payload.chaff_results = results.map(result =>
+                      new Object({
+                        name: result.name,
+                        result: result.result.json,
+                      })
+                    ));
+                // strip the names
+                return run_results.then(results => results.map(result => result.result));
+              }, function(wheat_reject) {
+                if (wheat_reject instanceof Array) {
+                  // don't halt the execution pipeline if the if the wheats
+                  // failed in a well-behaved way (e.g., failing test case)
+                  return null;
+                } else {
+                  // otherwise, don't try to recover
+                  throw wheat_reject;
+                }
+              });
+
+          // lastly, run the student's tests, if they've begun their implementation.
+          let test_results = Q.all([window.dummy_impl, chaff_results]).then(
+            function([dummy_impl, _]){
+              let impl_exists = sourceAPI.loaded.some(function(f) {
+                if (f.file && f.file.getName) {
+                  return f.file.getName().includes("code");
+                } else {
+                  return false;
+                }
+              });
+
+              runtime.setStdout(function(str){
+                output.append($("<pre>").addClass("replPrint").text(str));
+              });
+
+              if (impl_exists) {
+                console.log("test_results");
+                delete window.injection;
+                // run students' impl tests, too
+                options.checkAll = true;
+                options.checkMode = true;
+                return repl.restartInteractions(src, options);
+              } else {
+                // run the dummy impl
+                window.injection = dummy_impl;
+                options.checkMode = false;
+                return repl.restartInteractions(src, options);
+              }
+            }, function(e) {
+              console.error("CHAFF ERROR?", e);
+              return null;
+            }).then(jsonResult(output, runtime, repl.runtime, true));
+
+          test_results.then(local_result => {
+            payload.local_result = local_result.json;
+          })
+          .then(
+            function(_) {send_log.resolve()},
+            function(e) {send_log.resolve()});
+
+          // then display the result
+          let display_result =
+            Q.all([wheat_results, chaff_results, test_results]).then(
+              function([wheat_results, chaff_results, test_results]) {
+                let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
+                if (wheat_block_error) {
+                  return displayResult(output, runtime, repl.runtime, true, updateItems)(
+                                        wheat_block_error.pyret,
+                                       {error: true, wheat: wheat_results.map(r => r.json)});
+                }
+                if (chaff_results) {
+                  chaff_results = chaff_results.map(r => r.json)
+                }
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results.pyret,
+                                     {wheat: wheat_results.map(r => r.json), chaff: chaff_results});
+              }, function(error_result) {
+                payload.error = true;
+                send_log.resolve();
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result,
+                  {error: true});
+              });
+
+          display_result.fin(afterRun(false));
+        } else {
+            maybeShowOutputPending();
+            payload.skip_checks = true;
+            repl.restartInteractions(src, options)
+              .then(function(run_result) {
+                send_log.resolve();
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+              }, function(error_result) {
+                send_log.resolve();
+                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result);
+              })
+              .fin(afterRun(false));
+        }
       };
 
       var runner = function(code) {
@@ -880,8 +1196,9 @@
         setWhileRunning();
         interactionsCount++;
         var thisName = 'interactions://' + interactionsCount;
-        CPO.documents.set(thisName, echoCM.getDoc());
+        let source = sourceAPI.from_doc(thisName, echoCM.getDoc());
         logger.log('run', { name: thisName });
+        cloud_log("REPL_START", {code: code});
         var replResult = repl.run(code, thisName);
 //        replResult.then(afterRun(CM));
         var startRendering = replResult.then(function(r) {
@@ -935,8 +1252,6 @@
       var history = replHistory.makeReplHistory(CM, CPO);
 
       CM.on('beforeChange', function(instance, changeObj){textHandlers.autoCorrect(instance, changeObj, CM);});
-
-      CPO.documents.set('definitions://', CM.getDoc());
 
       var lastNameRun = 'interactions';
       var lastEditorRun = null;

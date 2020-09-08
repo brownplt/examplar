@@ -257,8 +257,9 @@
           */
           restartInteractions: function(source, options) {
             var pyOptions = defaultOptions.extendWith({
-              "type-check": options.typeCheck,
-              "check-all": options.checkAll,
+              "type-check": !!options.typeCheck,
+              "check-mode": !!options.checkMode,
+              "check-all": !!options.checkAll,
               "on-compile": onCompile
             });
             var ret = Q.defer();
@@ -347,44 +348,39 @@
       var editor = CPO.editor;
       var currentAction = "run";
 
-      $("#select-run").click(function() {
-        runButton.text("Run");
-        currentAction = "run";
-        doRunAction(editor.cm.getValue());
-        $('#runDropdown').attr('aria-expanded', 'false');
-        $("#run-dropdown-content").attr('aria-hidden', 'true').hide();
-      });
+      document.getElementById("option-tc").addEventListener("change", update_run_button);
+      document.getElementById("option-check-mode").addEventListener("change", update_run_button);
 
-      $("#select-tc-run").click(function() {
-        runButton.text("Type-check and Run");
-        currentAction = "tc-and-run";
-        doRunAction(editor.cm.getValue());
-        $('#runDropdown').attr('aria-expanded', 'false');
-        $("#run-dropdown-content").attr('aria-hidden', 'true').hide();
-      });
-      /*
-      $("#select-scsh").click(function() {
-        highlightMode = "scsh"; $("#run-dropdown-content").hide();});
-      $("#select-scmh").click(function() {
-        highlightMode = "scmh"; $("#run-dropdown-content").hide();});
-      $("#select-mcmh").click(function() {
-        highlightMode = "mcmh"; $("#run-dropdown-content").hide();});
-      */
-      function doRunAction(src) {
-        editor.cm.operation(function() {
-          editor.cm.clearGutter("test-marker-gutter");
-          var marks = editor.cm.getAllMarks();
-          document.getElementById("main").dataset.highlights = "";
-          editor.cm.eachLine(function(lh){
-            editor.cm.removeLineClass(lh, "background");});
-          for(var i = 0; i < marks.length; i++) {
-            marks[i].clear();
+      function update_run_button() {
+          var skipTests = document.getElementById("option-check-mode").checked;
+          var typeCheck = document.getElementById("option-tc").checked;
+
+          var runText = "";
+
+          if (skipTests) {
+              runText += "Skip Tests"
           }
-        });
-        var sheet = document.getElementById("highlight-styles").sheet;
-        for(var i=0; i< sheet.cssRules.length; i++) {
-          sheet.deleteRule(i);
-        }
+
+          if (skipTests && typeCheck) {
+              runText += ", ";
+          }
+
+          if (typeCheck) {
+              runText += "Type Check"
+          }
+
+          if (skipTests || typeCheck) {
+              runText += " & ";
+          }
+
+          runText += "Run";
+
+          document.getElementById("runButton").innerText = runText;
+      }
+
+      function doRunAction(src) {
+        CPO.clearEditorDecorations();
+
         switch (currentAction) {
           case "run":
             replWidget.runCode(src, {check: true, cm: editor.cm});
@@ -395,7 +391,7 @@
         }
       }
 
-      runButton.on("click", function() { doRunAction(editor.cm.getValue()); });
+      runButton.on("click", function() { doRunAction(sourceAPI.get_loaded("definitions://").contents); });
 
       $(window).on("keyup", function(e) {
         if(e.keyCode === 27) { // "ESC"
@@ -570,7 +566,7 @@
 
       // run the definitions area
       Mousetrap.bindGlobal('ctrl+enter', function(e){
-        doRunAction(editor.cm.getValue());
+        doRunAction(sourceAPI.get_loaded("definitions://").contents);
         CPO.autoSave();
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -631,7 +627,7 @@
       });
 
       Mousetrap.bindGlobal('f7', function(e) {
-        doRunAction(editor.cm.getValue());
+        doRunAction(sourceAPI.get_loaded("definitions://").contents);
         CPO.autoSave();
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -715,10 +711,10 @@
 
                 window.CPO.showShareContainer(p);
                 history.pushState(null, null, "#program=" + id);
-                window.CPO.loadProgram(p).then(function(contents) {
-                  window.CPO.editor.cm.setValue(contents);
-                  window.CPO.editor.cm.clearHistory();
-                });
+                //window.CPO.loadProgram(p).then(function(contents) {
+                //  window.CPO.editor.cm.setValue(contents);
+                //  window.CPO.editor.cm.clearHistory();
+                //});
               })
               .fail(function(err) {
                 window.flashMessage("Currently unable to save, try opening that file in a new tab");
