@@ -46,12 +46,14 @@ function makeAuth(config) {
         // popping up a dialog every half hour)
         access_type: 'offline',
         // Skip permission confirmation if the user has confirmed with us before
-        approval_prompt: 'auto',
+        //approval_prompt: 'auto',
         // NOTE(joe): We do not use the drive scope on the server, but we ask
         // for it so that we don't have to do another popup on the client.
         // #notpola
         scope: scopes.join(' '),
-        state: afterUrl
+        state: afterUrl,
+        hd: "brown.edu",
+        prompt: "select_account",
       });
     },
     serveRedirect: function(req, callback) {

@@ -2,9 +2,20 @@
 
 var shareAPI = makeShareAPI(process.env.CURRENT_PYRET_RELEASE);
 
+var FileSaver = require('file-saver');
+var JSZip = require("jszip");
 var url = require('url.js');
 var modalPrompt = require('./modal-prompt.js');
 window.modalPrompt = modalPrompt;
+
+const session_id = logger.guid();
+const cloud_log_d = Q.defer();
+const cloud_log_p = cloud_log_d.promise;
+
+window.cloud_log = function cloud_log(event, payload) {
+  let time = Date.now();
+  cloud_log_p.then(log => log({event, time, payload}));
+};
 
 const LOG = true;
 window.ct_log = function(/* varargs */) {
@@ -106,13 +117,83 @@ var Documents = function() {
   return Documents;
 }();
 
+var Tab = function() {
+
+  let tab_bar = document.getElementById("files-tabs");
+
+  function Tab(source) {
+    this.source = source;
+
+    let uri = "my-gdrive://" + source.name;
+    CPO.tabs.set(source, this);
+
+    let tab = document.createElement("li");
+    this.tab = tab;
+
+    tab.classList.add("tab");
+    let anchor = document.createElement("a");
+    anchor.innerText = source.name;
+    anchor.href = "#";
+    tab.appendChild(anchor);
+
+    let activate = this.activate.bind(this)
+    tab.addEventListener("click", function(e) {
+      e.preventDefault();
+      activate();
+    });
+
+    tab_bar.appendChild(tab);
+  }
+
+  Tab.prototype.activate = function () {
+    document.querySelectorAll(".selected").forEach(tab => tab.classList.remove("selected"));
+    CPO.editor.cm.swapDoc(this.source.document);
+    this.tab.classList.add("selected");
+  };
+
+  return Tab;
+}();
+
+CodeMirror.defineDocExtension("clearDecorations", function() {
+  let doc = this;
+  let editor = doc.getEditor();
+
+  try {
+    if (editor != null) {
+      editor.startOperation();
+    }
+
+    doc.clearGutter("test-marker-gutter");
+
+    doc.eachLine(function(lh){
+      doc.removeLineClass(lh, "background");});
+
+    let marks = doc.getAllMarks();
+
+    for(var i = 0; i < marks.length; i++) {
+      if (marks[i].className === "import-marker") {
+        continue;
+      }
+      const attribs = marks[i].attributes;
+      if(!(attribs && attribs.useline)) {
+        marks[i].clear();
+      }
+    }
+  } finally {
+    if (editor != null) {
+      editor.endOperation();
+    }
+  }
+});
+
+
 var VERSION_CHECK_INTERVAL = 120000 + (30000 * Math.random());
 
 function checkVersion() {
   $.get("/current-version").then(function(resp) {
     resp = JSON.parse(resp);
-    if(resp.version && resp.version !== process.env.CURRENT_PYRET_RELEASE) {
-      window.flashMessage("A new version of Pyret is available. Save and reload the page to get the newest version.");
+    if(resp.version && resp.version > Number(window.CURRENT_VERSION)) {
+      window.stickMessage("A new version of Pyret is available. Save and reload the page to get the newest version.");
     }
   });
 }
@@ -121,8 +202,19 @@ window.setInterval(checkVersion, VERSION_CHECK_INTERVAL);
 window.CPO = {
   save: function() {},
   autoSave: function() {},
-  documents : new Documents()
+  documents : new Documents(),
+  tabs: new Map(),
 };
+
+CPO.clearEditorDecorations = function() {
+  document.getElementById("main").dataset.highlights = "";
+  sourceAPI.loaded.forEach(source => source.document.clearDecorations());
+  let sheet = document.getElementById("highlight-styles").sheet;
+  for(var i=0; i< sheet.cssRules.length; i++) {
+    sheet.deleteRule(i);
+  }
+};
+
 $(function() {
   const CONTEXT_FOR_NEW_FILES = "use context essentials2021\n";
   function merge(obj, extension) {
@@ -185,8 +277,8 @@ $(function() {
 
     var cmOptions = {
       extraKeys: CodeMirror.normalizeKeyMap({
-        "Shift-Enter": function(cm) { runFun(cm.getValue()); },
-        "Shift-Ctrl-Enter": function(cm) { runFun(cm.getValue()); },
+        "Shift-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://").contents); },
+        "Shift-Ctrl-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://")); },
         "Tab": "indentAuto",
         "Ctrl-I": reindentAllLines,
         "Esc Left": "goBackwardSexp",
@@ -290,7 +382,7 @@ $(function() {
       setContextLine: setContextLine,
       refresh: function() { CM.refresh(); },
       run: function() {
-        runFun(CM.getValue());
+        runFun(sourceAPI.get_loaded("definitions://"));
       },
       focus: function() { CM.focus(); },
       focusCarousel: null //initFocusCarousel
@@ -327,6 +419,7 @@ $(function() {
   });
 
   storageAPI = storageAPI.then(function(api) { return api.api; });
+/*<<<<<<< HEAD
   $("#fullConnectButton").click(function() {
     reauth(
       false,  // Don't do an immediate load (this will require login)
@@ -369,56 +462,20 @@ $(function() {
     });
     storageAPI = storageAPI.then(function(api) { return api.api; });
   });
+>>>>>>> 6b93c8818 (implement examplar)*/
 
-  /*
-    initialProgram holds a promise for a Drive File object or null
+  window.sourceAPI = window.createSourceManager(storageAPI);
+  CPO.sourceAPI = window.sourceAPI;
 
-    It's null if the page doesn't have a #share or #program url
+  let assignment;
 
-    If the url does have a #program or #share, the promise is for the
-    corresponding object.
-  */
-  var initialProgram = storageAPI.then(function(api) {
-    var programLoad = null;
-    if(params["get"] && params["get"]["program"]) {
-      enableFileOptions();
-      programLoad = api.getFileById(params["get"]["program"]);
-      programLoad.then(function(p) { showShareContainer(p); });
-    }
-    else if(params["get"] && params["get"]["share"]) {
-      logger.log('shared-program-load',
-        {
-          id: params["get"]["share"]
-        });
-      programLoad = api.getSharedFileById(params["get"]["share"]);
-      programLoad.then(function(file) {
-        // NOTE(joe): If the current user doesn't own or have access to this file
-        // (or isn't logged in) this will simply fail with a 401, so we don't do
-        // any further permission checking before showing the link.
-        file.getOriginal().then(function(response) {
-          console.log("Response for original: ", response);
-          var original = $("#open-original").show().off("click");
-          var id = response.result.value;
-          original.removeClass("hidden");
-          original.click(function() {
-            window.open(window.APP_BASE_URL + "/editor#program=" + id, "_blank");
-          });
-        });
-      });
-    }
-    else {
-      programLoad = null;
-    }
-    if(programLoad) {
-      programLoad.fail(function(err) {
-        console.error(err);
-        window.stickError("The program failed to load.");
-      });
-      return programLoad;
-    } else {
-      return null;
-    }
-  });
+
+  if (ASSIGNMENT_ID) {
+    assignment = storageAPI.then(api => api.getTemplateFileById(ASSIGNMENT_ID));
+  } else {
+    // Redirect to main page.
+    window.location.href = "/";
+  }
 
   function setTitle(progName) {
     document.title = progName + " - code.pyret.org";
@@ -429,18 +486,16 @@ $(function() {
   var filename = false;
 
   $("#download a").click(function() {
-    var downloadElt = $("#download a");
-    var contents = CPO.editor.cm.getValue();
-    var downloadBlob = window.URL.createObjectURL(new Blob([contents], {type: 'text/plain'}));
-    if(!filename) { filename = 'untitled_program.arr'; }
-    if(filename.indexOf(".arr") !== (filename.length - 4)) {
-      filename += ".arr";
-    }
-    downloadElt.attr({
-      download: filename,
-      href: downloadBlob
-    });
-    $("#download").append(downloadElt);
+    var zip = new JSZip();
+
+    sourceAPI.loaded
+      .filter(s => !s.ephemeral && !s.shared)
+      .forEach(s => zip.file(s.name, s.contents));
+
+    Promise.all([zip.generateAsync({type:"blob"}), window.assignment_name])
+      .then(function ([blob, name]) {
+          FileSaver.saveAs(blob, name + ".zip");
+      });
   });
 
   function showModal(currentContext) {
@@ -495,26 +550,14 @@ $(function() {
   }
 
   function updateName(p) {
-    filename = p.getName();
+    if (p.assignment_name != null) {
+      filename = p.assignment_name;
+    } else {
+      filename = p.getName();
+    }
     $("#filename").text(" (" + truncateName(filename) + ")");
     setTitle(filename);
     showShareContainer(p);
-  }
-
-  function loadProgram(p) {
-    programToSave = p;
-    return p.then(function(prog) {
-      if(prog !== null) {
-        updateName(prog);
-        if(prog.shared) {
-          window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
-        }
-        return prog.getContents();
-      }
-      else {
-        return CONTEXT_FOR_NEW_FILES;
-      }
-    });
   }
 
   function say(msg, forget) {
@@ -643,9 +686,92 @@ $(function() {
     //console.log('(cf)docactelt=', document.activeElement);
   }
 
-  var programLoaded = loadProgram(initialProgram);
+  window.user = storageAPI.then(api => api.about()).then(about => about.user.emailAddress);
+  window.assignment_id = assignment.then(function(assn) { return assn.assignment_id });
+  window.assignment_name = assignment.then(function(assn) { return assn.assignment_name });
 
-  var programToSave = initialProgram;
+  Q.all([window.user, window.assignment_id])
+    .then(function([email, id]) {
+      function cloud_log_internal({event, time, payload}) {
+        console.info("LOG", {event, time, payload});
+        navigator.sendBeacon("https://us-central1-pyret-examples.cloudfunctions.net/submit", JSON.stringify({
+          email: email,
+          assignment: id,
+          session: session_id,
+          event,
+          time,
+          payload,
+        }));
+      }
+
+      cloud_log_d.resolve(cloud_log_internal);
+
+      window.cloud_log = function cloud_log(event, payload) {
+        let time = Date.now();
+        cloud_log_internal({event, time, payload});
+      };
+  });
+
+  let assignment_tests = assignment.then(assn => {if (assn.tests){return sourceAPI.from_file(assn.tests)}});
+  let assignment_common = assignment.then(assn => {if(assn.common){return sourceAPI.from_file(assn.common)}});
+
+  window.dummy_impl = assignment.then(assn => assn.dummy_impl);
+
+  // set `definitions://` to the test document
+  assignment_tests.then(tests => {
+    if (!tests) return;
+    sourceAPI.set_definitions(tests);
+  });
+
+  // load the wheats & chaff
+  window.wheat = assignment.then(assn => assn.wheat);
+  window.chaff = assignment.then(assn => assn.chaff);
+
+  let assignment_code = Promise.all([assignment_tests, assignment.then(assn => assn.code)])
+    .then(([tests, code]) => {
+      if (!tests) {
+        code.edited();
+        return sourceAPI.from_file(code);
+      } else if (code._googObj.properties.find(p => p.key == "edited").value == "true") {
+        return sourceAPI.from_file(code);
+      } else {
+        let begin_button = document.createElement("button");
+        begin_button.textContent = "+ Begin Implementation";
+        let clicked = false;
+        begin_button.addEventListener("click", function() {
+          if (clicked) return; clicked = true;
+          code.edited().then(function (_) {
+            begin_button.remove();
+            sourceAPI.from_file(code).then(code => new Tab(code));
+            cloud_log("BEGIN_IMPLEMENTATION", {});
+          });
+        });
+        document.getElementById("files-tabs-container")
+          .appendChild(begin_button);
+        return null;
+      }
+    });
+
+  let common_and_tests_tabs =
+    Q.all([assignment_common, assignment_tests, assignment_code])
+      .then(function ([common, tests, code]) {
+        if (common) new Tab(common);
+        if (tests) new Tab(tests).activate();
+        CPO.editor.cm.setOption('readOnly', false);
+        if (code) {
+          let code_tab = new Tab(code);
+          if (!tests) {
+            code_tab.activate();
+            sourceAPI.set_definitions(code);
+          }
+        }
+      });
+
+  window.programLoaded = Q.all([common_and_tests_tabs])
+    .then(function (p) {
+      enableFileOptions();
+      return p;
+    });
 
   function showShareContainer(p) {
     //console.log('called showShareContainer');
@@ -661,9 +787,7 @@ $(function() {
     return filename || "Untitled";
   }
   function autoSave() {
-    programToSave.then(function(p) {
-      if(p !== null && !p.shared) { save(); }
-    });
+    return save();
   }
 
   function enableFileOptions() {
@@ -694,126 +818,21 @@ $(function() {
     set the name to "Untitled".
 
   */
-  function save(newFilename) {
-    var useName, create;
-    if(newFilename !== undefined) {
-      useName = newFilename;
-      create = true;
-    }
-    else if(filename === false) {
-      filename = "Untitled";
-      create = true;
-    }
-    else {
-      useName = filename; // A closed-over variable
-      create = false;
-    }
+  function save() {
     window.stickMessage("Saving...");
-    var savedProgram = programToSave.then(function(p) {
-      if(p !== null && p.shared && !create) {
-        return p; // Don't try to save shared files
-      }
-      if(create) {
-        programToSave = storageAPI
-          .then(function(api) { return api.createFile(useName); })
-          .then(function(p) {
-            // showShareContainer(p); TODO(joe): figure out where to put this
-            history.pushState(null, null, "#program=" + p.getUniqueId());
-            updateName(p); // sets filename
-            enableFileOptions();
-            return p;
-          });
-        return programToSave.then(function(p) {
-          return save();
-        });
-      }
-      else {
-        return programToSave.then(function(p) {
-          if(p === null) {
-            return null;
-          }
-          else {
-            return p.save(CPO.editor.cm.getValue(), false);
-          }
-        }).then(function(p) {
-          if(p !== null) {
-            window.flashMessage("Program saved as " + p.getName());
-          }
-          return p;
-        });
-      }
-    });
-    savedProgram.fail(function(err) {
-      window.stickError("Unable to save", "Your internet connection may be down, or something else might be wrong with this site or saving to Google.  You should back up any changes to this program somewhere else.  You can try saving again to see if the problem was temporary, as well.");
-      console.error(err);
-    });
-    return savedProgram;
-  }
-
-  function saveAs() {
-    if(menuItemDisabled("saveas")) { return; }
-    programToSave.then(function(p) {
-      var name = p === null ? "Untitled" : p.getName();
-      var saveAsPrompt = new modalPrompt({
-        title: "Save a copy",
-        style: "text",
-        submitText: "Save",
-        narrow: true,
-        options: [
-          {
-            message: "The name for the copy:",
-            defaultValue: name
-          }
-        ]
-      });
-      return saveAsPrompt.show().then(function(newName) {
-        if(newName === null) { return null; }
-        window.stickMessage("Saving...");
-        return save(newName);
-      }).
-      fail(function(err) {
-        console.error("Failed to rename: ", err);
-        window.flashError("Failed to rename file");
-      });
-    });
-  }
-
-  function rename() {
-    programToSave.then(function(p) {
-      var renamePrompt = new modalPrompt({
-        title: "Rename this file",
-        style: "text",
-        narrow: true,
-        options: [
-          {
-            message: "The new name for the file:",
-            defaultValue: p.getName()
-          }
-        ]
-      });
-      // null return values are for the "cancel" path
-      return renamePrompt.show().then(function(newName) {
-        if(newName === null) {
-          return null;
-        }
-        window.stickMessage("Renaming...");
-        programToSave = p.rename(newName);
-        return programToSave;
-      })
-      .then(function(p) {
-        if(p === null) {
-          return null;
-        }
-        updateName(p);
-        window.flashMessage("Program saved as " + p.getName());
-      })
-      .fail(function(err) {
-        console.error("Failed to rename: ", err);
-        window.flashError("Failed to rename file");
-      });
-    })
-    .fail(function(err) {
-      console.error("Unable to rename: ", err);
+    return Promise.all(
+      sourceAPI.unique_loaded
+        .filter(s => !s.ephemeral && !s.shared)
+        .map(s => s.save()))
+    .then(function(s) {
+      window.flashMessage("Programs saved!");
+      return s;
+    }, function(e) {
+      let message =
+        (e && e.response && e.response.error && e.response.error.message) ? e.response.error.message : "Your internet connection may be down, or something else might be wrong with this site or saving to Google.  You should back up any changes to this program somewhere else.  You can try saving again to see if the problem was temporary, as well.";
+      window.stickError("Unable to save", message);
+      console.error("Unable to save:", e);
+      throw e;
     });
   }
 
@@ -821,10 +840,7 @@ $(function() {
     CPO.autoSave();
   });
 
-  $("#new").click(newEvent);
   $("#save").click(saveEvent);
-  $("#rename").click(rename);
-  $("#saveas").click(saveAs);
 
   var focusableElts = $(document).find('#header .focusable');
   //console.log('focusableElts=', focusableElts)
@@ -1272,21 +1288,6 @@ $(function() {
     }
   });
 
-  programLoaded.then(function(c) {
-    CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
-    if(c === "") {
-      c = CONTEXT_FOR_NEW_FILES;
-    }
-
-    // NOTE(joe): Clearing history to address https://github.com/brownplt/pyret-lang/issues/386,
-    // in which undo can revert the program back to empty
-    CPO.editor.cm.setValue(c);
-    CPO.editor.cm.clearHistory();
-  });
-
-  programLoaded.fail(function() {
-    CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
-  });
 
   var pyretLoad = document.createElement('script');
   console.log(process.env.PYRET);
@@ -1376,7 +1377,6 @@ $(function() {
   CPO.save = save;
   CPO.updateName = updateName;
   CPO.showShareContainer = showShareContainer;
-  CPO.loadProgram = loadProgram;
   CPO.cycleFocus = cycleFocus;
   CPO.say = say;
   CPO.sayAndForget = sayAndForget;
