@@ -1,3 +1,53 @@
+class Batch {
+  constructor() {
+    this.empty = true;
+    this.batch = gapi.client.newBatch();
+  }
+
+  add(name, req) {
+    this.empty = false;
+    this.batch.add(req, {'id': name});
+  }
+
+  get(name, path, params) {
+    console.trace("DEPRECATED");
+    this.empty = false;
+    this.batch.add(gapi.client.request({
+      path: path,
+      params: params,
+    }), {'id': name});
+  }
+
+  post(name, path, params) {
+    console.trace("DEPRECATED");
+    this.empty = false;
+    this.batch.add(gapi.client.request({
+      path: path,
+      method: "POST",
+      body: params,
+    }), {'id': name});
+  }
+
+  run() {
+    if (this.empty) {
+      return Promise.resolve({});
+    }
+    return this.batch.then(function(result) {
+      let results = {};
+      for (let [name, response] of Object.entries(result.result)) {
+        if (response.status != 200) {
+          delete response.body;
+          console.error({request: name, response: response});
+          throw {request: name, response: response};
+        } else {
+          results[name] = response.result;
+        }
+      }
+      return results;
+    })
+  }
+}
+
 window.createProgramCollectionAPI = function createProgramCollectionAPI(collectionName, immediate) {
   function DriveError(err) {
     this.err = err;
@@ -6,12 +56,16 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
   var drive;
   var SCOPE = "https://www.googleapis.com/auth/drive.file "
     + "https://spreadsheets.google.com/feeds "
+    + "https://www.googleapis.com/auth/drive.appdata "
     + "https://www.googleapis.com/auth/drive.install";
-  var FOLDER_MIME = "application/vnd.google-apps.folder";
+  var FOLDER_MIME =  "application/vnd.google-apps.folder";
   var BACKREF_KEY = "originalProgram";
   var PUBLIC_LINK = "pubLink";
 
   function createAPI(baseCollection) {
+    var shareCollection = findOrCreateDirectory(collectionName + ".shared");
+    var cacheCollection = findOrCreateCacheDirectory(collectionName + ".compiled");
+
     function makeSharedFile(googFileObject, fetchFromGoogle) {
       return {
         shared: true,
@@ -44,6 +98,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         getName: function() {
           return googFileObject.title;
         },
+        getURI: function() {
+          return "shared-gdrive://" + googFileObject.title + ":" + googFileObject.id;
+        },
         getModifiedTime: function() {
           return googFileObject.modifiedDate;
         },
@@ -54,10 +111,26 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     }
 
     function makeFile(googFileObject, mimeType, fileExtension) {
+      let cm_doc = null;
+      let contents = null;
       return {
         shared: false,
+        edited: function() {
+          return drive.properties.patch({
+            "fileId": googFileObject.id,
+            "propertyKey": "edited",
+            "visibility": "PUBLIC",
+            "resource": {
+              "key": "edited",
+              "value": true,
+            }
+          });
+        },
         getName: function() {
           return googFileObject.title;
+        },
+        getURI: function() {
+          return "my-gdrive://" + googFileObject.title;
         },
         getModifiedTime: function() {
           return googFileObject.modifiedDate;
@@ -68,6 +141,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         getExternalURL: function() {
           return googFileObject.alternateLink;
         },
+        getAssignment: function() {
+          return drive.properties.get({
+              "fileId": googFileObject.id,
+              "propertyKey": "assignment",
+              "visibility": "PUBLIC"
+            }).then(function(result){return result.value;});
+        },
         getShares: function() {
           return drive.files.list({
             q: "trashed=false and properties has {key='" + BACKREF_KEY + "' and value='" + googFileObject.id + "' and visibility='PRIVATE'}"
@@ -77,15 +157,54 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               else { return files.items.map(fileBuilder); }
             });
         },
-        getContents: function() {
-          var baseUrl = "https://www.googleapis.com/drive/v3/files/" + googFileObject.id + "?alt=media&source=download";
-          return Q($.ajax(baseUrl, {
-            method: "get",
-            dataType: 'text',
-            headers: {'Authorization': 'Bearer ' + gapi.auth.getToken().access_token }
-          })).then(function(response) {
-            return response;
-          });
+        getContents: function(cache_mode) {
+          let id = this.getUniqueId();
+          if (contents != null) {
+            return contents;
+          } else {
+            let url = "https://www.googleapis.com/drive/v3/files/" + googFileObject.id + "?alt=media&source=download";
+            return fetch(url,
+              { method: "get",
+                cache: cache_mode || "no-cache",
+                headers: new Headers([
+                    ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
+                  ])
+              }).then(function(response) {
+                contents = response.text();
+                return contents;
+              });
+          }
+        },
+        getDoc: function() {
+          let uri = "my-gdrive://" + this.getName();
+          // TODO this is a race condition fml
+          if (cm_doc == null) {
+            return this.getContents().then(function(contents){
+              cm_doc = CodeMirror.Doc(contents, "pyret");
+              CPO.documents.set(uri, cm_doc);
+
+              // Freeze the document contents up to the following border
+              var border = "# DO NOT CHANGE ANYTHING ABOVE THIS LINE";
+              var border_end_index = contents.indexOf(border) + border.length;
+              var border_end_pos = cm_doc.posFromIndex(border_end_index);
+
+              let marker =
+                cm_doc.markText({line:0,ch:0}, {line: border_end_pos.line + 1, ch: 0},
+                  { inclusiveLeft: true,
+                    inclusiveRight: false,
+                    addToHistory: false,
+                    readOnly: true,
+                    className: "import-marker" });
+
+              marker.lines.slice(0, -1).forEach(function(line) {
+                cm_doc.addLineClass(line, "wrap", "import-line-background");
+              });
+
+              return cm_doc;
+            });
+          } else {
+            return Q(cm_doc);
+          }
         },
         rename: function(newName) {
           return drive.files.update({
@@ -118,31 +237,16 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           else {
             var params = {};
           }
-          const boundary = '-------314159265358979323846';
-          const delimiter = "\r\n--" + boundary + "\r\n";
-          const close_delim = "\r\n--" + boundary + "--";
-          var metadata = {
-            'mimeType': mimeType,
-            'fileExtension': fileExtension
-          };
-          var multipartRequestBody =
-              delimiter +
-              'Content-Type: application/json\r\n\r\n' +
-              JSON.stringify(metadata) +
-              delimiter +
-              'Content-Type: text/plain\r\n' +
-              '\r\n' +
-              contents +
-              close_delim;
 
           var request = gwrap.request({
             'path': '/upload/drive/v2/files/' + googFileObject.id,
             'method': 'PUT',
-            'params': {'uploadType': 'multipart'},
+            'params': {'uploadType': 'media'},
             'headers': {
-              'Content-Type': 'multipart/mixed; boundary="' + boundary + '"'
+              'Content-Type': 'text/plain',
+              'Content-Length': new Blob([contents]).size,
             },
-            'body': multipartRequestBody});
+            'body': contents});
           return request.then(fileBuilder);
         },
         _googObj: googFileObject
@@ -152,7 +256,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     // The primary purpose of this is to have some sort of fallback for
     // any situation in which the file object has somehow lost its info
     function fileBuilder(googFileObject) {
-      if ((googFileObject.mimeType === 'text/plain' && !googFileObject.fileExtension)
+      if (googFileObject == null ) {
+        return null;
+      } else if ((googFileObject.mimeType === 'text/plain' && !googFileObject.fileExtension)
           || googFileObject.fileExtension === 'arr') {
         return makeFile(googFileObject, 'text/plain', 'arr');
       } else {
@@ -160,7 +266,12 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       }
     }
 
+    let file_cache = new Map();
+
     var api = {
+      about: function() {
+        return drive.about.get({});
+      },
       getCollectionLink: function() {
         return baseCollection.then(function(bc) {
           return "https://drive.google.com/drive/u/0/folders/" + bc.id;
@@ -169,8 +280,17 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       getCollectionFolderId: function() {
         return baseCollection.then(function(bc) { return bc.id; });
       },
+      getCacheCollectionFolderId: function() {
+        return cacheCollection.then(function(cc) { return cc.id; });
+      },
       getFileById: function(id) {
-        return drive.files.get({fileId: id}).then(fileBuilder);
+        if (file_cache.has(id)) {
+          return file_cache.get(id);
+        } else {
+          let req = drive.files.get({fileId: id}).then(fileBuilder);
+          file_cache.set(id, req);
+          return req;
+        }
       },
       getFileByName: function(name) {
         return this.getAllFiles().then(function(files) {
@@ -185,6 +305,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       getSharedFileById: function(id) {
         var fromDrive = drive.files.get({fileId: id}, true).then(function(googFileObject) {
           return makeSharedFile(googFileObject, true);
+        });
+        fromDrive.catch(function(e){
+          console.error("BAH", e);
         });
         var fromServer = fromDrive.fail(function() {
           return Q($.get("/shared-file", {
@@ -201,6 +324,148 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         });
         return result;
       },
+      getTemplateFileById: function(id) {
+
+        let user_and_template_files =
+          baseCollection.then(function (bc) {
+            var batch = new Batch();
+
+            batch.add('user_files',
+              gapi.client.drive.files.list({
+                'q': `not trashed and "${bc.id}" in parents and properties has {key="assignment" and value="${id}" and visibility="PUBLIC"}`
+              }));
+
+            batch.add('template_files',
+              gapi.client.drive.files.list({
+                'q': `not trashed and "${id}" in parents`
+              }));
+
+            return batch.run().then(function (result) {
+              result["bc"] = bc;
+              return result;
+            });
+          });
+
+        /* query wheats and chaffs */
+        let user_and_wheat_and_chaff =
+          user_and_template_files.then(function({bc, user_files, template_files}) {
+            // if necessary, copy the template file of `name` to the user gdrive
+            function maybe_copy_template(name, batch, template_files, user_files) {
+              let user_file = user_files.find(file => file.title.includes(name));
+
+              if (!user_file) {
+                let template_file = template_files.find(file => file.title.includes(name));
+
+                if (template_file) {
+                  batch.add(name,
+                    gapi.client.drive.files.copy({
+                      fileId: template_file.id,
+                      resource: {
+                        "parents": [{"id": bc.id}],
+                        "properties": [
+                          {
+                            "key": "assignment",
+                            "value": id,
+                            "visibility": "PUBLIC",
+                          },
+                          {
+                            "key": "edited",
+                            "value": "false",
+                            "visibility": "PUBLIC",
+                          }
+                        ],
+                      }
+                    }));
+                }
+              }
+            }
+
+            var batch = new Batch();
+
+            let wheat = template_files.items.find(file => file.title == "wheat");
+            let chaff = template_files.items.find(file => file.title == "chaff");
+
+            if (wheat && chaff) {
+              batch.add('wheat',
+                gapi.client.drive.files.list({
+                  'q': `not trashed and "${wheat.id}" in parents`
+                }));
+              batch.add('chaff',
+                gapi.client.drive.files.list({
+                  'q': `not trashed and "${chaff.id}" in parents`
+                }));
+            }
+
+            maybe_copy_template('code',    batch, template_files.items, user_files.items);
+            maybe_copy_template('common',  batch, template_files.items, user_files.items);
+            maybe_copy_template('tests',   batch, template_files.items, user_files.items);
+
+            let share = template_files.items.find(file => file.title == "shares.txt");
+
+            let shares_defer = Q.defer();
+            let shares_promise = shares_defer.promise;
+
+            if (share) {
+              gapi.client.drive.files.get({
+                'fileId': share.id,
+                alt: 'media',
+              }).then(function(shares) {
+                shares_defer.resolve(shares.body.split("\n").filter(e => e.includes("@")));
+              });
+            }
+
+            return batch.run().then(function({wheat, chaff, code, common, tests}) {
+              if (!code) { code = user_files.items.find(file => file.title.includes("code")); }
+              if (!common) { common = user_files.items.find(file => file.title.includes("common")); }
+              if (!tests) { tests = user_files.items.find(file => file.title.includes("tests")); }
+
+              if (!wheat) { wheat = []; } else { wheat = wheat.items; }
+              if (!chaff) { chaff = []; } else { chaff = chaff.items; }
+
+              shares_promise.then(function(shares) {
+                let batch = new Batch();
+                [code, common, tests].filter(f => f).forEach(function (file, i) {
+                  shares.forEach(function(email) {
+                    batch.add(`permissions-${email}-${i}`,
+                      gapi.client.drive.permissions.insert({
+                          "fileId": file.id,
+                          "sendNotificationEmails": "false",
+                          "resource": {
+                            "role": "reader",
+                            "type": "user",
+                            "value": email,
+                          }
+                      }));
+                  });
+                });
+
+                batch.run().then(function(results) {
+                  console.error("PERMISSIONS SET", results);
+                }, function(error) {
+                  console.error("PERMISSIONS ERROR", error);
+                });
+              });
+
+              return {wheat, chaff, code, common, tests,
+                dummy_impl: template_files.items.find(file => file.title.includes("dummy")),
+              };
+            });
+          });
+
+        return user_and_wheat_and_chaff.then(function({wheat, chaff, code, common, tests, dummy_impl}) {
+          return {
+            assignment_name: "assignment", // TODO: actually thread in the assignment name
+            assignment_id: id,
+            wheat: wheat.map(file => makeSharedFile(file, true)),
+            chaff: chaff.map(file => makeSharedFile(file, true)),
+            code: fileBuilder(code),
+            tests: fileBuilder(tests),
+            common: fileBuilder(common),
+            dummy_impl: makeSharedFile(dummy_impl, true),
+          };
+        });
+      },
+
       getFiles: function(c) {
         return c.then(function(bc) {
           return drive.files.list({ q: "trashed=false and '" + bc.id + "' in parents" })
@@ -245,9 +510,6 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         return collection.then(function() { return true; });
       }
     };
-
-    var shareCollection = findOrCreateDirectory(collectionName + ".shared");
-    var cacheCollection = findOrCreateCacheDirectory(collectionName + ".compiled");
 
     return {
       api: api,

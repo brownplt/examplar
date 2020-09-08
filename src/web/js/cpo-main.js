@@ -257,8 +257,9 @@
           */
           restartInteractions: function(source, options) {
             var pyOptions = defaultOptions.extendWith({
-              "type-check": options.typeCheck,
-              "check-all": options.checkAll,
+              "type-check": !!options.typeCheck,
+              "check-mode": !!options.checkMode,
+              "check-all": !!options.checkAll,
               "on-compile": onCompile
             });
             var ret = Q.defer();
@@ -377,23 +378,8 @@
         if(!synthetic) {
           CPO.triggerOnRun();
         }
-        editor.cm.operation(function() {
-          editor.cm.clearGutter("test-marker-gutter");
-          var marks = editor.cm.getAllMarks();
-          document.getElementById("main").dataset.highlights = "";
-          editor.cm.eachLine(function(lh){
-            editor.cm.removeLineClass(lh, "background");});
-          for(var i = 0; i < marks.length; i++) {
-            const attribs = marks[i].attributes;
-            if(!(attribs && attribs.useline)) {
-              marks[i].clear();
-            }
-          }
-        });
-        var sheet = document.getElementById("highlight-styles").sheet;
-        for(var i=0; i< sheet.cssRules.length; i++) {
-          sheet.deleteRule(i);
-        }
+        CPO.clearEditorDecorations();
+
         switch (currentAction) {
           case "run":
             replWidget.runCode(src, {check: true, cm: editor.cm});
@@ -403,8 +389,38 @@
             break;
         }
       }
+      
+      document.getElementById("option-tc").addEventListener("change", update_run_button);
+      document.getElementById("option-check-mode").addEventListener("change", update_run_button);
+      
+      function update_run_button() {
+          var skipTests = document.getElementById("option-check-mode").checked;
+          var typeCheck = document.getElementById("option-tc").checked;
 
-      runButton.on("click", function() { doRunAction(editor.cm.getValue(), false); });
+          var runText = "";
+
+          if (skipTests) {
+              runText += "Skip Tests"
+          }
+
+          if (skipTests && typeCheck) {
+              runText += ", ";
+          }
+
+          if (typeCheck) {
+              runText += "Type Check"
+          }
+
+          if (skipTests || typeCheck) {
+              runText += " & ";
+          }
+
+          runText += "Run";
+
+          document.getElementById("runButton").innerText = runText;
+      }
+
+      runButton.on("click", function() { doRunAction(sourceAPI.get_loaded("definitions://").contents, false); });
 
       $(window).on("keyup", function(e) {
         if(e.keyCode === 27) { // "ESC"
@@ -585,7 +601,7 @@
 
       // run the definitions area
       Mousetrap.bindGlobal('ctrl+enter', function(e){
-        doRunAction(editor.cm.getValue(), false);
+        doRunAction(sourceAPI.get_loaded("definitions://").contents, false);
         CPO.autoSave();
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -646,7 +662,7 @@
       });
 
       Mousetrap.bindGlobal('f7', function(e) {
-        doRunAction(editor.cm.getValue(), false);
+        doRunAction(sourceAPI.get_loaded("definitions://").contents, false);
         CPO.autoSave();
         e.stopImmediatePropagation();
         e.preventDefault();
@@ -743,10 +759,10 @@
 
                 window.CPO.showShareContainer(p);
                 history.pushState(null, null, "#program=" + id);
-                window.CPO.loadProgram(p).then(function(contents) {
-                  window.CPO.editor.cm.setValue(contents);
-                  window.CPO.editor.cm.clearHistory();
-                });
+                //window.CPO.loadProgram(p).then(function(contents) {
+                //  window.CPO.editor.cm.setValue(contents);
+                //  window.CPO.editor.cm.clearHistory();
+                //});
               })
               .fail(function(err) {
                 window.flashMessage("Currently unable to save, try opening that file in a new tab");
