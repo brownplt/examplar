@@ -205,7 +205,7 @@
           });
 
           chaff.addEventListener('mouseleave',function() {
-            catchers.forEach(function(loc) { loc.highlight(''); });
+            catchers.forEach(function(loc) { loc.highlight(); });
           });
 
           return chaff;
