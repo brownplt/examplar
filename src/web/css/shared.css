@@ -17,32 +17,9 @@ em {
   width: 100%;
   height: 100%;
   z-index: 8700;
-  animation: loaderbackground 60s ease infinite;
-  /* pretty colors from: https://codepen.io/P1N2O/pen/pyBNzX */
   background: url(/img/pyret-spin.gif) 50% 50% no-repeat,
-    linear-gradient(-45deg,
-      hsla(14, 82%, 63%, 0.5),
-      hsla(337, 78%, 57%, 0.5),
-      hsla(196, 72%, 49%, 0.5),
-      hsla(166, 72%, 49%, 0.5)),
-    white;
-  background-size: auto 20%, 400% 400%;
-}
-
-#loader p {
-  display: none;
-}
-
-@keyframes loaderbackground {
-  0% {
-    background-position: 50% 50%, 0% 50%
-  }
-  50% {
-    background-position: 50% 50%, 100% 50%
-  }
-  100% {
-    background-position: 50% 50%, 0% 50%
-  }
+    url(/img/loading.svg);
+  background-size: auto 20%, 100px 100px;
 }
 
 body.hideDefinitions #loader, body.hideDefinitions .replContainer {
@@ -193,8 +170,11 @@ body.hideDefinitions .replMain, body.hideDefinitions #handle {
 }
 
 #loader p {
+  font-family: 'Gochi Hand', cursive;
+  font-size:2em;
+  margin: 0;
   position: relative;
-  top: 320px;
+  top: 70%;
   text-align: center;
   width: 100%;
 }
