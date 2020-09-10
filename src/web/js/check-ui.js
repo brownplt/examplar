@@ -135,7 +135,7 @@
         thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
         validity_elt.textContent = "VALIDITY UNKNOWN";
         validity_elt.classList.add("maybe-valid");
-        message_elt.textContent = "The validity and thoroughness of test cases in this file are unknown.";
+        message_elt.textContent = "Tests in this file are not checked against other implementations.";
         return container_elt;
       } else if (examplar_results.error) {
         thoroughness_elt.textContent = "ERROR ENCOUNTERED";
@@ -229,7 +229,7 @@
         validity_elt.textContent = "INVALID";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
-        message_elt.textContent = "This file contains invalid tests:";
+        message_elt.textContent = "These tests do not match the behavior described by the assignment handout:";
 
         let wheat_catchers =
           wheats.map(
