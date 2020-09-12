@@ -226,10 +226,10 @@
       } else {
         // this is unreachable right now :/
         thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
-        validity_elt.textContent = "INVALID";
+        validity_elt.textContent = "INCORRECT";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
-        message_elt.textContent = "These tests do not match the behavior described by the assignment handout:";
+        message_elt.textContent = "These tests do not match the behavior described by the assignment:";
 
         let wheat_catchers =
           wheats.map(
