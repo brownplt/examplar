@@ -29,8 +29,7 @@ class Batch {
       for (let [name, response] of Object.entries(result.result)) {
         if (response.status != 200) {
           delete response.body;
-          console.error({request: name, response: response});
-          throw {request: name, response: response};
+          console.error("Could not load assignment.", {request: name, response: response});
         } else {
           results[name] = response.result;
         }
