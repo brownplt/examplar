@@ -28,6 +28,10 @@ window.createSourceManager = function createSourceManager(storageAPI) {
 
     save() {
       let _this = this;
+      // examplar will _not_ eat your homework
+      if (this.contents.trim() == "") {
+        return Promise.reject("I'm sorry Dave, I'm afraid I can't do that.");
+      }
       return this.file.save(this.contents, false)
         .then(function (f) {
           _this.file = f;
