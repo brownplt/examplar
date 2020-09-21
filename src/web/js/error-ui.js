@@ -230,7 +230,7 @@
           errors.forEach(function (e) {
             console.error(e);
           });
-          logger.log('error', record);
+          console.log("LOGGED ERROR FEEDBACK", record);
         });
     }
 
