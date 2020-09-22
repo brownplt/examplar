@@ -230,7 +230,8 @@
           errors.forEach(function (e) {
             console.error(e);
           });
-          console.log("LOGGED ERROR FEEDBACK", record);
+          try { log_set("stack")(JSON.stringify(stack)); } catch(e) {}
+          cloud_log("LOGGED_ERROR_FEEDBACK", record)
         });
     }
 
