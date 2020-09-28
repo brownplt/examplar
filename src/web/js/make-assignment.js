@@ -99,15 +99,13 @@ function save(file, contents) {
 async function fixCompiled(file) {
   console.log("Fixing", file);
   let contents = eval(await file_contents(file));
-  deepMap(contents, function(val, key) {
+  let new_contents = JSON.stringify(deepMap(contents, function(val, key) {
     if (key == 'uri-of-definition') {
-      return `gdrive-js://{file.id}`;
+      return `gdrive-js://${file.id}`;
     } else {
       return val;
     }
-  });
-
-  let new_contents = JSON.stringify(contents);
+  }));
 
   await save(file, new_contents);
   console.log("Copied & Corrected", file);
