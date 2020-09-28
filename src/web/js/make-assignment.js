@@ -36,7 +36,7 @@ function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget) {
                           title: targetName,
                           parents: [{id: targetFolder}],
                         }
-                    }).then(fixCompiled);
+                    }).execute(fixCompiled);
                 })
             })
             .catch(e => console.error(e));
@@ -97,6 +97,7 @@ function save(file, contents) {
 }
 
 async function fixCompiled(file) {
+  console.log("Fixing", file);
   let contents = eval(await file_contents(file));
   deepMap(contents, function(val, key) {
     if (key == 'uri-of-definition') {
@@ -109,5 +110,5 @@ async function fixCompiled(file) {
   let new_contents = JSON.stringify(contents);
 
   await save(file, new_contents);
-  console.log("Copied & Corrected");
+  console.log("Copied & Corrected", file);
 }
