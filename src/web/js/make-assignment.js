@@ -36,7 +36,7 @@ function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget) {
                           title: targetName,
                           parents: [{id: targetFolder}],
                         }
-                    }).then(file => fixCompiled(file));
+                    }).then(fixCompiled);
                 })
             })
             .catch(e => console.error(e));
@@ -109,4 +109,5 @@ async function fixCompiled(file) {
   let new_contents = JSON.stringify(contents);
 
   await save(file, new_contents);
+  console.log("Copied & Corrected");
 }
