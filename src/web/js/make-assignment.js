@@ -30,13 +30,13 @@ function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget) {
                 res.result.items.map(file => {
                     const targetName = files.find(f => f.compiledName == file.title).targetName;
                     console.log(targetName);
-                    gapi.client.drive.files.copy({
+                    return gapi.client.drive.files.copy({
                         fileId: file.id,
                         resource: {
                           title: targetName,
                           parents: [{id: targetFolder}],
                         }
-                    }).then(() => console.log("COPIED"));
+                    }).then(file => fixCompiled(file));
                 })
             })
             .catch(e => console.error(e));
@@ -47,4 +47,66 @@ function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget) {
             copyFiles(chaffFiles, chaffTarget);
         });
     })
+}
+
+function deepMap(obj, f, ctx) {
+    if (Array.isArray(obj)) {
+        return obj.map(function(val, key) {
+            return (typeof val === 'object') ? deepMap(val, f, ctx) : f.call(ctx, val, key);
+        });
+    } else if (typeof obj === 'object') {
+        var res = {};
+        for (var key in obj) {
+            var val = obj[key];
+            if (typeof val === 'object') {
+                res[key] = deepMap(val, f, ctx);
+            } else {
+                res[key] = f.call(ctx, val, key);
+            }
+        }
+        return res;
+    } else {
+        return obj;
+    }
+}
+
+function file_contents(file) {
+  let url = "https://www.googleapis.com/drive/v3/files/" + file.id + "?alt=media&source=download";
+  return fetch(url,
+    { method: "get",
+      cache: "no-cache",
+      headers: new Headers([
+          ['Authorization', 'Bearer ' + gapi.auth.getToken().access_token]
+        ])
+    }).then(function(response) {
+      contents = response.text();
+      return contents;
+    });
+}
+
+function save(file, contents) {
+  return gapi.client.request({
+    'path': '/upload/drive/v2/files/' + file.id,
+    'method': 'PUT',
+    'params': {'uploadType': 'media'},
+    'headers': {
+      'Content-Type': 'text/plain',
+      'Content-Length': new Blob([contents]).size,
+    },
+    'body': contents});
+}
+
+async function fixCompiled(file) {
+  let contents = eval(await file_contents(file));
+  deepMap(contents, function(val, key) {
+    if (key == 'uri-of-definition') {
+      return `gdrive-js://{file.id}`;
+    } else {
+      return val;
+    }
+  });
+
+  let new_contents = JSON.stringify(contents);
+
+  await save(file, new_contents);
 }
