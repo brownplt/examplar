@@ -34,7 +34,7 @@
     "file-saver": "^2.0.2",
     "git-rev-sync": "^1.11.1",
     "googleapis": "^46.0.0",
-    "handlebars": "^4.7.6",
+    "handlebars": "^4.7.7",
     "heroku": "^7.42.6",
     "hoek": "^5.0.3",
     "install": "^0.13.0",
