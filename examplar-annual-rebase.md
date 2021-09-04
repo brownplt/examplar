@@ -24,3 +24,5 @@ Fix the conflicts, ensure everything works, then finally:
 ```
 git rebase --continue
 ```
+
+git checkout refs/remotes/origin/2021 --
