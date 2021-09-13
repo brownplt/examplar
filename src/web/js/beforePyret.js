@@ -360,9 +360,18 @@ $(function() {
           CM.clearGutter("help-gutter");
         }
       }
+      
       CM.on("change", function(change) {
         function doesNotChangeFirstLine(c) { return c.from.line !== 0; }
         if(change.curOp.changeObjs.every(doesNotChangeFirstLine)) { return; }
+        var hasNamespace = firstLineIsNamespace();
+        if(hasNamespace) {
+          if(namespacemark) { namespacemark.clear(); }
+          namespacemark = CM.markText({line: 0, ch: 0}, {line: 1, ch: 0}, { attributes: { useline: true }, className: "useline", atomic: true, inclusiveLeft: true, inclusiveRight: false });
+        }
+      });
+      
+      CM.on("swapDoc", function(oldDoc) {
         var hasNamespace = firstLineIsNamespace();
         if(hasNamespace) {
           if(namespacemark) { namespacemark.clear(); }
