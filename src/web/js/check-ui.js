@@ -135,10 +135,10 @@
       container_elt.appendChild(message_elt);
 
       if (!hasValidity(examplar_results)) {
-        thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
+        thoroughness_elt.textContent = "CONSEQUENTLY, THOROUGHNESS IS UNKNOWN";
         validity_elt.textContent = "VALIDITY UNKNOWN";
         validity_elt.classList.add("maybe-valid");
-        message_elt.textContent = "Tests in this file are not checked against other implementations.";
+        message_elt.textContent = "Tests in this file are not checked against other implementations. Consequently, we cannot provide you with validity and thoroughness feedback for these tests.";
         return container_elt;
       } else if (examplar_results.error) {
         thoroughness_elt.textContent = "ERROR ENCOUNTERED";
@@ -228,7 +228,7 @@
 
       } else {
         // this is unreachable right now :/
-        thoroughness_elt.textContent = "THOROUGHNESS UNKNOWN";
+        thoroughness_elt.textContent = "CONSEQUENTLY, THOROUGHNESS IS UNKNOWN";
         validity_elt.textContent = "INCORRECT";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
