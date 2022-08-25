@@ -1066,13 +1066,11 @@
                     block => !block.error
                       && block.tests.every(test => test.passed))).length;
               let all_passed = wheats == passed;
-              if (all_passed) {
-                payload.wheat_passed = true;
-                return check_results;
-              } else {
-                payload.wheat_passed = false;
-                throw check_results;
-              }
+              
+              // Always return wheat results.
+              payload.wheat_passed = all_passed;
+              return check_results;
+              
             });
 
           // if the wheats pass, then run the chaffs
@@ -1099,6 +1097,20 @@
                   throw wheat_reject;
                 }
               });
+
+
+
+          // sid: Do not run student tests IF the wheats did not pass.... (should I add this?)
+          let wheats_passed_check = wheat_results.then(
+            function(check_results) {
+              
+              if (payload.wheat_passed)
+              {
+                return check_results
+              }
+              throw check_results;
+              
+            });
 
           // lastly, run the student's tests, if they've begun their implementation.
           let test_results = Q.all([window.dummy_impl, chaff_results]).then(
