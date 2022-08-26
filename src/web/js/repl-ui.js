@@ -108,94 +108,6 @@
 
     
 
-///////// I'd like to put this elsewhere //////////
-function get_chaff_name(chaff_result)
-{
-    let output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-
-    let output_as_string = JSON.stringify(output);
-
-    let prefix = "shared-gdrive://";
-    let start_index = output_as_string.indexOf(prefix) + prefix.length;
-    let to_search = output_as_string.substring(start_index);
-    let end_index = to_search.indexOf(".arr");
-
-    return output_as_string.substring(start_index, start_index + end_index);
-}
-
-function get_passing_test_locations(chaff_result)
-{
-    locations = []
-
-    for (var test_block of chaff_result['json'])
-    for (var t of test_block['tests'])
-    {
-        if (t["passed"])
-        {
-            locations.push(t['loc'])
-        }
-    }
-    return locations
-}
-
-function get_passing_chaff_results(chaff_results)
-{
-
-    passed_tests = chaff_results.filter(
-
-        chaff_result =>
-        {
-            for (var cr of chaff_result['json'])
-            {
-                if (cr['tests'].some(x => x['passed']))
-                    return true
-            }
-
-        })
-        .map(cr => 
-            {
-                let n = get_chaff_name(cr);
-                let passing_tests = get_passing_test_locations(cr);
-
-                return passing_tests.map( 
-                    t => {
-                    return {test:t, chaff_name : n};
-                });
-            })
-
-
-    let merged = [].concat.apply([], passed_tests);
-    
-    let aggregated = {}
-
-    // I would like to do this with reduce, but it is needlessly verbose.
-    for (var r of merged)
-    {
-        let t = r['test'];
-        let n = r['chaff_name'];
-        if (t in aggregated)
-        {
-            aggregated[t].push(n);
-        }
-        else
-        {
-            aggregated[t] = [n];
-        }
-    }
-
-    return aggregated
-}
-
-function getHint(chaff_results) {
-
-        passing_chaff_results = get_passing_chaff_results(chaff_results)
-
-        
-        // Get hint here from hint file.
-        return "No hint available"
-}
-///////// I'd like to put this elsewhere //////////
-
 
 
 
@@ -1256,12 +1168,6 @@ function getHint(chaff_results) {
           let display_result =
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
-
-                console.log(chaff_results)
-
-
-                let hint = getHint(chaff_results)
-                alert(hint) // Change this :)
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {

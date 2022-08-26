@@ -108,6 +108,115 @@
         return result;
       }, "check-block-comments: each: contents");
     }
+
+
+
+    ///////// I'd like to put this elsewhere //////////
+    function get_chaff_name(chaff_result)
+    {
+        let output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
+
+        let output_as_string = JSON.stringify(output);
+
+        let prefix = "shared-gdrive://";
+        let start_index = output_as_string.indexOf(prefix) + prefix.length;
+        let to_search = output_as_string.substring(start_index);
+        let end_index = to_search.indexOf(".arr");
+
+        return output_as_string.substring(start_index, start_index + end_index);
+    }
+
+    function get_passing_test_locations(chaff_result)
+    {
+        locations = []
+
+        for (var test_block of chaff_result['json'])
+        for (var t of test_block['tests'])
+        {
+            if (t["passed"])
+            {
+                locations.push(t['loc'])
+            }
+        }
+        return locations
+    }
+
+    function get_passing_chaff_results(chaff_results)
+    {
+
+        passed_tests = chaff_results.filter(
+
+            chaff_result =>
+            {
+                for (var cr of chaff_result['json'])
+                {
+                    if (cr['tests'].some(x => x['passed']))
+                        return true
+                }
+
+            })
+            .map(cr => 
+                {
+                    let n = get_chaff_name(cr);
+                    let passing_tests = get_passing_test_locations(cr);
+
+                    return passing_tests.map( 
+                        t => {
+                        return {test:t, chaff_name : n};
+                    });
+                })
+
+        let merged = [].concat.apply([], passed_tests);        
+        let aggregated = {}
+
+        // I would like to do this with reduce, but it is needlessly verbose.
+        for (var r of merged)
+        {
+            let t = r['test'];
+            let n = r['chaff_name'];
+            if (t in aggregated)
+            {
+                aggregated[t].push(n);
+            }
+            else
+            {
+                aggregated[t] = [n];
+            }
+        }
+
+        return aggregated
+    }
+
+
+    function areChaffsAvailable(examplar_results)
+    {
+      return examplar_results != null 
+      && examplar_results.chaff != null
+      && examplar_results.chaff.length >= 0;
+    }
+
+    function getHint(examplar_results) 
+    {
+      if (areChaffsAvailable(examplar_results))
+      {
+          let passing_chaff_results = get_passing_chaff_results(examplar_results.chaff);
+
+
+          // Get hint here from hint file.
+          
+
+
+          return "We perhaps have a hint for you!"
+      }
+
+        
+        return "No hint available"
+    }
+    ///////// I'd like to put this elsewhere //////////
+
+
+
+
     
     function hasValidity(examplar_results) {
       return !(examplar_results == null ||
@@ -117,6 +226,7 @@
     }
 
     function drawExamplarResults(check_blocks, examplar_results) {
+
 
       let container_elt = document.createElement("div");
       container_elt.classList.add("file-examplar-summary");
@@ -232,7 +342,11 @@
         validity_elt.textContent = "INCORRECT";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
-        message_elt.textContent = "These tests do not match the behavior described by the assignment:";
+
+
+        let hint = getHint(examplar_results);
+
+        message_elt.textContent = `Hint: ${hint}. These tests do not match the behavior described by the assignment:`;
 
         let wheat_catchers =
           wheats.map(
