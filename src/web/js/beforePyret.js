@@ -691,6 +691,7 @@ $(function() {
   window.wheat = assignment.then(assn => assn.wheat);
   window.chaff = assignment.then(assn => assn.chaff);
 
+
   let assignment_code = Promise.all([assignment_tests, assignment.then(assn => assn.code)])
     .then(([tests, code]) => {
       if (!tests) {

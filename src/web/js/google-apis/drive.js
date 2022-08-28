@@ -385,6 +385,19 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             let wheat = template_files.items.find(file => file.title == "wheat");
             let chaff = template_files.items.find(file => file.title == "chaff");
 
+            try
+            {
+              // sid: TODO IS this correct? I'd like hints in the windowed files (or I'd like to set up an API somewhere)
+              let hints = template_files.items.find(file => file.title == "hints.json");
+              drive.files.get({fileId: hints.id, alt: 'media',})
+                          .then(res =>  window.hints = res.result)
+           
+            }
+            catch(Exception)
+            {
+              console.err('COULD NOT FETCH HINTS')
+            }
+
             if (wheat && chaff) {
               batch.add('wheat',
                 gapi.client.drive.files.list({
