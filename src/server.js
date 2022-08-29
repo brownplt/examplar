@@ -118,8 +118,6 @@ function start(config, onServerReady) {
     var redirect = req.param("redirect") || "/editor";
     var scopesParam = req.param("scopes") === "full" ? "full" : "default";
     var scopes = scopesParam === "full" ? googleAuth.FULL_OAUTH_SCOPES : googleAuth.DEFAULT_OAUTH_SCOPES;
-
-
     if(!(req.session && req.session["user_id"])) {
       req.session["scopes"] = scopesParam;
       res.redirect(auth.getAuthUrl(redirect, scopes));
