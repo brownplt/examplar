@@ -113,24 +113,41 @@
 
     function getHint() 
     {
+      const DEFAULT_TEXT = "Check for typos! This 'wheat failure' did not look like any we have seen before. If you are not sure why this test fails the wheat, please go see a TA.";
+      const HINT_PREFIX = "<h3>Hint:</h3> ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
+
+      let text_for_hint = DEFAULT_TEXT;
       try
       {
         let mc = window.modal_chaff;
 
         if (mc != null && mc != undefined && mc in window.hints)
         {
-          return window.hints[mc]
+          text_for_hint = HINT_PREFIX + window.hints[mc];
         }
       }
       catch(e)
       {
         console.error('Error generating hint:', e)
       }
+      finally
+      {
+        window.modal_chaff = null;
 
-      window.modal_chaff = null;
-      return "No hint available"
+        
+        var container = document.createElement("div");
+        container.innerHTML = text_for_hint;
+
+        // Again, this styling is not ideal but does allow for quick prototyping.
+        container.style.backgroundColor = "white";
+        container.style.borderStyle = "solid";
+        container.style.borderColor = "green";
+        return container;
+      }
+
+
     }
 
 
@@ -259,10 +276,10 @@
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
 
+        message_elt.textContent = `These tests do not match the behavior described by the assignment:`;
 
         let hint = getHint();
-
-        message_elt.textContent = `Hint: ${hint}. These tests do not match the behavior described by the assignment:`;
+        message_elt.parentElement.appendChild(hint);
 
         let wheat_catchers =
           wheats.map(
