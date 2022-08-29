@@ -121,14 +121,25 @@
         return output_as_string.substring(start_index, start_index + end_index);
     }
 
-    function get_passing_test_locations(chaff_result)
+    function get_failing_test_locations(result)
+    {
+      return get_test_locations(result, false);
+    }
+
+
+    function get_passing_test_locations(result)
+    {
+        return get_test_locations(result, true);
+    }
+
+    function get_test_locations(result, passing)
     {
         locations = []
 
-        for (var test_block of chaff_result['json'])
+        for (var test_block of result['json'])
         for (var t of test_block['tests'])
         {
-            if (t["passed"])
+            if (t["passed"] == passing)
             {
                 locations.push(t['loc'])
             }
@@ -136,7 +147,19 @@
         return locations
     }
 
-    function get_passing_chaff_results(chaff_results)
+
+    function get_failing_wheat_locations(wheat_results)
+    {
+      console.log('GETTING FAILING WHEAT LOC', wheat_results)
+      let failed_tests = wheat_results.map(wr => get_failing_test_locations(wr));
+
+
+      console.log('THESE FAILED: ', failed_tests)
+      let merged = [].concat.apply([], failed_tests); 
+      return new Set(merged);
+    }
+
+    function get_passing_chaff_results(chaff_results,wheat_failures)
     {
         let passed_tests = chaff_results.filter(
 
@@ -156,7 +179,8 @@
                 {
                     let n = get_chaff_name(cr);
 
-                    let passing_tests = get_passing_test_locations(cr);
+                    let passing_tests = get_passing_test_locations(cr)
+                                        .filter(t => wheat_failures.has(t)); // Filter out any wheat 'passes'
 
                     return passing_tests.map( 
                         t => {
@@ -187,9 +211,10 @@
         return aggregated;
     }
 
-    function modal_passing_chaff(chaff_results)
+    function modal_passing_chaff(chaff_results, wheat_failures)
     {
-      let res = get_passing_chaff_results(chaff_results);
+      console.log('Failing wheat locations were: ', wheat_failures)
+      let res = get_passing_chaff_results(chaff_results, wheat_failures);
 
       if (res == null || Object.keys(res).length == 0)
       {
@@ -1192,6 +1217,7 @@
           let chaff_results = wheats_pass
             .then(
               function(_){
+                
                 let run_results = window.chaff.then(run_injections);
                 run_results.then(results =>
                   payload.chaff_results = results.map(result =>
@@ -1268,7 +1294,10 @@
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
 
-                window.modal_chaff = modal_passing_chaff(chaff_results);
+                //let wheat_failures = get_failing_wheat_locations(wheat_results);
+                console.log("We got:", wheat_results)
+                
+                window.modal_chaff = modal_passing_chaff(chaff_results, new Set());
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {
