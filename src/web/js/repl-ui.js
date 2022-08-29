@@ -138,7 +138,6 @@
 
     function get_passing_chaff_results(chaff_results)
     {
-        console.log('Chaff results were : ', chaff_results);
         let passed_tests = chaff_results.filter(
 
             chaff_result =>
@@ -157,8 +156,6 @@
                 {
                     let n = get_chaff_name(cr);
 
-                    console.log('Chaff :', n)
-
                     let passing_tests = get_passing_test_locations(cr);
 
                     return passing_tests.map( 
@@ -168,11 +165,10 @@
                 });
 
 
-        let merged = [].concat.apply([], passed_tests);        
+        let merged = [].concat.apply([], passed_tests); 
         let aggregated = {};
 
-          
-
+        
         // I would like to do this with reduce, but it is needlessly verbose.
         for (var r of merged)
         {
@@ -194,6 +190,12 @@
     function modal_passing_chaff(chaff_results)
     {
       let res = get_passing_chaff_results(chaff_results);
+
+      if (res == null || Object.keys(res).length == 0)
+      {
+        console.log('No chaff passes');
+        return null;
+      }
 
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.

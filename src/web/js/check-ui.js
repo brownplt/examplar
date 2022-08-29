@@ -129,6 +129,7 @@
         console.error('Error generating hint:', e)
       }
 
+      window.modal_chaff = null;
       return "No hint available"
     }
 
