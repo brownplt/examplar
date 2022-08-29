@@ -129,7 +129,9 @@
 
     function get_passing_test_locations(result)
     {
-        return get_test_locations(result, true);
+        let tmp = get_test_locations(result, true);
+        console.log('Passing chaff locations were: ', tmp)
+        return tmp;
     }
 
     function get_test_locations(result, passing)
@@ -141,7 +143,8 @@
         {
             if (t["passed"] == passing)
             {
-                locations.push(t['loc'])
+                // sid: Hack here. Stringify to simplifylocation/ object comparisons.
+                locations.push(JSON.stringify(t['loc']));
             }
         }
         return locations
@@ -150,43 +153,42 @@
 
     function get_failing_wheat_locations(wheat_results)
     {
-      console.log('GETTING FAILING WHEAT LOC', wheat_results)
       let failed_tests = wheat_results.map(wr => get_failing_test_locations(wr));
-
-
-      console.log('THESE FAILED: ', failed_tests)
-      let merged = [].concat.apply([], failed_tests); 
+      let merged = [].concat.apply([], failed_tests);
       return new Set(merged);
     }
 
     function get_passing_chaff_results(chaff_results,wheat_failures)
     {
+
+      console.log('Failing wheat locations were: ', wheat_failures)
+
         let passed_tests = chaff_results.filter(
 
-            chaff_result =>
-            {
-                for (var cr of chaff_result['json'])
-                {
-                    if (cr['tests'].some(x => x['passed']))
-                    {
-                        return true;
-                    }
-                }
-                return false;
+          chaff_result =>
+          {
+              for (var cr of chaff_result['json'])
+              {
+                  if (cr['tests'].some(x => x['passed']))
+                  {
+                      return true;
+                  }
+              }
+              return false;
 
-            })
-            .map(cr => 
-                {
-                    let n = get_chaff_name(cr);
+          })
+          .map(cr => 
+              {
+                  let n = get_chaff_name(cr);
 
-                    let passing_tests = get_passing_test_locations(cr)
-                                        .filter(t => wheat_failures.has(t)); // Filter out any wheat 'passes'
+                  let passing_tests = get_passing_test_locations(cr)
+                                      .filter(t => wheat_failures.has(t)); // Filter out any wheat 'passes'
 
-                    return passing_tests.map( 
-                        t => {
-                        return {test:t, chaff_name : n};
-                    });
-                });
+                  return passing_tests.map( 
+                      t => {
+                      return {test:t, chaff_name : n};
+                  });
+              });
 
 
         let merged = [].concat.apply([], passed_tests); 
@@ -213,7 +215,7 @@
 
     function modal_passing_chaff(chaff_results, wheat_failures)
     {
-      console.log('Failing wheat locations were: ', wheat_failures)
+      
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
 
       if (res == null || Object.keys(res).length == 0)
@@ -1294,10 +1296,9 @@
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
 
-                //let wheat_failures = get_failing_wheat_locations(wheat_results);
-                console.log("We got:", wheat_results)
+                let wheat_failures = get_failing_wheat_locations(wheat_results);
                 
-                window.modal_chaff = modal_passing_chaff(chaff_results, new Set());
+                window.modal_chaff = modal_passing_chaff(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {
