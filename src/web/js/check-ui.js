@@ -113,13 +113,20 @@
 
     function getHint() 
     {
-      // return hint
-
-      let mc = window.modal_chaff;
-
-      if (mc != null && mc != undefined && mc in window.hints)
+      // Bad practice, but we'll do this for now. Don't want to crash
+      // Examplar if something went wrong generating a hint.
+      try
       {
-        return window.hints[mc]
+        let mc = window.modal_chaff;
+
+        if (mc != null && mc != undefined && mc in window.hints)
+        {
+          return window.hints[mc]
+        }
+      }
+      catch(e)
+      {
+        console.error('Error generating hint:', e)
       }
 
       return "No hint available"

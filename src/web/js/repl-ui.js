@@ -146,10 +146,10 @@
                 for (var cr of chaff_result['json'])
                 {
                     if (cr['tests'].some(x => x['passed']))
-                        console.log('Pass found');
+                    {
                         return true;
+                    }
                 }
-                console.log('No PASS FOUND')
                 return false;
 
             })
@@ -167,13 +167,11 @@
                     });
                 });
 
-        console.log('Merged chaff results: ', passed_tests)
 
         let merged = [].concat.apply([], passed_tests);        
         let aggregated = {};
 
-        
-        
+          
 
         // I would like to do this with reduce, but it is needlessly verbose.
         for (var r of merged)
@@ -197,13 +195,18 @@
     {
       let res = get_passing_chaff_results(chaff_results);
 
-      console.log('Passing chaff results: ', res)
-
-      let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
-      return vals;
+      // Bad practice, but we'll do this for now. Don't want to crash
+      // Examplar if something went wrong generating a hint.
+      try{
+        let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
+        return vals;
+      }
+      catch(e)
+      {
+        console.err('Chaff run error: ', e);
+        return null;
+      }
     }
-
-
     //////////////////
 
 
@@ -1212,8 +1215,7 @@
 
 
 
-          // sid: Do not run student tests IF the wheats did not pass.... (should I add this?)
-          // How...?
+          // sid: Do not run student tests IF the wheats did not pass.... (have I broken this? Need to test)
 
           // lastly, run the student's tests, if they've begun their implementation.
           let test_results = Q.all([window.dummy_impl, chaff_results]).then(

@@ -387,7 +387,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
             try
             {
-              // sid: TODO IS this correct? I'd like hints in the windowed files (or I'd like to set up an API somewhere)
+              // sid: I know this isn't ideal, but I'm not too worried about an enterprising user
+              // finding a 'hints' file if they look hard at the Javascript bindings.
+              // I do wish this was easier to cache though...
               let hints = template_files.items.find(file => file.title == "hints.json");
               drive.files.get({fileId: hints.id, alt: 'media',})
                           .then(res =>  window.hints = res.result)
