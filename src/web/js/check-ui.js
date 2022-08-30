@@ -111,7 +111,7 @@
 
     function getHint() {
       const DEFAULT_TEXT = "Check for typos! This 'wheat failure' did not look like any we have seen before. If you are not sure why this test fails the wheat, please go see a TA.";
-      const HINT_PREFIX = "<h3>Hint:</h3> ";
+      const HINT_PREFIX = "<h4>Hint:</h4> ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
 
@@ -134,7 +134,12 @@
         // Again, this styling is not ideal but does allow for quick prototyping.
         container.style.backgroundColor = "white";
         container.style.borderStyle = "solid";
-        container.style.borderColor = "green";
+        container.style.borderColor = "white";
+        container.style.borderWidth = "thick";
+        container.style.alignContent = "center";
+        container.style.width = "100%";
+        container.id = "hint_box";
+
         return container;
       }
     }
