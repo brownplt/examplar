@@ -101,18 +101,10 @@
 
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
-
-
-
-
-
-    ///////// sid: I'd like to put this elsewhere //////////
-    function get_chaff_name(chaff_result)
-    {
+    ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
+    function get_chaff_name(chaff_result) {
         let output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-
         let output_as_string = JSON.stringify(output);
-
         let prefix = "shared-gdrive://";
         let start_index = output_as_string.indexOf(prefix) + prefix.length;
         let to_search = output_as_string.substring(start_index);
@@ -121,29 +113,22 @@
         return output_as_string.substring(start_index, start_index + end_index);
     }
 
-    function get_failing_test_locations(result)
-    {
+    function get_failing_test_locations(result) {
       return get_test_locations(result, false);
     }
 
 
-    function get_passing_test_locations(result)
-    {
-        let tmp = get_test_locations(result, true);
-        console.log('Passing chaff locations were: ', tmp)
-        return tmp;
+    function get_passing_test_locations(result) {
+        return get_test_locations(result, true);
     }
 
-    function get_test_locations(result, passing)
-    {
+    function get_test_locations(result, passing) {
         locations = []
 
         for (var test_block of result['json'])
-        for (var t of test_block['tests'])
-        {
-            if (t["passed"] == passing)
-            {
-                // sid: Hack here. Stringify to simplifylocation/ object comparisons.
+        for (var t of test_block['tests']) {
+            if (t["passed"] == passing) {
+                // Sid: Hacky. Simplifyies location/object comparisons.
                 locations.push(JSON.stringify(t['loc']));
             }
         }
@@ -151,61 +136,43 @@
     }
 
 
-    function get_failing_wheat_locations(wheat_results)
-    {
+    function get_failing_wheat_locations(wheat_results) {
       let failed_tests = wheat_results.map(wr => get_failing_test_locations(wr));
       let merged = [].concat.apply([], failed_tests);
       return new Set(merged);
     }
 
-    function get_passing_chaff_results(chaff_results,wheat_failures)
-    {
-
-      console.log('Failing wheat locations were: ', wheat_failures)
+    function get_passing_chaff_results(chaff_results,wheat_failures) {
 
         let passed_tests = chaff_results.filter(
-
-          chaff_result =>
-          {
-              for (var cr of chaff_result['json'])
-              {
-                  if (cr['tests'].some(x => x['passed']))
-                  {
+          chaff_result => {
+              for (var cr of chaff_result['json']) {
+                  if (cr['tests'].some(x => x['passed'])) {
                       return true;
                   }
               }
               return false;
-
           })
-          .map(cr => 
-              {
+          .map(cr => {
                   let n = get_chaff_name(cr);
-
                   let passing_tests = get_passing_test_locations(cr)
-                                      .filter(t => wheat_failures.has(t)); // Filter out any wheat 'passes'
+                                      .filter(t => wheat_failures.has(t)); 
 
                   return passing_tests.map( 
-                      t => {
-                      return {test:t, chaff_name : n};
+                      t => { return {test:t, chaff_name : n};
                   });
               });
-
 
         let merged = [].concat.apply([], passed_tests); 
         let aggregated = {};
 
-        
-        // I would like to do this with reduce, but it is needlessly verbose.
-        for (var r of merged)
-        {
+        for (var r of merged) {
             let t = r['test'];
             let n = r['chaff_name'];
-            if (t in aggregated)
-            {
+            if (t in aggregated) {
                 aggregated[n].push(t);
             }
-            else
-            {
+            else {
                 aggregated[n] = [t];
             }
         };
@@ -213,34 +180,25 @@
         return aggregated;
     }
 
-    function modal_passing_chaff(chaff_results, wheat_failures)
-    {
-      
+    function modal_passing_chaff(chaff_results, wheat_failures) { 
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
 
-      if (res == null || Object.keys(res).length == 0)
-      {
-        console.log('No chaff passes');
+      if (res == null || Object.keys(res).length == 0) {
         return null;
       }
 
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
-      try{
+      try {
         let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
         return vals;
       }
-      catch(e)
-      {
+      catch(e) {
         console.err('Chaff run error: ', e);
         return null;
       }
     }
-    //////////////////
-
-
-
-
+    
 
     function merge(obj, extension) {
       var newobj = {};
