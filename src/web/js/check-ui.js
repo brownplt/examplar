@@ -110,12 +110,12 @@
     }
 
     function getHint() {
-      const DEFAULT_TEXT = `<b>Sorry, this wheat failure does not look like ones we have seen before.</b>
-      <ul>
+      const DEFAULT_TEXT = `Unrecognized wheat failure: Sorry, this wheat failure does not look like ones we have seen before. Try:
+      <ul padding ='5px' list-style-type='circle'>
         <li>Checking for typos</li>
         <li>Re-reading the problem statement</li>
       </ul>
-      If these don't help, please talk to course staff.`;
+      If these don't help, please talk to the course staff.`;
       const HINT_PREFIX = "<h3>The assignment says:</h3> ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
