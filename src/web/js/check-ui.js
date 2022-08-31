@@ -133,7 +133,7 @@
       finally {
         window.modal_chaff = null;
        
-        var container = document.createElement("div");
+        let container = document.createElement("div");
         container.innerHTML = text_for_hint;
 
         // Again, this styling is not ideal but does allow for quick prototyping.
@@ -144,6 +144,12 @@
         container.style.alignContent = "center";
         container.style.width = "100%";
         container.id = "hint_box";
+
+        let bullet_points = container.children[0];
+
+        bullet_points.style.listStyleType = 'circle'
+        bullet_points.style.padding = '5px';
+
         return container;
       }
     }
