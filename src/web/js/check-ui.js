@@ -110,8 +110,13 @@
     }
 
     function getHint() {
-      const DEFAULT_TEXT = "Check for typos! This 'wheat failure' did not look like any we have seen before. If you are not sure why this test fails the wheat, please go see a TA.";
-      const HINT_PREFIX = "<h4>Hint:</h4> ";
+      const DEFAULT_TEXT = `<b>Sorry, this wheat failure does not look like ones we have seen before.</b>
+      <ul>
+        <li>Checking for typos</li>
+        <li>Re-reading the problem statement</li>
+      </ul>
+      If these don't help, please talk to course staff.`;
+      const HINT_PREFIX = "<h3>The assignment says:</h3> ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
 
@@ -139,11 +144,9 @@
         container.style.alignContent = "center";
         container.style.width = "100%";
         container.id = "hint_box";
-
         return container;
       }
     }
-
 
     function hasValidity(examplar_results) {
       return !(examplar_results == null ||

@@ -388,7 +388,6 @@
       }
     }
 
-
     // the result of applying `displayResult` is a function that MUST
     // NOT BE CALLED ON THE PYRET STACK.
     function jsonResult(output, callingRuntime, resultRuntime, isMain) {
@@ -1176,8 +1175,7 @@
           // if the wheats pass, then run the chaffs
           let chaff_results = wheats_pass
             .then(
-              function(_){
-                
+              function(_){          
                 let run_results = window.chaff.then(run_injections);
                 run_results.then(results =>
                   payload.chaff_results = results.map(result =>
@@ -1186,8 +1184,6 @@
                         result: result.result.json,
                       })
                     ));
-
-
                 // strip the names
                 return run_results.then(results => results.map(result => result.result));
               }, function(wheat_reject) {
@@ -1253,9 +1249,7 @@
           let display_result =
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
-
-                let wheat_failures = get_failing_wheat_locations(wheat_results);
-                
+                let wheat_failures = get_failing_wheat_locations(wheat_results);               
                 window.modal_chaff = modal_passing_chaff(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
