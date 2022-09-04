@@ -101,6 +101,105 @@
 
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
+    ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
+    function get_chaff_name(chaff_result) {
+        let output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
+        let output_as_string = JSON.stringify(output);
+        let prefix = "shared-gdrive://";
+        let start_index = output_as_string.indexOf(prefix) + prefix.length;
+        let to_search = output_as_string.substring(start_index);
+        let end_index = to_search.indexOf(".arr");
+
+        return output_as_string.substring(start_index, start_index + end_index);
+    }
+
+    function get_failing_test_locations(result) {
+      return get_test_locations(result, false);
+    }
+
+
+    function get_passing_test_locations(result) {
+        return get_test_locations(result, true);
+    }
+
+    function get_test_locations(result, passing) {
+        locations = []
+
+        for (var test_block of result['json'])
+        for (var t of test_block['tests']) {
+            if (t["passed"] == passing) {
+                // Sid: Hacky. Simplifyies location/object comparisons.
+                locations.push(JSON.stringify(t['loc']));
+            }
+        }
+        return locations
+    }
+
+
+    function get_failing_wheat_locations(wheat_results) {
+      let failed_tests = wheat_results.map(wr => get_failing_test_locations(wr));
+      let merged = [].concat.apply([], failed_tests);
+      return new Set(merged);
+    }
+
+    function get_passing_chaff_results(chaff_results,wheat_failures) {
+
+        let passed_tests = chaff_results.filter(
+          chaff_result => {
+              for (var cr of chaff_result['json']) {
+                  if (cr['tests'].some(x => x['passed'])) {
+                      return true;
+                  }
+              }
+              return false;
+          })
+          .map(cr => {
+                  let n = get_chaff_name(cr);
+                  let passing_tests = get_passing_test_locations(cr)
+                                      .filter(t => wheat_failures.has(t)); 
+
+                  return passing_tests.map( 
+                      t => { return {test:t, chaff_name : n};
+                  });
+              });
+
+        let merged = [].concat.apply([], passed_tests); 
+        let aggregated = {};
+
+        for (var r of merged) {
+            let t = r['test'];
+            let n = r['chaff_name'];
+            if (t in aggregated) {
+                aggregated[n].push(t);
+            }
+            else {
+                aggregated[n] = [t];
+            }
+        };
+
+        return aggregated;
+    }
+
+    function modal_passing_chaff(chaff_results, wheat_failures) { 
+      let res = get_passing_chaff_results(chaff_results, wheat_failures);
+
+      if (res == null || Object.keys(res).length == 0) {
+        return null;
+      }
+
+      // Bad practice, but we'll do this for now. Don't want to crash
+      // Examplar if something went wrong generating a hint.
+      try {
+        let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
+        return vals;
+      }
+      catch(e) {
+        console.err('Chaff run error: ', e);
+        return null;
+      }
+    }
+    
+
     function merge(obj, extension) {
       var newobj = {};
       Object.keys(obj).forEach(function(k) {
@@ -1066,19 +1165,17 @@
                     block => !block.error
                       && block.tests.every(test => test.passed))).length;
               let all_passed = wheats == passed;
-              if (all_passed) {
-                payload.wheat_passed = true;
-                return check_results;
-              } else {
-                payload.wheat_passed = false;
-                throw check_results;
-              }
+              
+              // Always return wheat results.
+              payload.wheat_passed = all_passed;
+              return check_results;
+              
             });
 
           // if the wheats pass, then run the chaffs
           let chaff_results = wheats_pass
             .then(
-              function(_){
+              function(_){          
                 let run_results = window.chaff.then(run_injections);
                 run_results.then(results =>
                   payload.chaff_results = results.map(result =>
@@ -1100,9 +1197,14 @@
                 }
               });
 
+
+
+          // sid: Do not run student tests IF the wheats did not pass.... (have I broken this? Need to test)
+
           // lastly, run the student's tests, if they've begun their implementation.
           let test_results = Q.all([window.dummy_impl, chaff_results]).then(
             function([dummy_impl, _]){
+
               let impl_exists = sourceAPI.loaded.some(function(f) {
                 if (f.file && f.file.getName) {
                   return f.file.getName().includes("code");
@@ -1140,10 +1242,16 @@
             function(_) {send_log.resolve()},
             function(e) {send_log.resolve()});
 
+
+          
+
           // then display the result
           let display_result =
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
+                let wheat_failures = get_failing_wheat_locations(wheat_results);               
+                window.modal_chaff = modal_passing_chaff(chaff_results, wheat_failures);
+
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {
                   return displayResult(output, runtime, repl.runtime, true, updateItems)(

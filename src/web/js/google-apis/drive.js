@@ -385,6 +385,19 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
             let wheat = template_files.items.find(file => file.title == "wheat");
             let chaff = template_files.items.find(file => file.title == "chaff");
 
+            try {
+              // sid: I know this isn't ideal, but I'm not too worried about an enterprising user
+              // finding a 'hints' file if they look hard at the Javascript bindings.
+              let hints = template_files.items.find(file => file.title == "hints.json");
+              drive.files.get({fileId: hints.id, alt: 'media',})
+                          .then(res =>  window.hints = res.result)
+            }
+            catch(Exception) {
+              // Again, not ideal but this is a safeguard against
+              // an unstable experience.
+              console.err('COULD NOT FETCH HINTS.')
+            }
+
             if (wheat && chaff) {
               batch.add('wheat',
                 gapi.client.drive.files.list({

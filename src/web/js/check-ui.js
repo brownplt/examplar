@@ -108,7 +108,44 @@
         return result;
       }, "check-block-comments: each: contents");
     }
-    
+
+    function getHint() {
+      const DEFAULT_TEXT ="";
+      const HINT_PREFIX = "<h3>The assignment says:</h3> ";
+      // Bad practice, but we'll do this for now. Don't want to crash
+      // Examplar if something went wrong generating a hint.
+
+      let text_for_hint = DEFAULT_TEXT;
+      try {
+        let mc = window.modal_chaff;
+        if (mc != null && mc != undefined && mc in window.hints) {
+          text_for_hint = HINT_PREFIX + window.hints[mc];
+        }
+      }
+      catch(e) {
+        console.error('Error generating hint:', e)
+      }
+      finally {
+        window.modal_chaff = null;
+       
+        let container = document.createElement("div");
+        container.innerHTML = text_for_hint;
+
+        // Again, this styling is not ideal but does allow for quick prototyping.
+        container.style.backgroundColor = "white";
+        container.style.borderStyle = "solid";
+        container.style.borderColor = "white";
+        container.style.borderWidth = "thick";
+        container.style.alignContent = "center";
+        container.style.width = "100%";
+        container.id = "hint_box";
+
+
+
+        return container;
+      }
+    }
+
     function hasValidity(examplar_results) {
       return !(examplar_results == null ||
              ( examplar_results != null &&
@@ -233,6 +270,9 @@
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
         message_elt.textContent = "These tests do not match the behavior described by the assignment:";
+
+        let hint = getHint();
+        message_elt.parentElement.appendChild(hint);
 
         let wheat_catchers =
           wheats.map(
