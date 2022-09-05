@@ -389,13 +389,24 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               // sid: I know this isn't ideal, but I'm not too worried about an enterprising user
               // finding a 'hints' file if they look hard at the Javascript bindings.
               let hints = template_files.items.find(file => file.title == "hints.json");
+
+              if (hints == null)
+              {
+                console.log('COULD NOT FETCH HINTS!');
+                window.hints = {}
+              }
+              else
+              {
+
               drive.files.get({fileId: hints.id, alt: 'media',})
                           .then(res =>  window.hints = res.result)
+              }
             }
             catch(Exception) {
               // Again, not ideal but this is a safeguard against
               // an unstable experience.
               console.err('COULD NOT FETCH HINTS.')
+              console.log('COULD NOT FETCH HINTS.')
             }
 
             if (wheat && chaff) {
