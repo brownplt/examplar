@@ -18,8 +18,8 @@
    note their IDs, and set them (temporarily) to be publicly accessible via link
 
 2. Load the Examplar dummy assignment (https://pyret.cs.brown.edu/assignment/1QIZ_LpROVf4yzWTlfTIJcturEyIs71u_)
-   and open the JavaScript console. Note: The following Steps 3,
-   4, and 5 are to be
+   and open the JavaScript console. Note: The following Steps 3-6
+   are to be
    done in the JS console, not in the Pyret interaction
    window!
 
@@ -27,28 +27,29 @@
     ```javascript
     const wheats = compileFiles(<wheat source folder id>)
     ```
-    and clicking the run button
 
-4. Compile the chaffs by executing
+4. Click the Run button in the interaction window
+
+5. Compile the chaffs by executing
     ```javascript
     const chaffs = compileFiles(<chaff source folder id>)
     ```
-    and clicking the run button
+6. Click the Run button in the interaction window
 
-5. Make a public subdirectory in the assignment folder with the public facing
+7. Make a public subdirectory in the assignment folder with the public facing
    name for the assignment (e.g. 'docdiff') with subdirectories 'wheat' and 'chaff'
 
-6. After determining the folder IDs for 'wheat' and 'chaff', execute
+8. After determining the folder IDs for 'wheat' and 'chaff', execute
     ```javascript
     copyCompiled(wheats, <'wheat' folder ID>, chaffs, <'chaff' folder ID>)
     ```
 
-7. Check that the files, which should now have names ending in '.js',
+9. Check that the files, which should now have names ending in '.js',
    are present in the 'wheat' and 'chaff' folders
 
-8. Remove link sharing from the wheat and chaff source folders from step 1
+10. Remove link sharing from the wheat and chaff source folders from step 1 (optional)
 
-9. In the folder created in step 5, create the following files:
+11. In the folder created in step 7, create the following files:
     * \<assignment>-code.arr
         ```
         provide *
@@ -115,4 +116,4 @@
         ```
 
 
-10. Access the assignment at https://pyret.cs.brown.edu/assignment/<ID of folder from step 5>
+12. Access the assignment at https://pyret.cs.brown.edu/assignment/<ID of folder from step 7>
