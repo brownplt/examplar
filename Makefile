@@ -103,7 +103,7 @@ build/web/js/events.js: src/web/js/events.js
 	cp $< $@
 
 build/web/js/beforePyret.js: src/web/js/beforePyret.js
-	`npm bin`/webpack
+	./node_modules/.bin/webpack
 
 build/web/js/q.js: node_modules/q/q.js
 	cp $< $@

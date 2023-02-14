@@ -441,6 +441,8 @@ $(function() {
     window.location.href = "/";
   }
 
+  console.log("FETCHED ASSIGNMENT!!!")
+
   function setTitle(progName) {
     document.title = progName + " - code.pyret.org";
     $("#showFilename").text("File: " + progName);

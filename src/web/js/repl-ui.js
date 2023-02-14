@@ -1177,15 +1177,19 @@
           // TODO: Make this an option from the CPO (I want a separate, gen hint button maybe?)
           // basically want one of two options: Shown chaffs and full chaffs.
           let hint_gen = true;
+            if (hint_gen)
+            {
+              console.log("HINT RUN!")
+            }
 
-          
+          chaff_to_run = hint_gen ? window.mutant : window.chaff
 
 
           // After wheats, run the chaffs
           let chaff_results = wheats_pass
             .then(
               function(_){          
-                let run_results = window.chaff.then(run_injections);
+                let run_results = chaff_to_run.then( run_injections    );
                 run_results.then(results =>
                   payload.chaff_results = results.map(result =>
                       new Object({

@@ -421,13 +421,15 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                 }));
             }
 
-
+            
             if (mutant) {
               batch.add('mutant',
                 gapi.client.drive.files.list({
                   'q': `not trashed and "${mutant.id}" in parents`
                 }));
+                console.log('Done Loading mutants!')
             }
+ 
 
             maybe_copy_template('code',    batch, template_files.items, user_files.items);
             maybe_copy_template('common',  batch, template_files.items, user_files.items);
@@ -447,14 +449,17 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               });
             }
 
-            return batch.run().then(function({wheat, chaff, code, common, tests}) {
+            return batch.run().then(function({wheat, chaff, code, common, tests, mutant}) {
               if (!code) { code = user_files.items.find(file => file.title.includes("code")); }
               if (!common) { common = user_files.items.find(file => file.title.includes("common")); }
               if (!tests) { tests = user_files.items.find(file => file.title.includes("tests")); }
 
               if (!wheat) { wheat = []; } else { wheat = wheat.items; }
               if (!chaff) { chaff = []; } else { chaff = chaff.items; }
+
+              console.log('bacth mutants!')
               if (!mutant) { mutant = []; } else { mutant = mutant.items; }
+              console.log('Done batch Loading mutants!')
 
               shares_promise.then(function(shares) {
                 let batch = new Batch();
