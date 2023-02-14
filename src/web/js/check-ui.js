@@ -148,6 +148,7 @@
         let voting = document.createElement("div");
         voting.innerHTML = `
             <div>
+              Did you find this hint useful?
               <button id="hint_upvote" onclick="window.vote(this)" >👍</button>
               <button id="hint_downvote" onclick="window.vote(this)">👎</button>
             </div>`;
