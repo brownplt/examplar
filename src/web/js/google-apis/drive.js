@@ -384,7 +384,9 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
             let wheat = template_files.items.find(file => file.title == "wheat");
             let chaff = template_files.items.find(file => file.title == "chaff");
+            let mutant = template_files.items.find(file => file.title == "mutant");
 
+            // Hint fetching
             try {
               // sid: I know this isn't ideal, but I'm not too worried about an enterprising user
               // finding a 'hints' file if they look hard at the Javascript bindings.
@@ -406,7 +408,6 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               // Again, not ideal but this is a safeguard against
               // an unstable experience.
               console.err('COULD NOT FETCH HINTS.')
-              console.log('COULD NOT FETCH HINTS.')
             }
 
             if (wheat && chaff) {
@@ -417,6 +418,14 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               batch.add('chaff',
                 gapi.client.drive.files.list({
                   'q': `not trashed and "${chaff.id}" in parents`
+                }));
+            }
+
+
+            if (mutant) {
+              batch.add('mutant',
+                gapi.client.drive.files.list({
+                  'q': `not trashed and "${mutant.id}" in parents`
                 }));
             }
 
@@ -445,6 +454,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
               if (!wheat) { wheat = []; } else { wheat = wheat.items; }
               if (!chaff) { chaff = []; } else { chaff = chaff.items; }
+              if (!mutant) { mutant = []; } else { mutant = mutant.items; }
 
               shares_promise.then(function(shares) {
                 let batch = new Batch();
@@ -472,16 +482,18 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
               return {wheat, chaff, code, common, tests,
                 dummy_impl: template_files.items.find(file => file.title.includes("dummy")),
+                mutant
               };
             });
           });
 
-        return user_and_wheat_and_chaff.then(function({wheat, chaff, code, common, tests, dummy_impl}) {
+        return user_and_wheat_and_chaff.then(function({wheat, chaff, code, common, tests, dummy_impl, mutant}) {
           return {
             assignment_name: "assignment", // TODO: actually thread in the assignment name
             assignment_id: id,
             wheat: wheat.map(file => makeSharedFile(file, true)),
             chaff: chaff.map(file => makeSharedFile(file, true)),
+            mutant: mutant.map(file => makeSharedFile(file, true)),
             code: fileBuilder(code),
             tests: fileBuilder(tests),
             common: fileBuilder(common),

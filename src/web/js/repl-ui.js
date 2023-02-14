@@ -1152,7 +1152,7 @@
                 })
               );
 
-              // strip the names
+              // strip the names -- Sidd: WHY?
               return results.map(result => result.result);
             }) ;
 
@@ -1172,7 +1172,16 @@
               
             });
 
-          // if the wheats pass, then run the chaffs
+
+          //Sidd:
+          // TODO: Make this an option from the CPO (I want a separate, gen hint button maybe?)
+          // basically want one of two options: Shown chaffs and full chaffs.
+          let hint_gen = true;
+
+          
+
+
+          // After wheats, run the chaffs
           let chaff_results = wheats_pass
             .then(
               function(_){          
@@ -1184,7 +1193,7 @@
                         result: result.result.json,
                       })
                     ));
-                // strip the names
+                // strip the names -- Sidd: WHY??
                 return run_results.then(results => results.map(result => result.result));
               }, function(wheat_reject) {
                 if (wheat_reject instanceof Array) {
@@ -1196,6 +1205,9 @@
                   throw wheat_reject;
                 }
               });
+
+
+
 
 
 
