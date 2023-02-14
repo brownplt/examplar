@@ -111,38 +111,32 @@
 
     function getHint() {
       const DEFAULT_TEXT ="";
-      const HINT_PREFIX = "<h3>The assignment says:</h3> ";
+      const HINT_PREFIX = "<h3>Hint</h3> The assignment says: ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
 
       let text_for_hint = DEFAULT_TEXT;
       try {
-        let mc = window.modal_chaff;
+        let mc = window.hint_candidate;
         if (mc != null && mc != undefined && mc in window.hints) {
-          text_for_hint = HINT_PREFIX + window.hints[mc];
+          let chaff_metadata = window.hints[mc];
+
+          let hint_text =
+          (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
+          ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
+          : chaff_metadata['hint'];
+
+          // TODO: Hook up logging for these buttons.
+          text_for_hint =  `<div>
+          ${HINT_PREFIX + hint_text}
+          Was this hint helpful?
+          <button id="thumbsUp">👍</button>
+          <button id="thumbsDown">👎</button>
+        </div>`;
         }
       }
       catch(e) {
         console.error('Error generating hint:', e)
-      }
-      finally {
-        window.modal_chaff = null;
-       
-        let container = document.createElement("div");
-        container.innerHTML = text_for_hint;
-
-        // Again, this styling is not ideal but does allow for quick prototyping.
-        container.style.backgroundColor = "white";
-        container.style.borderStyle = "solid";
-        container.style.borderColor = "white";
-        container.style.borderWidth = "thick";
-        container.style.alignContent = "center";
-        container.style.width = "100%";
-        container.id = "hint_box";
-
-
-
-        return container;
       }
     }
 
@@ -274,15 +268,32 @@
 
         if (window.hint_run)
         {
-                  let hint = getHint();
-                  message_elt.parentElement.appendChild(hint);
+            let hint = getHint();
+            message_elt.parentElement.appendChild(hint);
 
+            // Rudimentary
+            upvote = document.getElementById('thumbsUp');
+            downvote = document.getElementById('thumbsDown');
+
+            upvote.onClick =  () => {
+
+              let payload = document.getElementById("output");
+              window.cloudlLog("HINT_UPVOTE", payload);
+            };
+
+            downvote.onClick =  () => {
+
+              let payload = document.getElementById("output");
+              window.cloudlLog("HINT_DOWNVOTE", payload);
+            };
 
         }
         else
         { 
           window.hint_run = true;
-          let btn = `<button id='hint_button' onclick="document.getElementById('runButton').click()">Run With Hints!</button>`;
+          let btn = `
+                <button id='hint_button' onclick="document.getElementById('runButton').click()">Try Get Hint! (This may take some time)</button>
+                `;
           let c = document.createElement("div");
           c.innerHTML = btn;
           message_elt.parentElement.appendChild(c);
