@@ -1182,7 +1182,6 @@
           console.log(`Hint run ${window.hint_run}`)
 
           chaff_to_run = window.hint_run ? window.mutant : window.chaff
-          //window.hint_run = false; // Now reset
 
           // After wheats, run the chaffs
           let chaff_results = wheats_pass

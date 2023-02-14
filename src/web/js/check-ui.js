@@ -115,7 +115,10 @@
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
       let mc = window.hint_candidate;
-      let text_for_hint = DEFAULT_TEXT;
+
+      let container = document.createElement("div");
+      container.innerHTML = DEFAULT_TEXT;
+
       try {
 
         if (mc != null && mc != undefined && mc in window.hints) {
@@ -126,20 +129,53 @@
           ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
           : chaff_metadata['hint'];
 
-          // TODO: Hook up logging for these buttons.
-          text_for_hint =  `<div>
+
+          container.innerHTML = `<div>
           ${HINT_PREFIX + hint_text}
-          Was this hint helpful?
-          <button id="thumbsUp">👍</button>
-          <button id="thumbsDown">👎</button>
-        </div>`;
+           </div>`;
+
+
+          window.vote =  function (button) {
+            const bId = button.getAttribute('id');
+            
+            let payload = document.getElementById("output");
+
+            console.log(bId);
+            console.log(payload);
+            window.cloud_log(bId, payload);
+          }
+
+        let voting = document.createElement("div");
+        voting.innerHTML = `
+            <div>
+              <button id="hint_upvote" onclick="window.vote(this)" >👍</button>
+              <button id="hint_downvote" onclick="window.vote(this)">👎</button>
+            </div>`;
+        
+          container.appendChild(voting)
+          console.log(voting)
         }
       }
       catch(e) {
         console.error('Error generating hint:', e)
       }
+      finally {
+        window.hint_candidate = null;
+       
 
-      return text_for_hint;
+        // Again, this styling is not ideal but does allow for quick prototyping.
+        container.style.backgroundColor = "white";
+        container.style.borderStyle = "solid";
+        container.style.borderColor = "white";
+        container.style.borderWidth = "thick";
+        container.style.alignContent = "center";
+        container.style.width = "100%";
+        container.id = "hint_box";
+
+
+
+        return container;
+      }
     }
 
     function hasValidity(examplar_results) {
@@ -268,46 +304,36 @@
         message_elt.textContent = "These tests do not match the behavior described by the assignment:";
 
 
-        if (window.hint_run)
-        {
-            //RESET
+        if (window.hint_run) {
+
             try {
            
-
-
             let hint = getHint();
-
+            
             console.log(hint)
+
             message_elt.parentElement.appendChild(hint);
+
+
+            console.log(message_elt)
 
             // Rudimentary
             upvote = document.getElementById('thumbsUp');
             downvote = document.getElementById('thumbsDown');
 
-            if (upvote && downvote) {
-              upvote.onClick =  () => {
 
-                let payload = document.getElementById("output");
-                window.cloudlLog("HINT_UPVOTE", payload);
-              };
-
-              downvote.onClick =  () => {
-
-                let payload = document.getElementById("output");
-                window.cloudlLog("HINT_DOWNVOTE", payload);
-              };
-            }
+          }
+          catch (e) {
+            console.error(`WE HAD AN ISSUE: ${e}`)
           }
           finally {
             window.hint_run = false;
+            console.log
           }
-
-
-
         }
         else
         { 
-          window.hint_run = true;
+          window.hint_run = true; // TODO: This should go inside the button click
           let btn = `
                 <button id='hint_button' onclick="document.getElementById('runButton').click()">Try Get Hint! (This may take some time)</button>
                 `;
