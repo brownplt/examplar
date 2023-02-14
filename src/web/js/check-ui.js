@@ -110,14 +110,14 @@
     }
 
     function getHint() {
-      const DEFAULT_TEXT ="";
+      const DEFAULT_TEXT ="No hint available.";
       const HINT_PREFIX = "<h3>Hint</h3> The assignment says: ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
-
+      let mc = window.hint_candidate;
       let text_for_hint = DEFAULT_TEXT;
       try {
-        let mc = window.hint_candidate;
+
         if (mc != null && mc != undefined && mc in window.hints) {
           let chaff_metadata = window.hints[mc];
 
@@ -138,6 +138,8 @@
       catch(e) {
         console.error('Error generating hint:', e)
       }
+
+      return text_for_hint;
     }
 
     function hasValidity(examplar_results) {
@@ -268,24 +270,39 @@
 
         if (window.hint_run)
         {
+            //RESET
+            try {
+           
+
+
             let hint = getHint();
+
+            console.log(hint)
             message_elt.parentElement.appendChild(hint);
 
             // Rudimentary
             upvote = document.getElementById('thumbsUp');
             downvote = document.getElementById('thumbsDown');
 
-            upvote.onClick =  () => {
+            if (upvote && downvote) {
+              upvote.onClick =  () => {
 
-              let payload = document.getElementById("output");
-              window.cloudlLog("HINT_UPVOTE", payload);
-            };
+                let payload = document.getElementById("output");
+                window.cloudlLog("HINT_UPVOTE", payload);
+              };
 
-            downvote.onClick =  () => {
+              downvote.onClick =  () => {
 
-              let payload = document.getElementById("output");
-              window.cloudlLog("HINT_DOWNVOTE", payload);
-            };
+                let payload = document.getElementById("output");
+                window.cloudlLog("HINT_DOWNVOTE", payload);
+              };
+            }
+          }
+          finally {
+            window.hint_run = false;
+          }
+
+
 
         }
         else

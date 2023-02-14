@@ -457,9 +457,8 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
               if (!wheat) { wheat = []; } else { wheat = wheat.items; }
               if (!chaff) { chaff = []; } else { chaff = chaff.items; }
 
-              console.log('bacth mutants!')
-              if (!mutant) { mutant = []; } else { mutant = mutant.items; }
-              console.log('Done batch Loading mutants!')
+              // FOR BACKCOMPAT REASONS, set to chaff if not available.
+              if (!mutant) { mutant = chaff; } else { mutant = mutant.items; }
 
               shares_promise.then(function(shares) {
                 let batch = new Batch();
