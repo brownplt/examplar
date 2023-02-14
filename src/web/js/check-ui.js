@@ -172,8 +172,6 @@
         container.style.width = "100%";
         container.id = "hint_box";
 
-
-
         return container;
       }
     }
@@ -307,35 +305,29 @@
         if (window.hint_run) {
 
             try {
-           
-            let hint = getHint();
-            
+            let hint = getHint();       
             console.log(hint)
-
             message_elt.parentElement.appendChild(hint);
-
-
-            console.log(message_elt)
-
-            // Rudimentary
-            upvote = document.getElementById('thumbsUp');
-            downvote = document.getElementById('thumbsDown');
-
 
           }
           catch (e) {
-            console.error(`WE HAD AN ISSUE: ${e}`)
+            console.error(`Error generating hint: ${e}`)
           }
           finally {
             window.hint_run = false;
-            console.log
           }
         }
         else
         { 
-          window.hint_run = true; // TODO: This should go inside the button click
+
+          window.gen_hints =  function () {
+            window.hint_run = true; 
+            window.cloud_log("GEN_HINT", "");
+            document.getElementById('runButton').click()
+          }
+
           let btn = `
-                <button id='hint_button' onclick="document.getElementById('runButton').click()">Try Get Hint! (This may take some time)</button>
+                <button id='hint_button' onclick="window.gen_hints()"> Give Me a Hint! </button>
                 `;
           let c = document.createElement("div");
           c.innerHTML = btn;

@@ -1173,10 +1173,6 @@
             });
 
 
-          //Sidd:
-          // TODO: Make this an option from the CPO (I want a separate, gen hint button maybe?)
-          // basically want one of two options: Shown chaffs and full chaffs.
-
           // TODO: BACKCOMPAT FOR HINTS, right now, we may not have a mutant in which case, chaffs.
 
           console.log(`Hint run ${window.hint_run}`)
