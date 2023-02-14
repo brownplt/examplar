@@ -271,8 +271,23 @@
         container_elt.classList.add("invalid");
         message_elt.textContent = "These tests do not match the behavior described by the assignment:";
 
-        let hint = getHint();
-        message_elt.parentElement.appendChild(hint);
+
+        if (window.hint_run)
+        {
+                  let hint = getHint();
+                  message_elt.parentElement.appendChild(hint);
+
+
+        }
+        else
+        { 
+          window.hint_run = true;
+          let btn = `<button id='hint_button' onclick="document.getElementById('runButton').click()">Run With Hints!</button>`;
+          let c = document.createElement("div");
+          c.innerHTML = btn;
+          message_elt.parentElement.appendChild(c);
+        }
+
 
         let wheat_catchers =
           wheats.map(
