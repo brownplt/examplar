@@ -1259,7 +1259,11 @@
           let display_result =
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
-                let wheat_failures = get_failing_wheat_locations(wheat_results);               
+                let wheat_failures = get_failing_wheat_locations(wheat_results);
+
+
+                // TODO (siddhartha): Better strategy for characteristic chaff.
+                // Should it just be the modal passing chaff? 
                 window.hint_candidate = modal_passing_chaff(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));

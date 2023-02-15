@@ -147,8 +147,8 @@
 
         let voting = document.createElement("div");
         voting.innerHTML = `
-            <div>
-              Did you find this hint useful?
+            <div style="border: 1px solid #ccc; padding: 10px;">
+              <b>Did you find this hint useful?</b>
               <button id="hint_upvote" onclick="window.vote(this)" >👍</button>
               <button id="hint_downvote" onclick="window.vote(this)">👎</button>
             </div>`;
@@ -332,6 +332,7 @@
                 `;
           let c = document.createElement("div");
           c.innerHTML = btn;
+          c.style.padding = '5px'; // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
           message_elt.parentElement.appendChild(c);
         }
 
