@@ -110,42 +110,72 @@
     }
 
     function getHint() {
+      
       const DEFAULT_TEXT ="No hint available.";
       const HINT_PREFIX = "<h3>Hint</h3> The assignment says: ";
-      // Bad practice, but we'll do this for now. Don't want to crash
-      // Examplar if something went wrong generating a hint.
-      let mc = window.hint_candidate; // TODO: There could be multiple hint candidates now!
-      // If 2 -> choose 2.
-      // if we have more than 1 wf, we cannot implement a hint.
+
+      function get_hint_text() {
+        let wfes = window.hint_candidates
+        let num_wfes =   wfes ? Object.keys(wfes).length : 0;
+        if (num_wfes  == 0) {
+          return DEFAULT_TEXT;
+        }
+        else if (num_wfes > 1)
+        {
+          // TODO: May be annoying to run hints and then get this!
+          return  `Too many text failures to generate hint. 
+                  Hints can be generated only when there is
+                  exactly one failing test.`;
+        }
+
+
+          let test_id = Object.keys(wfes)[0];
+          let candidate_chaffs = wfes[test_id];
+    
+          // Strategy: We can only provide useful
+          // hints for exactly 1 or 2 chaff passes.
+          if (candidate_chaffs.length > 2)
+          {
+              // If too many chaffs passed,
+              // we do not have the ability to hint.
+              return DEFAULT_TEXT;
+          }
+
+          // Ugly, sorry!
+
+          let text = "";
+          for (var c in candidate_chaffs) {
+            let chaff_metadata = window.hints[c];
+            let hint_text =
+              (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
+              ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
+              : chaff_metadata['hint'];
+
+              text += hint_text + "\n";
+
+          }
+
+          return text;
+        }
 
       let container = document.createElement("div");
-      container.innerHTML = DEFAULT_TEXT;
-
       try {
+        
+        hint_text = get_hint_text();
 
-        if (mc != null && mc != undefined && mc in window.hints) {
-          let chaff_metadata = window.hints[mc];
-
-          let hint_text =
-          (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
-          ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
-          : chaff_metadata['hint'];
+        container.innerHTML = `<div>
+        ${HINT_PREFIX + hint_text}
+          </div>`;
 
 
-          container.innerHTML = `<div>
-          ${HINT_PREFIX + hint_text}
-           </div>`;
+        window.vote =  function (button) {
+          const bId = button.getAttribute('id');
+          let payload = document.getElementById("output");
 
-
-          window.vote =  function (button) {
-            const bId = button.getAttribute('id');
-            
-            let payload = document.getElementById("output");
-
-            console.log(bId);
-            console.log(payload);
-            window.cloud_log(bId, payload);
-          }
+          console.log(bId);
+          console.log(payload);
+          window.cloud_log(bId, payload);
+        }
 
         let voting = document.createElement("div");
         voting.innerHTML = `
@@ -158,14 +188,12 @@
           container.appendChild(voting)
           console.log(voting)
         }
-      }
       catch(e) {
         console.error('Error generating hint:', e)
       }
       finally {
-        window.hint_candidate = null;
+        window.hint_candidates = null;
        
-
         // Again, this styling is not ideal but does allow for quick prototyping.
         container.style.backgroundColor = "white";
         container.style.borderStyle = "solid";
@@ -329,6 +357,7 @@
             document.getElementById('runButton').click()
           }
 
+          // TODO: DO NOT SHOW THIS BUTTON IF NO HINT!
           let btn = `
                 <button id='hint_button' onclick="window.gen_hints()"> Give Me a Hint! </button>
                 `;

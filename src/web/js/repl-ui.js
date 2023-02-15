@@ -173,55 +173,30 @@
         for (var r of merged) {
             let t = r['test'];
             let n = r['chaff_name'];
-            if (n in aggregated) {
-                aggregated[n].push(t);
+            if (t in aggregated) {
+                aggregated[t].push(n);
             }
             else {
-                aggregated[n] = [t];
+                aggregated[t] = [n];
             }
         };
-
-
 
         return aggregated;
     }
 
 
-    function get_hint_candidate(chaff_results, wheat_failures) {
+    function get_hint_candidates(chaff_results, wheat_failures) {
 
       // TODO (siddhartha): Better strategy for characteristic chaff.
       // Should it just be the modal passing chaff?  
       // Should we have multiple candidates?
 
-      return modal_passing_chaff(chaff_results, wheat_failures)
-    }
-
-
-    function modal_passing_chaff(chaff_results, wheat_failures) { 
+      // Res is a dictionary of form { test : [chaffs passed] }
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
-
-      // Res is a dictionary of form { chaff : [passing tests] }
-
-
-            // if we have more than 1 wf, we cannot offer a hint.
-
-      if (res == null || Object.keys(res).length == 0) {
-        return null;
-      }
-
-      // Bad practice, but we'll do this for now. Don't want to crash
-      // Examplar if something went wrong generating a hint.
-      try {
-        let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
-
-        return vals;
-      }
-      catch(e) {
-        console.err('Chaff run error: ', e);
-        return null;
-      }
+      return res;
+     
     }
-    
+   
 
     function merge(obj, extension) {
       var newobj = {};
@@ -1284,7 +1259,7 @@
               function([wheat_results, chaff_results, test_results]) {
                 let wheat_failures = get_failing_wheat_locations(wheat_results);
 
-                window.hint_candidate = get_hint_candidate(chaff_results, wheat_failures);
+                window.hint_candidates = get_hint_candidates(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {
