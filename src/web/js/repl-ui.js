@@ -163,13 +163,17 @@
                   });
               });
 
+
+
+
         let merged = [].concat.apply([], passed_tests); 
         let aggregated = {};
+
 
         for (var r of merged) {
             let t = r['test'];
             let n = r['chaff_name'];
-            if (t in aggregated) {
+            if (n in aggregated) {
                 aggregated[n].push(t);
             }
             else {
@@ -177,11 +181,29 @@
             }
         };
 
+
+
         return aggregated;
     }
 
+
+    function get_hint_candidate(chaff_results, wheat_failures) {
+
+      // TODO (siddhartha): Better strategy for characteristic chaff.
+      // Should it just be the modal passing chaff?  
+      // Should we have multiple candidates?
+
+      return modal_passing_chaff(chaff_results, wheat_failures)
+    }
+
+
     function modal_passing_chaff(chaff_results, wheat_failures) { 
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
+
+      // Res is a dictionary of form { chaff : [passing tests] }
+
+
+            // if we have more than 1 wf, we cannot offer a hint.
 
       if (res == null || Object.keys(res).length == 0) {
         return null;
@@ -191,6 +213,7 @@
       // Examplar if something went wrong generating a hint.
       try {
         let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
+
         return vals;
       }
       catch(e) {
@@ -1261,10 +1284,7 @@
               function([wheat_results, chaff_results, test_results]) {
                 let wheat_failures = get_failing_wheat_locations(wheat_results);
 
-
-                // TODO (siddhartha): Better strategy for characteristic chaff.
-                // Should it just be the modal passing chaff? 
-                window.hint_candidate = modal_passing_chaff(chaff_results, wheat_failures);
+                window.hint_candidate = get_hint_candidate(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {

@@ -114,7 +114,9 @@
       const HINT_PREFIX = "<h3>Hint</h3> The assignment says: ";
       // Bad practice, but we'll do this for now. Don't want to crash
       // Examplar if something went wrong generating a hint.
-      let mc = window.hint_candidate;
+      let mc = window.hint_candidate; // TODO: There could be multiple hint candidates now!
+      // If 2 -> choose 2.
+      // if we have more than 1 wf, we cannot implement a hint.
 
       let container = document.createElement("div");
       container.innerHTML = DEFAULT_TEXT;
@@ -332,7 +334,9 @@
                 `;
           let c = document.createElement("div");
           c.innerHTML = btn;
-          c.style.padding = '5px'; // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
+
+          // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
+          c.style.padding = '5px'; 
           message_elt.parentElement.appendChild(c);
         }
 
