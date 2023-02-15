@@ -123,7 +123,7 @@
         else if (num_wfes > 1)
         {
           // TODO: May be annoying to run hints and then get this!
-          return  `Too many text failures to generate hint. 
+          return  `Too many test failures to generate hint. 
                   Hints can be generated only when there is
                   exactly one failing test.`;
         }
@@ -333,6 +333,19 @@
         message_elt.textContent = "These tests do not match the behavior described by the assignment:";
 
 
+        // TODO: Test this! Currently wrong!! We want to count the number of 
+        // failures that fail every wheat. This would not succeed if there were different
+        // failures PER wfe.
+        let num_wfe =
+        Math.min(wheats.map(
+          wheat => wheat.reduce(
+            (acc, block) => acc + block.tests.reduce(
+              (wfes_in_block, test) => wfes_in_block + (test.passed ? 1 : 0),
+              0), 0)));
+
+
+
+
         if (window.hint_run) {
 
             try {
@@ -357,12 +370,15 @@
             document.getElementById('runButton').click()
           }
 
-          // TODO: DO NOT SHOW THIS BUTTON IF NO HINT!
-          let btn = `
-                <button id='hint_button' onclick="window.gen_hints()"> Give Me a Hint! </button>
-                `;
           let c = document.createElement("div");
-          c.innerHTML = btn;
+          c.innerHTML = `<button id='hint_button' onclick="window.gen_hints()"> Give Me a Hint! </button>`;
+          if (num_wfe != 1) {
+            
+            c.innerHTML += `Hints can be generated only when there is
+            exactly one failing test.`;
+            let btn = c.getElementById('hint_button');
+            btn.disabled = true;
+          }
 
           // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
           c.style.padding = '5px'; 
