@@ -159,8 +159,8 @@
         }
 
       let container = document.createElement("div");
+
       try {
-        
         hint_text = get_hint_text();
 
         container.innerHTML = `<div>
@@ -190,10 +190,10 @@
         }
       catch(e) {
         console.error('Error generating hint:', e)
+        container.innerHTML = "Something went wrong";
       }
       finally {
-        window.hint_candidates = null;
-       
+
         // Again, this styling is not ideal but does allow for quick prototyping.
         container.style.backgroundColor = "white";
         container.style.borderStyle = "solid";
@@ -335,18 +335,21 @@
 
         // TODO: Test this! Currently wrong!! We want to count the number of 
         // failures that fail every wheat. This would not succeed if there were different
-        // failures PER wfe.
+        // failures PER wfe. But for now, if even one wheat has > 1 failure, don't offer hints.
+
+
+
         let num_wfe =
-        Math.min(wheats.map(
+        wheats.map(
           wheat => wheat.reduce(
             (acc, block) => acc + block.tests.reduce(
-              (wfes_in_block, test) => wfes_in_block + (test.passed ? 1 : 0),
-              0), 0)));
-
-
-
+              (wfes_in_block, test) => wfes_in_block + (test.passed ? 0 : 1),
+              0), 0))             
+            .reduce((a, b) => Math.max(a, b), -Infinity);
 
         if (window.hint_run) {
+
+          
 
             try {
             let hint = getHint();       
@@ -359,6 +362,7 @@
           }
           finally {
             window.hint_run = false;
+            window.hint_candidates = null;
           }
         }
         else
@@ -371,14 +375,22 @@
           }
 
           let c = document.createElement("div");
+          try {
           c.innerHTML = `<button id='hint_button' onclick="window.gen_hints()"> Give Me a Hint! </button>`;
           if (num_wfe != 1) {
             
-            c.innerHTML += `Hints can be generated only when there is
+            console.log('NOW HERE')
+            c.innerHTML = `Hints can be generated only when there is
             exactly one failing test.`;
             let btn = c.getElementById('hint_button');
             btn.disabled = true;
+            btn.onclick = () => alert('Hints can be generated only when there is exactly one failing test.')
           }
+         }
+         catch (e){
+          console.error(e);
+          c.innerHtml = "Something went wrong";
+         }
 
           // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
           c.style.padding = '5px'; 
