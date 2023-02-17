@@ -163,12 +163,8 @@
                   });
               });
 
-
-
-
         let merged = [].concat.apply([], passed_tests); 
         let aggregated = {};
-
 
         for (var r of merged) {
             let t = r['test'];
@@ -180,17 +176,14 @@
                 aggregated[t] = [n];
             }
         };
-
         return aggregated;
     }
 
 
     function get_hint_candidates(chaff_results, wheat_failures) {
-
       // Res is a dictionary of form { test : [chaffs passed] }
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
       return res;
-     
     }
    
 
@@ -1166,9 +1159,8 @@
               
             });
 
-
-          // BACKCOMPAT FOR HINTS, right now, we may not have a mutants
-          // in which case, run against chaffs.
+          // Decides whether to run wfes against chaff-suite or
+          // all conceptual mutants.
           chaff_to_run = window.hint_run ? window.mutant : window.chaff
 
           // After wheats, run the chaffs
