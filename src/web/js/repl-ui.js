@@ -1171,10 +1171,8 @@
             });
 
 
-          // TODO: BACKCOMPAT FOR HINTS, right now, we may not have a mutant in which case, chaffs.
-
-          console.log(`Hint run ${window.hint_run}`)
-
+          // BACKCOMPAT FOR HINTS, right now, we may not have a mutants
+          // in which case, run against chaffs.
           chaff_to_run = window.hint_run ? window.mutant : window.chaff
 
           // After wheats, run the chaffs

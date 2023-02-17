@@ -427,7 +427,6 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                 gapi.client.drive.files.list({
                   'q': `not trashed and "${mutant.id}" in parents`
                 }));
-                console.log('Done Loading mutants!')
             }
  
 

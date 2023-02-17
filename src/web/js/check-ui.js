@@ -112,11 +112,11 @@
     function getHint() {
       
       const DEFAULT_TEXT ="No hint available.";
-      const HINT_PREFIX = "<h3>Hint</h3> The assignment says: ";
+      const HINT_PREFIX = "<h3>Hint</h3>";
 
       function get_hint_text() {
         let wfes = window.hint_candidates
-        let num_wfes =   wfes ? Object.keys(wfes).length : 0;
+        let num_wfes =   (wfes != null) ? Object.keys(wfes).length : 0;
         if (num_wfes  == 0) {
           return DEFAULT_TEXT;
         }
@@ -141,18 +141,30 @@
               return DEFAULT_TEXT;
           }
 
-          // Ugly, sorry!
-
           let text = "";
-          for (var c in candidate_chaffs) {
-            let chaff_metadata = window.hints[c];
+          for (var i in candidate_chaffs) {
+
+            let c = candidate_chaffs[i];
+            let chaff_metadata = (c in window.hints) ?
+                           window.hints[c] : "";
+
+
+            
             let hint_text =
               (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
               ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
               : chaff_metadata['hint'];
 
-              text += hint_text + "\n";
 
+              console.log(`c was ${c}. Hint was ${hint_text}`)
+
+              text += hint_text + "<br>";
+
+          }
+
+          if (text.length == 0)
+          {
+            text = DEFAULT_TEXT
           }
 
           return text;
@@ -186,7 +198,6 @@
             </div>`;
         
           container.appendChild(voting)
-          console.log(voting)
         }
       catch(e) {
         console.error('Error generating hint:', e)
@@ -353,7 +364,6 @@
 
             try {
             let hint = getHint();       
-            console.log(hint)
             message_elt.parentElement.appendChild(hint);
 
           }
@@ -376,16 +386,23 @@
 
           let c = document.createElement("div");
           try {
-          c.innerHTML = `<button id='hint_button' onclick="window.gen_hints()"> Give Me a Hint! </button>`;
-          if (num_wfe != 1) {
-            
-            console.log('NOW HERE')
-            c.innerHTML = `Hints can be generated only when there is
-            exactly one failing test.`;
-            let btn = c.getElementById('hint_button');
-            btn.disabled = true;
-            btn.onclick = () => alert('Hints can be generated only when there is exactly one failing test.')
-          }
+            if (num_wfe == 1)
+            {
+              c.innerHTML = `
+              The system may be able to provide a hint into why this test is invalid.<br><br>
+              <button id='hint_button' onclick="window.gen_hints()"> Try to generate a hint! </button>
+              Please note that this is not guaranteed to always generate a hint. 
+              `;
+            }
+            else {
+
+              
+
+              c.innerHTML = `
+              <p> There are currently too many invalid tests to provide further feedback.
+              The system may be able to provide more directed feedback,
+              when there is exactly one invalid test. </p>`;
+            }
          }
          catch (e){
           console.error(e);
@@ -394,6 +411,7 @@
 
           // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
           c.style.padding = '5px'; 
+          c.style.backgroundColor = "white";
           message_elt.parentElement.appendChild(c);
         }
 
@@ -407,8 +425,6 @@
                              .map(test => test.loc))
               .reduce((acc, val) => acc.concat(val), []))
             .reduce((acc, val) => acc.concat(val), []);
-
-        console.log("FAILING WHEATS", wheat_catchers);
 
         function render_wheat_catcher(position) {
           console.log("rendering", position);
