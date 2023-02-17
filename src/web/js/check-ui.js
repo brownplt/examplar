@@ -109,8 +109,7 @@
       }, "check-block-comments: each: contents");
     }
 
-    function getHint() {
-      
+    function getHint() {      
       const DEFAULT_TEXT ="No hint available.";
       const HINT_PREFIX = "<h3>Hint</h3>";
 
@@ -120,65 +119,41 @@
         if (num_wfes  == 0) {
           return DEFAULT_TEXT;
         }
-        else if (num_wfes > 1)
-        {
+        else if (num_wfes > 1) {
           // TODO: May be annoying to run hints and then get this!
           return  `Too many test failures to generate hint. 
                   Hints can be generated only when there is
                   exactly one failing test.`;
         }
 
-
-          let test_id = Object.keys(wfes)[0];
-          let candidate_chaffs = wfes[test_id];
-    
-          // Strategy: We can only provide useful
-          // hints for exactly 1 or 2 chaff passes.
-          if (candidate_chaffs.length > 2)
-          {
-              // If too many chaffs passed,
-              // we do not have the ability to hint.
-              return DEFAULT_TEXT;
-          }
-
-          let text = "";
-          for (var i in candidate_chaffs) {
-
-            let c = candidate_chaffs[i];
-            let chaff_metadata = (c in window.hints) ?
-                           window.hints[c] : "";
-
-
-            
-            let hint_text =
-              (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
-              ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
-              : chaff_metadata['hint'];
-
-
-              console.log(`c was ${c}. Hint was ${hint_text}`)
-
-              text += hint_text + "<br>";
-
-          }
-
-          if (text.length == 0)
-          {
-            text = DEFAULT_TEXT
-          }
-
-          return text;
+        let test_id = Object.keys(wfes)[0];
+        let candidate_chaffs = wfes[test_id];
+  
+        // Strategy: We can only provide useful
+        // hints for exactly 1 or 2 chaff passes.
+        if (candidate_chaffs.length > 2)
+        {
+            return DEFAULT_TEXT;
         }
 
-      let container = document.createElement("div");
+        let text = "";
+        for (var i in candidate_chaffs) {
+          let c = candidate_chaffs[i];
+          let chaff_metadata = (c in window.hints) ? window.hints[c] : "";
+          let hint_text =
+            (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
+            ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
+            : chaff_metadata['hint'];
 
+            text += hint_text + "<br>";
+        }
+        return (text.length == 0) ? DEFAULT_TEXT : text;
+      }
+
+      let container = document.createElement("div");
       try {
         hint_text = get_hint_text();
-
-        container.innerHTML = `<div>
-        ${HINT_PREFIX + hint_text}
-          </div>`;
-
+        container.innerHTML = `<div>${HINT_PREFIX + hint_text}</div>`;
 
         window.vote =  function (button) {
           const bId = button.getAttribute('id');
@@ -197,15 +172,14 @@
               <button id="hint_downvote" onclick="window.vote(this)">👎</button>
             </div>`;
         
-          container.appendChild(voting)
-        }
+        container.appendChild(voting)
+      }
       catch(e) {
         console.error('Error generating hint:', e)
         container.innerHTML = "Something went wrong";
       }
       finally {
-
-        // Again, this styling is not ideal but does allow for quick prototyping.
+        // This styling is not ideal but does allow for quick prototyping.
         container.style.backgroundColor = "white";
         container.style.borderStyle = "solid";
         container.style.borderColor = "white";
@@ -213,7 +187,6 @@
         container.style.alignContent = "center";
         container.style.width = "100%";
         container.id = "hint_box";
-
         return container;
       }
     }
@@ -343,13 +316,9 @@
         container_elt.classList.add("invalid");
         message_elt.textContent = "These tests do not match the behavior described by the assignment:";
 
-
-        // TODO: Test this! Currently wrong!! We want to count the number of 
-        // failures that fail every wheat. This would not succeed if there were different
-        // failures PER wfe. But for now, if even one wheat has > 1 failure, don't offer hints.
-
-
-
+        // Only count wfes that are failing across all wheats.
+        // TODO: Handle wfes that are in the inter-wheat space.
+        // Perhaps we should flag them differently in examplar.
         let num_wfe =
         wheats.map(
           wheat => wheat.reduce(
@@ -358,14 +327,10 @@
               0), 0))             
             .reduce((a, b) => Math.max(a, b), -Infinity);
 
-        if (window.hint_run) {
-
-          
-
-            try {
+        if (window.hint_run) {        
+          try {
             let hint = getHint();       
             message_elt.parentElement.appendChild(hint);
-
           }
           catch (e) {
             console.error(`Error generating hint: ${e}`)
@@ -375,9 +340,7 @@
             window.hint_candidates = null;
           }
         }
-        else
-        { 
-
+        else { 
           window.gen_hints =  function () {
             window.hint_run = true; 
             window.cloud_log("GEN_HINT", "");
@@ -385,31 +348,15 @@
           }
 
           let c = document.createElement("div");
-          try {
-            if (num_wfe == 1)
-            {
-              c.innerHTML = `
-              The system may be able to provide a hint into why this test is invalid.<br><br>
+            c.innerHTML = (num_wfe == 1) ?
+               `The system may be able to provide a hint into why this test is invalid.<br><br>
               <button id='hint_button' onclick="window.gen_hints()"> Try to generate a hint! </button>
-              Please note that this is not guaranteed to always generate a hint. 
-              `;
-            }
-            else {
-
-              
-
-              c.innerHTML = `
-              <p> There are currently too many invalid tests to provide further feedback.
+              Please note that this is not guaranteed to always generate a hint.`
+            : `<p> There are currently too many invalid tests to provide further feedback.
               The system may be able to provide more directed feedback,
               when there is exactly one invalid test. </p>`;
-            }
-         }
-         catch (e){
-          console.error(e);
-          c.innerHtml = "Something went wrong";
-         }
 
-          // TODO: This is not good practice. It would be very helpful to have an accessibility/ UI review.
+          // TODO: This is not good practice.
           c.style.padding = '5px'; 
           c.style.backgroundColor = "white";
           message_elt.parentElement.appendChild(c);

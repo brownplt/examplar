@@ -420,8 +420,7 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                   'q': `not trashed and "${chaff.id}" in parents`
                 }));
             }
-
-            
+       
             if (mutant) {
               batch.add('mutant',
                 gapi.client.drive.files.list({
@@ -429,7 +428,6 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
                 }));
             }
  
-
             maybe_copy_template('code',    batch, template_files.items, user_files.items);
             maybe_copy_template('common',  batch, template_files.items, user_files.items);
             maybe_copy_template('tests',   batch, template_files.items, user_files.items);

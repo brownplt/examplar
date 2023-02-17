@@ -187,10 +187,6 @@
 
     function get_hint_candidates(chaff_results, wheat_failures) {
 
-      // TODO (siddhartha): Better strategy for characteristic chaff.
-      // Should it just be the modal passing chaff?  
-      // Should we have multiple candidates?
-
       // Res is a dictionary of form { test : [chaffs passed] }
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
       return res;
@@ -1150,7 +1146,7 @@
                 })
               );
 
-              // strip the names -- Sidd: WHY?
+              // strip the names
               return results.map(result => result.result);
             }) ;
 
@@ -1179,7 +1175,7 @@
           let chaff_results = wheats_pass
             .then(
               function(_){          
-                let run_results = chaff_to_run.then( run_injections    );
+                let run_results = chaff_to_run.then(run_injections);
                 run_results.then(results =>
                   payload.chaff_results = results.map(result =>
                       new Object({
@@ -1187,7 +1183,7 @@
                         result: result.result.json,
                       })
                     ));
-                // strip the names -- Sidd: WHY??
+                // strip the names
                 return run_results.then(results => results.map(result => result.result));
               }, function(wheat_reject) {
                 if (wheat_reject instanceof Array) {
@@ -1199,13 +1195,6 @@
                   throw wheat_reject;
                 }
               });
-
-
-
-
-
-
-          // sid: Do not run student tests IF the wheats did not pass.... (have I broken this? Need to test)
 
           // lastly, run the student's tests, if they've begun their implementation.
           let test_results = Q.all([window.dummy_impl, chaff_results]).then(
@@ -1256,7 +1245,6 @@
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
                 let wheat_failures = get_failing_wheat_locations(wheat_results);
-
                 window.hint_candidates = get_hint_candidates(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
