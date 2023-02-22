@@ -150,10 +150,11 @@
 
             let hint_html = `<div style="border: 1px solid #ccc; padding: 10px;">
               ${hint_text}
-              <br>
+              <div class="text-right text-muted">
               Did you find this hint useful?
               <button class="hint_upvote" id="hint_upvote_${c}" onclick="window.vote(this)" >👍</button>
               <button class="hint_downvote" id="hint_downvote_${c}" onclick="window.vote(this)">👎</button>
+              </div>
             </div>`;
 
             text += hint_html + "<br>";
