@@ -151,7 +151,7 @@
             let hint_html = `<div style="border: 1px solid #ccc; padding: 10px;">
               ${hint_text}
               <br>
-              <b>Did you find this hint useful?</b>
+              Did you find this hint useful?
               <button class="hint_upvote" id="hint_upvote_${c}" onclick="window.vote(this)" >👍</button>
               <button class="hint_downvote" id="hint_downvote_${c}" onclick="window.vote(this)">👎</button>
             </div>`;
@@ -163,6 +163,7 @@
 
       
       let container = document.createElement("div");
+      container.classList += ["container-fluid"];
       try {
         hint_text = get_hint_text();
         container.innerHTML = `<div>${HINT_PREFIX + hint_text}</div>`;
@@ -356,13 +357,20 @@
           }
 
           let c = document.createElement("div");
+          c.classList += ["container-fluid"];
+
             c.innerHTML = (num_wfe == 1) ?
-               `The system may be able to provide a hint into why this test is invalid.<br><br>
-              <button id='hint_button' onclick="window.gen_hints()"> Try to generate a hint! </button>
-              Please note that this is not guaranteed to always generate a hint.`
-            : `<p> There are currently too many invalid tests to provide further feedback.
+               ` <div class="card-body> 
+                    <p class="card-text">
+                      The system may be able to provide a hint into why this test is invalid.<br><br>
+                      <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to generate a hint! </button> <br>
+                      Please note that this is not guaranteed to always generate a hint.  
+                      </p> </div>`
+            : `<div class="card-body> <p class="card-text">
+              There are currently too many invalid tests to provide further feedback.
               The system may be able to provide more directed feedback,
-              when there is exactly one invalid test. </p>`;
+              when there is exactly one invalid test. </p>    
+              </p> </div>`;
 
           // TODO: This is not good practice.
           c.style.padding = '5px'; 
