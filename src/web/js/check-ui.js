@@ -133,7 +133,9 @@
         // hints for exactly 1 or 2 chaff passes.
         if (candidate_chaffs.length > 2)
         {
-            return DEFAULT_TEXT;
+            // TODO: We can do better here!
+            return `This test looked similar to ${candidate_cahhfs.length} common misunderstandings of the problem.
+                    However, we could not determine an actionable hint that would help achieve validity.`;
         }
 
         let text = "";
@@ -145,11 +147,21 @@
             ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
             : chaff_metadata['hint'];
 
-            text += hint_text + "<br>";
+
+            let hint_html = `<div style="border: 1px solid #ccc; padding: 10px;">
+              ${hint_text}
+              <br>
+              <b>Did you find this hint useful?</b>
+              <button class="hint_upvote" id="hint_upvote_${c}" onclick="window.vote(this)" >👍</button>
+              <button class="hint_downvote" id="hint_downvote_${c}" onclick="window.vote(this)">👎</button>
+            </div>`;
+
+            text += hint_html + "<br>";
         }
         return (text.length == 0) ? DEFAULT_TEXT : text;
       }
 
+      
       let container = document.createElement("div");
       try {
         hint_text = get_hint_text();
@@ -157,22 +169,18 @@
 
         window.vote =  function (button) {
           const bId = button.getAttribute('id');
-          let payload = document.getElementById("output");
+          let content = document.getElementById("output");
 
-          console.log(bId);
+          let payload = {
+            "hint_id": bId,
+            "context": content
+          };
+
+          const event_type = button.getAttribute('class');
+
           console.log(payload);
-          window.cloud_log(bId, payload);
+          window.cloud_log(event_type, payload);
         }
-
-        let voting = document.createElement("div");
-        voting.innerHTML = `
-            <div style="border: 1px solid #ccc; padding: 10px;">
-              <b>Did you find this hint useful?</b>
-              <button id="hint_upvote" onclick="window.vote(this)" >👍</button>
-              <button id="hint_downvote" onclick="window.vote(this)">👎</button>
-            </div>`;
-        
-        container.appendChild(voting)
       }
       catch(e) {
         console.error('Error generating hint:', e)
