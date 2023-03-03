@@ -360,7 +360,7 @@
             c.innerHTML = (num_wfe == 1) ?
                ` <div class="card-body> 
                     <p class="card-text">
-                      The system <em>may</em> be able to provide a hint into why this test is invalid.<br><br>
+                      The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
                       <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
                       </p> </div>`
             : `<div class="card-body> <p class="card-text">
