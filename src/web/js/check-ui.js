@@ -110,7 +110,7 @@
     }
 
     function getHint() {      
-      const DEFAULT_TEXT ="No hint available.";
+      const DEFAULT_TEXT ="The system was unable to find a hint. This is sometimes indicative of a typo -- please double check!";
       const HINT_PREFIX = "<h3>Hint</h3>";
 
       function get_hint_text() {
@@ -133,9 +133,7 @@
         // hints for exactly 1 or 2 chaff passes.
         if (candidate_chaffs.length > 2)
         {
-            // TODO: We can do better here!
-            return `This test looked similar to ${candidate_cahhfs.length} common misunderstandings of the problem.
-                    However, we could not determine an actionable hint that would help achieve validity.`;
+            return DEFAULT_TEXT;
         }
 
         let text = "";
@@ -323,7 +321,7 @@
         validity_elt.textContent = "INCORRECT";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
-        message_elt.textContent = "These tests do not match the behavior described by the assignment:";
+        message_elt.textContent = "These tests do not match intended behavior:";
 
         // Only count wfes that are failing across all wheats.
         // TODO: Handle wfes that are in the inter-wheat space.
@@ -362,9 +360,8 @@
             c.innerHTML = (num_wfe == 1) ?
                ` <div class="card-body> 
                     <p class="card-text">
-                      The system may be able to provide a hint into why this test is invalid.<br><br>
-                      <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to generate a hint! </button> <br>
-                      Please note that this is not guaranteed to always generate a hint.  
+                      The system <em>may</em> be able to provide a hint into why this test is invalid.<br><br>
+                      <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to Find a Hint! </button>
                       </p> </div>`
             : `<div class="card-body> <p class="card-text">
               There are currently too many invalid tests to provide further feedback.
