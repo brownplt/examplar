@@ -122,8 +122,8 @@
         else if (num_wfes > 1) {
           // TODO: May be annoying to run hints and then get this!
           return  `Too many test failures to generate hint. 
-                  Hints can be generated only when there is
-                  exactly one failing test.`;
+                  Hints can only be generated when there is
+                  <em>exactly</em> one failing test.`;
         }
 
         let test_id = Object.keys(wfes)[0];
@@ -365,7 +365,7 @@
                       </p> </div>`
             : `<div class="card-body> <p class="card-text">
               There are currently too many invalid tests to provide further feedback.
-              The system may be able to provide more directed feedback,
+              The system may be able to provide more directed feedback
               when there is exactly one invalid test. </p>    
               </p> </div>`;
 
