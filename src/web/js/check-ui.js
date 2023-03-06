@@ -369,7 +369,10 @@
                       <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
                       </p> </div>`
             : `<div class="card-body> <p class="card-text">
-              ${MULTIPLE_WFE_TEXT}    </p> </div>`;
+              There are currently too many invalid tests to provide further feedback.
+              The system may be able to provide more directed feedback
+              when there is exactly one invalid test. </p>    
+              </p> </div>`;
 
           // TODO: This is not good practice.
           c.style.padding = '5px'; 
