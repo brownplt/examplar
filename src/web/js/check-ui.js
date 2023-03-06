@@ -113,6 +113,10 @@
       const DEFAULT_TEXT ="The system was unable to find a hint. This is sometimes indicative of a typo — please double check!";
       const HINT_PREFIX = "<h3>Hint</h3>";
 
+      const MULTIPLE_WFE_TEXT = `There are currently too many invalid tests to provide further feedback.
+      The system may be able to provide more directed feedback
+      when there is exactly one invalid test.`
+
       function get_hint_text() {
         let wfes = window.hint_candidates
         let num_wfes =   (wfes != null) ? Object.keys(wfes).length : 0;
@@ -120,10 +124,11 @@
           return DEFAULT_TEXT;
         }
         else if (num_wfes > 1) {
-          // TODO: May be annoying to run hints and then get this!
-          return  `Too many test failures to generate hint. 
-                  Hints can only be generated when there is
-                  <em>exactly</em> one failing test.`;
+          // This is (hopefully) unreachable. 
+          // However, keeping it in as a backstop in case
+          // Examplar reaches a state where there are multiple wheat failures
+          // and we're still looking for a hint.
+          return  MULTIPLE_WFE_TEXT;
         }
 
         let test_id = Object.keys(wfes)[0];
@@ -183,7 +188,7 @@
       }
       catch(e) {
         console.error('Error generating hint:', e)
-        container.innerHTML = "Something went wrong";
+        container.innerHTML = "Something went wrong, failed to find a hint.";
       }
       finally {
         // This styling is not ideal but does allow for quick prototyping.
@@ -364,10 +369,7 @@
                       <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
                       </p> </div>`
             : `<div class="card-body> <p class="card-text">
-              There are currently too many invalid tests to provide further feedback.
-              The system may be able to provide more directed feedback
-              when there is exactly one invalid test. </p>    
-              </p> </div>`;
+              ${MULTIPLE_WFE_TEXT}    </p> </div>`;
 
           // TODO: This is not good practice.
           c.style.padding = '5px'; 
