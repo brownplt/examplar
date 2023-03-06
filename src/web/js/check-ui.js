@@ -110,7 +110,7 @@
     }
 
     function getHint() {      
-      const DEFAULT_TEXT ="The system was unable to find a hint. This is sometimes indicative of a typo — please double check!";
+      const DEFAULT_TEXT ="Examplar was unable to find a hint. This is sometimes indicative of a typo in your invalid test — please double check!";
       const HINT_PREFIX = "<h3>Hint</h3>";
 
       function get_hint_text() {
@@ -120,7 +120,7 @@
           return DEFAULT_TEXT;
         }
         else if (num_wfes > 1) {
-          // This is (hopefully) unreachable. 
+          // This is (hopefully) unreachable.
           // However, keeping it in as a backstop in case
           // Examplar reaches a state where there are multiple wheat failures
           // and we're still looking for a hint.
@@ -132,8 +132,7 @@
         let test_id = Object.keys(wfes)[0];
         let candidate_chaffs = wfes[test_id];
   
-        // Strategy: We can only provide useful
-        // hints for exactly 1 or 2 chaff passes.
+        // We can only provide useful hints when wfe's accept exactly 1 or 2 chaffs.
         if (candidate_chaffs.length > 2)
         {
             return DEFAULT_TEXT;

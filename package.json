@@ -70,7 +70,7 @@
     "supervisor": "^0.11.0",
     "url-loader": "^0.6.2",
     "url.js": "^1.0.2",
-    "webpack": "^4.46.0"
+    "webpack": "^4.41.4"
   },
   "scripts": {
     "local-install": "heroku local:run npm install",
