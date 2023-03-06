@@ -113,10 +113,6 @@
       const DEFAULT_TEXT ="The system was unable to find a hint. This is sometimes indicative of a typo — please double check!";
       const HINT_PREFIX = "<h3>Hint</h3>";
 
-      const MULTIPLE_WFE_TEXT = `There are currently too many invalid tests to provide further feedback.
-      The system may be able to provide more directed feedback
-      when there is exactly one invalid test.`
-
       function get_hint_text() {
         let wfes = window.hint_candidates
         let num_wfes =   (wfes != null) ? Object.keys(wfes).length : 0;
@@ -128,7 +124,9 @@
           // However, keeping it in as a backstop in case
           // Examplar reaches a state where there are multiple wheat failures
           // and we're still looking for a hint.
-          return  MULTIPLE_WFE_TEXT;
+          return  `There are currently too many invalid tests to provide further feedback.
+          The system may be able to provide more directed feedback
+          when there is exactly one invalid test.`;
         }
 
         let test_id = Object.keys(wfes)[0];
