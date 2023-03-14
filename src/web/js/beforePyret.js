@@ -671,8 +671,17 @@ $(function() {
       cloud_log_d.resolve(cloud_log_internal);
 
       window.cloud_log = function cloud_log(event, payload) {
-        let time = Date.now();
-        cloud_log_internal({event, time, payload});
+
+        console.log("cloudlog!")
+        let log_switch = document.getElementById("logging_switch");
+        
+        let logging_enabled = log_switch ? log_switch.checked : false;
+        console.log("Logging was " + logging_enabled)
+        if (logging_enabled) 
+        {
+          let time = Date.now();
+          cloud_log_internal({event, time, payload});
+        }
       };
   });
 
