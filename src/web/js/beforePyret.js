@@ -441,6 +441,7 @@ $(function() {
     window.location.href = "/";
   }
 
+  
   function setTitle(progName) {
     document.title = progName + " - code.pyret.org";
     $("#showFilename").text("File: " + progName);
@@ -690,6 +691,7 @@ $(function() {
   // load the wheats & chaff
   window.wheat = assignment.then(assn => assn.wheat);
   window.chaff = assignment.then(assn => assn.chaff);
+  window.mutant = assignment.then(assn => assn.mutant);
 
   let assignment_code = Promise.all([assignment_tests, assignment.then(assn => assn.code)])
     .then(([tests, code]) => {

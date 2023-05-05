@@ -109,29 +109,86 @@
       }, "check-block-comments: each: contents");
     }
 
-    function getHint() {
-      const DEFAULT_TEXT ="";
-      const HINT_PREFIX = "<h3>The assignment says:</h3> ";
-      // Bad practice, but we'll do this for now. Don't want to crash
-      // Examplar if something went wrong generating a hint.
+    function getHint() {      
+      const DEFAULT_TEXT ="Examplar was unable to find a hint. This is sometimes indicative of a typo in your invalid test — please double check!";
+      const HINT_PREFIX = "<h3>Hint</h3>";
 
-      let text_for_hint = DEFAULT_TEXT;
+      function get_hint_text() {
+        let wfes = window.hint_candidates
+        let num_wfes =   (wfes != null) ? Object.keys(wfes).length : 0;
+        if (num_wfes  == 0) {
+          return DEFAULT_TEXT;
+        }
+        else if (num_wfes > 1) {
+          // This is (hopefully) unreachable.
+          // However, keeping it in as a backstop in case
+          // Examplar reaches a state where there are multiple wheat failures
+          // and we're still looking for a hint.
+          return  `There are currently too many invalid tests to provide further feedback.
+          The system may be able to provide more directed feedback
+          when there is exactly one invalid test.`;
+        }
+
+        let test_id = Object.keys(wfes)[0];
+        let candidate_chaffs = wfes[test_id];
+  
+        // We can only provide useful hints when wfe's accept exactly 1 or 2 chaffs.
+        if (candidate_chaffs.length > 2)
+        {
+            return DEFAULT_TEXT;
+        }
+
+        let text = "";
+        for (var i in candidate_chaffs) {
+          let c = candidate_chaffs[i];
+          let chaff_metadata = (c in window.hints) ? window.hints[c] : "";
+          let hint_text =
+            (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
+            ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
+            : chaff_metadata['hint'];
+
+
+            let hint_html = `<div style="border: 1px solid #ccc; padding: 10px;">
+              ${hint_text}
+              <div class="text-right text-muted">
+              <button class="hint_upvote" id="hint_upvote_${c}" onclick="window.vote(this)" >👍</button>
+              <button class="hint_downvote" id="hint_downvote_${c}" onclick="window.vote(this)">👎</button>
+              </div>
+            </div>`;
+
+            text += hint_html + "<br>";
+        }
+        return (text.length == 0) ? DEFAULT_TEXT : text;
+      }
+
+      
+      let container = document.createElement("div");
+      container.classList += ["container-fluid"];
       try {
-        let mc = window.modal_chaff;
-        if (mc != null && mc != undefined && mc in window.hints) {
-          text_for_hint = HINT_PREFIX + window.hints[mc];
+        hint_text = get_hint_text();
+        container.innerHTML = `<div>${HINT_PREFIX + hint_text}</div>`;
+
+        window.vote =  function (button) {
+          const bId = button.getAttribute('id');
+          let content = document.getElementById("output");
+
+          let payload = {
+            "hint_id": bId,
+            "context": content
+          };
+
+          const event_type = button.getAttribute('class');
+
+          console.log(payload);
+          window.cloud_log(event_type, payload);
         }
       }
       catch(e) {
         console.error('Error generating hint:', e)
+        container.innerHTML = "Something went wrong, failed to find a hint.";
       }
       finally {
-        window.modal_chaff = null;
-       
-        let container = document.createElement("div");
-        container.innerHTML = text_for_hint;
-
-        // Again, this styling is not ideal but does allow for quick prototyping.
+        // This styling is not ideal but does allow for quick prototyping.
         container.style.backgroundColor = "white";
         container.style.borderStyle = "solid";
         container.style.borderColor = "white";
@@ -139,9 +196,6 @@
         container.style.alignContent = "center";
         container.style.width = "100%";
         container.id = "hint_box";
-
-
-
         return container;
       }
     }
@@ -269,10 +323,60 @@
         validity_elt.textContent = "INCORRECT";
         validity_elt.classList.add("invalid");
         container_elt.classList.add("invalid");
-        message_elt.textContent = "These tests do not match the behavior described by the assignment:";
+        message_elt.textContent = "These tests do not match intended behavior:";
 
-        let hint = getHint();
-        message_elt.parentElement.appendChild(hint);
+        // Only count wfes that are failing across all wheats.
+        // TODO: Handle wfes that are in the inter-wheat space.
+        // Perhaps we should flag them differently in examplar.
+        let num_wfe =
+        wheats.map(
+          wheat => wheat.reduce(
+            (acc, block) => acc + block.tests.reduce(
+              (wfes_in_block, test) => wfes_in_block + (test.passed ? 0 : 1),
+              0), 0))             
+            .reduce((a, b) => Math.max(a, b), -Infinity);
+
+        if (window.hint_run) {        
+          try {
+            let hint = getHint();       
+            message_elt.parentElement.appendChild(hint);
+          }
+          catch (e) {
+            console.error(`Error generating hint: ${e}`)
+          }
+          finally {
+            window.hint_run = false;
+            window.hint_candidates = null;
+          }
+        }
+        else { 
+          window.gen_hints =  function () {
+            window.hint_run = true; 
+            window.cloud_log("GEN_HINT", "");
+            document.getElementById('runButton').click()
+          }
+
+          let c = document.createElement("div");
+          c.classList += ["container-fluid"];
+
+            c.innerHTML = (num_wfe == 1) ?
+               ` <div class="card-body> 
+                    <p class="card-text">
+                      The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
+                      <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
+                      </p> </div>`
+            : `<div class="card-body> <p class="card-text">
+              There are currently too many invalid tests to provide further feedback.
+              The system may be able to provide more directed feedback
+              when there is exactly one invalid test. </p>    
+              </p> </div>`;
+
+          // TODO: This is not good practice.
+          c.style.padding = '5px'; 
+          c.style.backgroundColor = "white";
+          message_elt.parentElement.appendChild(c);
+        }
+
 
         let wheat_catchers =
           wheats.map(
@@ -283,8 +387,6 @@
                              .map(test => test.loc))
               .reduce((acc, val) => acc.concat(val), []))
             .reduce((acc, val) => acc.concat(val), []);
-
-        console.log("FAILING WHEATS", wheat_catchers);
 
         function render_wheat_catcher(position) {
           console.log("rendering", position);

@@ -13,3 +13,4 @@ pyret
 test-util/failed-test-screenshots/*
 .coverage/
 *~
+.vscode/**

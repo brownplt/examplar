@@ -170,35 +170,22 @@
             let t = r['test'];
             let n = r['chaff_name'];
             if (t in aggregated) {
-                aggregated[n].push(t);
+                aggregated[t].push(n);
             }
             else {
-                aggregated[n] = [t];
+                aggregated[t] = [n];
             }
         };
-
         return aggregated;
     }
 
-    function modal_passing_chaff(chaff_results, wheat_failures) { 
+
+    function get_hint_candidates(chaff_results, wheat_failures) {
+      // Res is a dictionary of form { test : [chaffs passed] }
       let res = get_passing_chaff_results(chaff_results, wheat_failures);
-
-      if (res == null || Object.keys(res).length == 0) {
-        return null;
-      }
-
-      // Bad practice, but we'll do this for now. Don't want to crash
-      // Examplar if something went wrong generating a hint.
-      try {
-        let vals = Object.keys(res).reduce(function(a,b)  { return res[a].length > res[b].length ? a : b ;})
-        return vals;
-      }
-      catch(e) {
-        console.err('Chaff run error: ', e);
-        return null;
-      }
+      return res;
     }
-    
+   
 
     function merge(obj, extension) {
       var newobj = {};
@@ -1172,11 +1159,15 @@
               
             });
 
-          // if the wheats pass, then run the chaffs
+          // Decides whether to run wfes against chaff-suite or
+          // all conceptual mutants.
+          chaff_to_run = window.hint_run ? window.mutant : window.chaff
+
+          // After wheats, run the chaffs
           let chaff_results = wheats_pass
             .then(
               function(_){          
-                let run_results = window.chaff.then(run_injections);
+                let run_results = chaff_to_run.then(run_injections);
                 run_results.then(results =>
                   payload.chaff_results = results.map(result =>
                       new Object({
@@ -1196,10 +1187,6 @@
                   throw wheat_reject;
                 }
               });
-
-
-
-          // sid: Do not run student tests IF the wheats did not pass.... (have I broken this? Need to test)
 
           // lastly, run the student's tests, if they've begun their implementation.
           let test_results = Q.all([window.dummy_impl, chaff_results]).then(
@@ -1249,8 +1236,8 @@
           let display_result =
             Q.all([wheat_results, chaff_results, test_results]).then(
               function([wheat_results, chaff_results, test_results]) {
-                let wheat_failures = get_failing_wheat_locations(wheat_results);               
-                window.modal_chaff = modal_passing_chaff(chaff_results, wheat_failures);
+                let wheat_failures = get_failing_wheat_locations(wheat_results);
+                window.hint_candidates = get_hint_candidates(chaff_results, wheat_failures);
 
                 let wheat_block_error = wheat_results.find(w => w.json.some(b => b.error));
                 if (wheat_block_error) {
