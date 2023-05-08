@@ -129,7 +129,7 @@
 	"mutant1name": {
 		"hint": "hint text",
 	},
-	"mutant1name": {
+	"mutant2name": {
 		"hint": "hint text",
 	},
 }
