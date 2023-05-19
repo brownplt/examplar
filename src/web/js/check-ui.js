@@ -26,6 +26,35 @@
     function isTestResult(val) { return runtime.unwrap(runtime.getField(CH, "TestResult").app(val)); }
     function isTestSuccess(val) { return runtime.unwrap(runtime.getField(CH, "is-success").app(val)); }
 
+    function getStrFromLocObj(l) {
+      let name = JSON.parse(l.str);
+      let startLine = name[1].line;
+      let startChar = name[1].ch;
+      let endLine = name[2].line;
+      let endChar = name[2].ch;
+
+      let fileLines = l.doc.children[0].lines;
+      
+      if (startLine == endLine) {
+        return fileLines[startLine].text.substring(startChar, endChar);
+      }
+
+      let firstStr = fileLines[startLine].text.substring(startChar);
+      let betweenLinesStr = fileLines.slice(startLine + 1, endLine).map(l => l.text).join("\n");
+      let lastStr = fileLines[endLine].text.substring(0, endChar);
+
+      return `${firstStr}${betweenLinesStr}${lastStr}`;
+    }
+    function isInOutOkTestName(testAstStr) {
+      // TODO @eerivera: This really needs to be parsed properly. I'm surprised this info isn't already available somewhere.
+      return testAstStr.endsWith("-ok");
+    }
+    function isInOutOkTest(test) {
+      return isInOutOkTestName(getStrFromLocObj(test.loc));
+    }
+
+
+
     // https://stackoverflow.com/a/38327540/7501301
     function groupBy(list, keyGetter) {
         const map = new Map();
@@ -656,10 +685,34 @@
           header.textContent = this.name;
           container.appendChild(header);
 
+          function implFilter(blocks, lookingForInOutOk) {
+            return blocks.map(block => {
+              return {
+                ...block,
+                tests: block.tests.filter(x => isInOutOkTest(x) == lookingForInOutOk).map(x => {
+                  return {
+                    ...x,
+                    name: getStrFromLocObj(x.loc)
+                  };
+                })
+              };
+            });
+          }
+          let in_out_ok_results = {
+            wheat: examplar_results.wheat.map(x => implFilter(x, true)),
+            chaff: examplar_results.chaff.map(x => implFilter(x, true))
+          };
+          let other_results = {
+            wheat: examplar_results.wheat.map(x => implFilter(x, false)),
+            chaff: examplar_results.chaff.map(x => implFilter(x, false))
+          };
+
           let examplar_summary = window.wheat.then(wheat => {
             if (wheat.length == 0) return document.createElement("div");
-            let examplar_summary = drawExamplarResults(blocks, examplar_results);
+            let examplar_summary = drawExamplarResults(blocks, other_results);
             header.parentNode.insertBefore(examplar_summary, header.nextSibling);
+            let in_out_ok_summary = drawExamplarResults(blocks, in_out_ok_results);
+            header.parentNode.insertBefore(in_out_ok_summary, header.nextSibling);
             return examplar_summary;
           });
 
