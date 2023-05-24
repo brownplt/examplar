@@ -1246,7 +1246,13 @@
                                        {error: true, wheat: wheat_results.map(r => r.json)});
                 }
                 if (chaff_results) {
-                  chaff_results = chaff_results.map(r => r.json)
+                  chaff_results = chaff_results.map(r => {
+                    return r.json.map(cb_obj => {
+                      cb_obj["filename"] = get_chaff_name(r);
+                      console.info("cb_obj", cb_obj);
+                      return cb_obj;
+                    });
+                  });
                 }
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results.pyret,
                                      {wheat: wheat_results.map(r => r.json), chaff: chaff_results});

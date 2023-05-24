@@ -45,12 +45,33 @@
 
       return `${firstStr}${betweenLinesStr}${lastStr}`;
     }
-    function isInOutOkTestName(testAstStr) {
-      // TODO @eerivera: This really needs to be parsed properly. I'm surprised this info isn't already available somewhere.
-      return testAstStr.endsWith("-ok");
+    function isInOutOkTestStr(testAstStr) {
+      // TODO @eerivera: This really needs to be parsed properly. I'm surprised the AST info isn't already available somewhere.
+      let attempt1 = testAstStr.split(" satisfies ");
+      if (attempt1.length == 2) {
+        return attempt1[1].endsWith("-ok");
+      }
+
+      let attempt2 = testAstStr.split(" violates ");
+      if (attempt2.length == 2) {
+        return attempt2[1].endsWith("-ok");
+      }
+
+      let attempt3 = testAstStr.split(" is ");
+      if (attempt3.length == 2) {
+        let funcall = attempt3[1].split("(")[0];
+        return funcall.endsWith("-ok");
+      }
+
+      // If it's not one of the three kinds of tests above, we just assume it's not an in/out-ok test
+      return false;
     }
     function isInOutOkTest(test) {
-      return isInOutOkTestName(getStrFromLocObj(test.loc));
+      return isInOutOkTestStr(getStrFromLocObj(test.loc));
+    }
+    function isInOutOkChaff(cb_array) {
+      let name = cb_array[0].filename;
+      return name.includes("-in-ok") || name.includes("-out-ok");
     }
 
 
@@ -229,7 +250,7 @@
                examplar_results.wheat.length == 0));
     }
 
-    function drawExamplarResults(check_blocks, examplar_results) {
+    function drawExamplarResults(check_blocks, examplar_results, isQuartermasterBlock=false) {
 
       let container_elt = document.createElement("div");
       container_elt.classList.add("file-examplar-summary");
@@ -306,7 +327,7 @@
           let chaff = document.createElement('a');
           chaff.setAttribute('href','#');
           chaff.classList.add('chaff');
-          chaff.textContent = '🐛';
+          chaff.textContent = (isQuartermasterBlock) ? '🌠' : '🐛';
 
           if (catchers.length > 0) {
             chaff.classList.add('caught');
@@ -335,8 +356,11 @@
             chaff_list.appendChild(li);
           });
 
-        message_elt.innerHTML = `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
-
+        if (isQuartermasterBlock) {
+          message_elt.innerHTML = `The inputs and outputs checked with <code>median-in-ok</code> and <code>median-out-ok</code> are <span class="valid">valid and consistent</span> with the assignment handout. They also explored ${num_caught} of our ${num_chaffs} envisioned partitions of the input space. Add more inputs that cover more of the input space.`;
+        } else {
+          message_elt.innerHTML = `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
+        }
         thoroughness_elt.appendChild(chaff_list);
 
       } else {
@@ -350,53 +374,56 @@
         // Only count wfes that are failing across all wheats.
         // TODO: Handle wfes that are in the inter-wheat space.
         // Perhaps we should flag them differently in examplar.
-        let num_wfe =
-        wheats.map(
-          wheat => wheat.reduce(
-            (acc, block) => acc + block.tests.reduce(
-              (wfes_in_block, test) => wfes_in_block + (test.passed ? 0 : 1),
-              0), 0))             
-            .reduce((a, b) => Math.max(a, b), -Infinity);
+        if (!isQuartermasterBlock) {
+          let num_wfe =
+          wheats.map(
+            wheat => wheat.reduce(
+              (acc, block) => acc + block.tests.reduce(
+                (wfes_in_block, test) => wfes_in_block + (test.passed ? 0 : 1),
+                0), 0))             
+              .reduce((a, b) => Math.max(a, b), -Infinity);
 
-        if (window.hint_run) {        
-          try {
-            let hint = getHint();       
-            message_elt.parentElement.appendChild(hint);
+          if (window.hint_run) {        
+            try {
+              let hint = getHint();       
+              message_elt.parentElement.appendChild(hint);
+            }
+            catch (e) {
+              console.error(`Error generating hint: ${e}`)
+            }
+            finally {
+              window.hint_run = false;
+              window.hint_candidates = null;
+            }
           }
-          catch (e) {
-            console.error(`Error generating hint: ${e}`)
-          }
-          finally {
-            window.hint_run = false;
-            window.hint_candidates = null;
+          else { 
+            window.gen_hints =  function () {
+              window.hint_run = true; 
+              window.cloud_log("GEN_HINT", "");
+              document.getElementById('runButton').click()
+            }
+
+            let c = document.createElement("div");
+            c.classList += ["container-fluid"];
+
+              c.innerHTML = (num_wfe == 1) ?
+                ` <div class="card-body> 
+                      <p class="card-text">
+                        The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
+                        <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
+                        </p> </div>`
+              : `<div class="card-body> <p class="card-text">
+                There are currently too many invalid tests to provide further feedback.
+                The system may be able to provide more directed feedback
+                when there is exactly one invalid test. </p>    
+                </p> </div>`;
+
+            // TODO: This is not good practice.
+            c.style.padding = '5px'; 
+            c.style.backgroundColor = "white";
+            message_elt.parentElement.appendChild(c);
           }
         }
-        else { 
-          window.gen_hints =  function () {
-            window.hint_run = true; 
-            window.cloud_log("GEN_HINT", "");
-            document.getElementById('runButton').click()
-          }
-
-          let c = document.createElement("div");
-          c.classList += ["container-fluid"];
-          c.id = "hint_box";
-
-            c.innerHTML = (num_wfe == 1) ?
-               ` <div class="card-body> 
-                    <p class="card-text">
-                      The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
-                      <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
-                      </p> </div>`
-            : `<div class="card-body> <p class="card-text">
-              There are currently too many invalid tests to provide further feedback.
-              The system may be able to provide more directed feedback
-              when there is exactly one invalid test. </p>    
-              </p> </div>`;
-
-          message_elt.parentElement.appendChild(c);
-        }
-
 
         let wheat_catchers =
           wheats.map(
@@ -700,19 +727,28 @@
           }
           let in_out_ok_results = {
             wheat: examplar_results.wheat.map(x => implFilter(x, true)),
-            chaff: examplar_results.chaff.map(x => implFilter(x, true))
+            chaff: examplar_results.chaff.filter(isInOutOkChaff).map(x => implFilter(x, true))
           };
           let other_results = {
             wheat: examplar_results.wheat.map(x => implFilter(x, false)),
-            chaff: examplar_results.chaff.map(x => implFilter(x, false))
+            chaff: examplar_results.chaff.filter(cb_array => !isInOutOkChaff(cb_array)).map(x => implFilter(x, false))
           };
 
           let examplar_summary = window.wheat.then(wheat => {
             if (wheat.length == 0) return document.createElement("div");
-            let examplar_summary = drawExamplarResults(blocks, other_results);
+
+            let examplar_header = document.createElement("h3");
+            examplar_header.textContent = "Examplar Tests";
+            let examplar_summary = drawExamplarResults(blocks, other_results, isQuartermasterBlock=false);
             header.parentNode.insertBefore(examplar_summary, header.nextSibling);
-            let in_out_ok_summary = drawExamplarResults(blocks, in_out_ok_results);
-            header.parentNode.insertBefore(in_out_ok_summary, header.nextSibling);
+            header.parentNode.insertBefore(examplar_header, examplar_summary);
+
+            let qtm_header = document.createElement("h3");
+            qtm_header.textContent = "Quartermaster Tests";
+            let qtm_summary = drawExamplarResults(blocks, in_out_ok_results, isQuartermasterBlock=true);
+            header.parentNode.insertBefore(qtm_summary, header.nextSibling);
+            header.parentNode.insertBefore(qtm_header, qtm_summary);
+            
             return examplar_summary;
           });
 
