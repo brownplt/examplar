@@ -188,13 +188,6 @@
         container.innerHTML = "Something went wrong, failed to find a hint.";
       }
       finally {
-        // This styling is not ideal but does allow for quick prototyping.
-        container.style.backgroundColor = "white";
-        container.style.borderStyle = "solid";
-        container.style.borderColor = "white";
-        container.style.borderWidth = "thick";
-        container.style.alignContent = "center";
-        container.style.width = "100%";
         container.id = "hint_box";
         return container;
       }
@@ -358,6 +351,7 @@
 
           let c = document.createElement("div");
           c.classList += ["container-fluid"];
+          c.id = "hint_box";
 
             c.innerHTML = (num_wfe == 1) ?
                ` <div class="card-body> 
@@ -371,9 +365,6 @@
               when there is exactly one invalid test. </p>    
               </p> </div>`;
 
-          // TODO: This is not good practice.
-          c.style.padding = '5px'; 
-          c.style.backgroundColor = "white";
           message_elt.parentElement.appendChild(c);
         }
 
