@@ -2875,7 +2875,7 @@ ul.chaff_list {
 
 .wheat_list .wheat,
 .chaff_list .chaff {
-  display:block;
+  /* display:block; */
   color: white;
   text-decoration: none;
   padding:0.5em;
@@ -3049,4 +3049,12 @@ li.tab.selected {
   > .file-examplar-summary-message
 {
   background: hsla(0,100%,73%,1);
+}
+
+#hint_box {
+  padding: 5px;
+  background-color: white;
+  border: thick solid white;
+  align-content: center;
+  width: 100%;
 }
