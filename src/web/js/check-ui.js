@@ -27,51 +27,62 @@
     function isTestSuccess(val) { return runtime.unwrap(runtime.getField(CH, "is-success").app(val)); }
 
     function getStrFromLocObj(l) {
-      let name = JSON.parse(l.str);
-      let startLine = name[1].line;
-      let startChar = name[1].ch;
-      let endLine = name[2].line;
-      let endChar = name[2].ch;
+      const name = JSON.parse(l.str);
+      const startLine = name[1].line;
+      const startChar = name[1].ch;
+      const endLine = name[2].line;
+      const endChar = name[2].ch;
 
-      let fileLines = l.doc.children[0].lines;
+      const fileLines = l.doc.children[0].lines;
       
       if (startLine == endLine) {
         return fileLines[startLine].text.substring(startChar, endChar);
       }
 
-      let firstStr = fileLines[startLine].text.substring(startChar);
-      let betweenLinesStr = fileLines.slice(startLine + 1, endLine).map(l => l.text).join("\n");
-      let lastStr = fileLines[endLine].text.substring(0, endChar);
+      const firstStr = fileLines[startLine].text.substring(startChar);
+      const betweenLinesStr = fileLines.slice(startLine + 1, endLine).map(l => l.text).join("\n");
+      const lastStr = fileLines[endLine].text.substring(0, endChar);
 
       return `${firstStr}${betweenLinesStr}${lastStr}`;
     }
-    function isInOutOkTestStr(testAstStr) {
+    const QTM_IN_SUFFIX = "-in-ok";
+    const QTM_OUT_SUFFIX = "-out-ok";
+    function testedFuncHasSuffix(testAstStr, suffix) {
       // TODO @eerivera: This really needs to be parsed properly. I'm surprised the AST info isn't already available somewhere.
-      let attempt1 = testAstStr.split(" satisfies ");
+      const attempt1 = testAstStr.split(" satisfies ");
       if (attempt1.length == 2) {
-        return attempt1[1].endsWith("-ok");
+        return attempt1[1].endsWith(suffix);
       }
 
-      let attempt2 = testAstStr.split(" violates ");
+      const attempt2 = testAstStr.split(" violates ");
       if (attempt2.length == 2) {
-        return attempt2[1].endsWith("-ok");
+        return attempt2[1].endsWith(suffix);
       }
 
-      let attempt3 = testAstStr.split(" is ");
+      const attempt3 = testAstStr.split(" is ");
       if (attempt3.length == 2) {
-        let funcall = attempt3[1].split("(")[0];
-        return funcall.endsWith("-ok");
+        const funcall = attempt3[1].split("(")[0];
+        return funcall.endsWith(suffix);
       }
 
       // If it's not one of the three kinds of tests above, we just assume it's not an in/out-ok test
       return false;
     }
-    function isInOutOkTest(test) {
-      return isInOutOkTestStr(getStrFromLocObj(test.loc));
+    function isQtmInputTest(test) {
+      let testAsStr = getStrFromLocObj(test.loc);
+      return testedFuncHasSuffix(testAsStr, QTM_IN_SUFFIX);
     }
-    function isInOutOkChaff(cb_array) {
+    function isQtmOutputTest(test) {
+      let testAsStr = getStrFromLocObj(test.loc);
+      return testedFuncHasSuffix(testAsStr, QTM_OUT_SUFFIX);
+    }
+    function isQtmTest(test) {
+      let testAsStr = getStrFromLocObj(test.loc);
+      return testedFuncHasSuffix(testAsStr, QTM_IN_SUFFIX) || testedFuncHasSuffix(testAsStr, QTM_OUT_SUFFIX);
+    }
+    function isQtmChaff(cb_array) {
       let name = cb_array[0].filename;
-      return name.includes("-in-ok") || name.includes("-out-ok");
+      return name.includes(QTM_IN_SUFFIX) || name.includes(QTM_OUT_SUFFIX);
     }
 
 
@@ -250,7 +261,8 @@
                examplar_results.wheat.length == 0));
     }
 
-    function drawExamplarResults(check_blocks, examplar_results, isQuartermasterBlock=false) {
+    function drawExamplarResults(check_blocks, examplar_results, is_qtm_block=false) {
+      const class_prefix = is_qtm_block ? "qtm-" : "";
 
       let container_elt = document.createElement("div");
       container_elt.classList.add("file-examplar-summary");
@@ -277,8 +289,8 @@
       } else if (examplar_results.error) {
         thoroughness_elt.textContent = "ERROR ENCOUNTERED";
         validity_elt.textContent = "INVALID";
-        validity_elt.classList.add("invalid");
-        container_elt.classList.add("invalid");
+        validity_elt.classList.add(`${class_prefix}invalid`);
+        container_elt.classList.add(`${class_prefix}invalid`);
         message_elt.textContent = "A check block encountered an error.";
 
         return container_elt;
@@ -298,7 +310,7 @@
 
       if (all_passed) {
         validity_elt.textContent = "VALID";
-        validity_elt.classList.add("valid");
+        validity_elt.classList.add(`${class_prefix}valid`);
 
         let num_chaffs = chaffs.length;
 
@@ -321,13 +333,13 @@
                 .reduce((acc, val) => acc.concat(val), []));
 
         let chaff_list = document.createElement('ul');
-        chaff_list.classList.add('chaff_list');
+        chaff_list.classList.add(`${class_prefix}chaff_list`);
 
         function render_chaff(catchers) {
           let chaff = document.createElement('a');
           chaff.setAttribute('href','#');
           chaff.classList.add('chaff');
-          chaff.textContent = (isQuartermasterBlock) ? '🌠' : '🐛';
+          chaff.textContent = is_qtm_block ? '🌠' : '🐛';
 
           if (catchers.length > 0) {
             chaff.classList.add('caught');
@@ -356,25 +368,41 @@
             chaff_list.appendChild(li);
           });
 
-        if (isQuartermasterBlock) {
-          message_elt.innerHTML = `The inputs and outputs checked with <code>median-in-ok</code> and <code>median-out-ok</code> are <span class="valid">valid and consistent</span> with the assignment handout. They also explored ${num_caught} of our ${num_chaffs} envisioned partitions of the input space. Add more inputs that cover more of the input space.`;
-        } else {
-          message_elt.innerHTML = `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
-        }
+        const implementation_to_check = (wheats.length > 0) ? wheats[0] : ((chaffs.length > 0) ? chaffs[0] : undefined);
+        const has_qtm_in_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmInputTest)) : false;
+        const has_qtm_out_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmOutputTest)) : false;
+
+        const qtm_submessage = has_qtm_in_test
+          ? (has_qtm_out_test
+            ? "inputs and ouputs checked with the <code>*-in-ok</code> and <code>*-out-ok</code> functions"
+            : "inputs checked with the <code>*-in-ok</code> functions")
+          : (has_qtm_out_test
+            ? "outputs checked with the <code>*-out-ok</code> functions"
+            : undefined); // message will be overwritten below
+        const input_space_submessage = has_qtm_in_test ? `They also explored ${num_caught} of our ${num_chaffs} envisioned partitions of the input space. Add more inputs that cover more of the input space.` : "";
+        const qtm_message = (has_qtm_in_test || has_qtm_out_test)
+          ? `The ${qtm_submessage} are <span class="valid">valid and consistent</span> with the assignment handout. ${input_space_submessage}`
+          : `Quartermaster was not run. Refer to the documentation on how to use the <code>*-in-ok</code> and <code>*-out-ok</code> functions to check your inputs and outputs.`;
+        
+        message_elt.innerHTML = is_qtm_block
+          ? qtm_message 
+          : `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
         thoroughness_elt.appendChild(chaff_list);
 
       } else {
-        // this is unreachable right now :/
+        const things_mismatched = is_qtm_block ? "inputs and/or outputs" : "tests";
+
         thoroughness_elt.textContent = "CONSEQUENTLY, THOROUGHNESS IS UNKNOWN";
         validity_elt.textContent = "INCORRECT";
-        validity_elt.classList.add("invalid");
-        container_elt.classList.add("invalid");
-        message_elt.textContent = "These tests do not match intended behavior:";
+        validity_elt.classList.add(`${class_prefix}invalid`);
+        container_elt.classList.add(`${class_prefix}invalid`);
+        message_elt.textContent = `These ${things_mismatched} do not match intended behavior:`;
 
-        // Only count wfes that are failing across all wheats.
-        // TODO: Handle wfes that are in the inter-wheat space.
-        // Perhaps we should flag them differently in examplar.
-        if (!isQuartermasterBlock) {
+        // Only display hints outside of Quartermaster
+        if (!is_qtm_block) {
+          // Only count wfes that are failing across all wheats.
+          // TODO: Handle wfes that are in the inter-wheat space.
+          // Perhaps we should flag them differently in examplar.
           let num_wfe =
           wheats.map(
             wheat => wheat.reduce(
@@ -712,11 +740,11 @@
           header.textContent = this.name;
           container.appendChild(header);
 
-          function implFilter(blocks, lookingForInOutOk) {
+          function implementationFilter(blocks, lookingForQtm) {
             return blocks.map(block => {
               return {
                 ...block,
-                tests: block.tests.filter(x => isInOutOkTest(x) == lookingForInOutOk).map(x => {
+                tests: block.tests.filter(x => isQtmTest(x) == lookingForQtm).map(x => {
                   return {
                     ...x,
                     name: getStrFromLocObj(x.loc)
@@ -725,13 +753,13 @@
               };
             });
           }
-          let in_out_ok_results = {
-            wheat: examplar_results.wheat.map(x => implFilter(x, true)),
-            chaff: examplar_results.chaff.filter(isInOutOkChaff).map(x => implFilter(x, true))
+          const qtm_results = {
+            wheat: examplar_results.wheat.map(x => implementationFilter(x, true)),
+            chaff: examplar_results.chaff.filter(isQtmChaff).map(x => implementationFilter(x, true))
           };
-          let other_results = {
-            wheat: examplar_results.wheat.map(x => implFilter(x, false)),
-            chaff: examplar_results.chaff.filter(cb_array => !isInOutOkChaff(cb_array)).map(x => implFilter(x, false))
+          const regular_results = {
+            wheat: examplar_results.wheat.map(x => implementationFilter(x, false)),
+            chaff: examplar_results.chaff.filter(cb_array => !isQtmChaff(cb_array)).map(x => implementationFilter(x, false))
           };
 
           let examplar_summary = window.wheat.then(wheat => {
@@ -739,15 +767,18 @@
 
             let examplar_header = document.createElement("h3");
             examplar_header.textContent = "Examplar Tests";
-            let examplar_summary = drawExamplarResults(blocks, other_results, isQuartermasterBlock=false);
+            let examplar_summary = drawExamplarResults(blocks, regular_results, is_qtm_block=false);
             header.parentNode.insertBefore(examplar_summary, header.nextSibling);
             header.parentNode.insertBefore(examplar_header, examplar_summary);
 
-            let qtm_header = document.createElement("h3");
-            qtm_header.textContent = "Quartermaster Tests";
-            let qtm_summary = drawExamplarResults(blocks, in_out_ok_results, isQuartermasterBlock=true);
-            header.parentNode.insertBefore(qtm_summary, header.nextSibling);
-            header.parentNode.insertBefore(qtm_header, qtm_summary);
+            if (qtm_results.chaff.length > 0) {
+              let qtm_header = document.createElement("h3");
+              qtm_header.textContent = "Quartermaster Tests";
+              let qtm_summary = drawExamplarResults(blocks, qtm_results, is_qtm_block=true);
+              qtm_summary.style.marginBottom = "3em";
+              header.parentNode.insertBefore(qtm_summary, header.nextSibling);
+              header.parentNode.insertBefore(qtm_header, qtm_summary);
+            }
             
             return examplar_summary;
           });
