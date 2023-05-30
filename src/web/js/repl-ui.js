@@ -103,14 +103,16 @@
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
     function get_chaff_name(chaff_result) {
-        let output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-        let output_as_string = JSON.stringify(output);
-        let prefix = "shared-gdrive://";
-        let start_index = output_as_string.indexOf(prefix) + prefix.length;
-        let to_search = output_as_string.substring(start_index);
-        let end_index = to_search.indexOf(".arr");
-
-        return output_as_string.substring(start_index, start_index + end_index);
+        const js_prefix = "gdrive-js://";
+        const arr_prefix = "shared-gdrive://";
+        const arr_suffix = ".arr";
+        const output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
+        const output_module = Object.entries(output).find(x => x[0].startsWith(js_prefix))[1];
+        const module_map = JSON.parse(output_module["theMap"]);
+        const source_name = module_map["sources"][0];
+        const start_index = arr_prefix.length;
+        const end_index = source_name.indexOf(arr_suffix);
+        return source_name.substring(start_index, end_index);
     }
 
     function get_failing_test_locations(result) {
@@ -1249,7 +1251,6 @@
                   chaff_results = chaff_results.map(r => {
                     return r.json.map(cb_obj => {
                       cb_obj["filename"] = get_chaff_name(r);
-                      console.info("cb_obj", cb_obj);
                       return cb_obj;
                     });
                   });
