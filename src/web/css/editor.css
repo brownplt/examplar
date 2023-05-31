@@ -2893,7 +2893,7 @@ ul.qtm-chaff_list
 }
 
 .chaff_list .chaff.caught {
-  background: #3c9ee5;
+  background: #96bfe9;
 }
 
 .wheat_list .wheat.failed {
@@ -3012,7 +3012,7 @@ li.tab.selected {
 }
 
 .file-examplar-summary-validity.valid {
-  background: #3c9ee5;
+  background: #96bfe9;
   color: white;
 }
 
@@ -3072,7 +3072,7 @@ li.tab.selected {
   width: 100%;
 }
 .file-examplar-summary-validity.qtm-valid {
-  background: #9d4fdd;
+  background: #b59ddb;
   color: white;
 }
 
@@ -3083,5 +3083,5 @@ li.tab.selected {
 }
 
 .qtm-chaff_list .chaff.caught {
-  background: #9d4fdd;
+  background: #b59ddb;
 }

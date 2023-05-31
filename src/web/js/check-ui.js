@@ -309,6 +309,17 @@
       let all_passed = num_wheats == num_passed;
 
       if (all_passed) {
+        const implementation_to_check = (wheats.length > 0) ? wheats[0] : ((chaffs.length > 0) ? chaffs[0] : undefined);
+        const has_qtm_in_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmInputTest)) : false;
+        const has_qtm_out_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmOutputTest)) : false;
+
+        if (is_qtm_block && !(has_qtm_in_test || has_qtm_out_test)) {
+          validity_elt.textContent = "VALIDITY UNKNOWN";
+          validity_elt.classList.add("maybe-valid");
+          message_elt.innerHTML = `Quartermaster was not run. Refer to the documentation on how to use the <code>*-in-ok</code> and <code>*-out-ok</code> functions to check your inputs and outputs.`;
+          return container_elt;
+        }
+
         validity_elt.textContent = "VALID";
         validity_elt.classList.add(`${class_prefix}valid`);
 
@@ -368,21 +379,15 @@
             chaff_list.appendChild(li);
           });
 
-        const implementation_to_check = (wheats.length > 0) ? wheats[0] : ((chaffs.length > 0) ? chaffs[0] : undefined);
-        const has_qtm_in_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmInputTest)) : false;
-        const has_qtm_out_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmOutputTest)) : false;
-
         const qtm_submessage = has_qtm_in_test
           ? (has_qtm_out_test
             ? "inputs and ouputs checked with the <code>*-in-ok</code> and <code>*-out-ok</code> functions"
             : "inputs checked with the <code>*-in-ok</code> functions")
           : (has_qtm_out_test
             ? "outputs checked with the <code>*-out-ok</code> functions"
-            : undefined); // message will be overwritten below
+            : undefined); // unreachable
         const input_space_submessage = has_qtm_in_test ? `They also explored ${num_caught} of our ${num_chaffs} envisioned partitions of the input space. Add more inputs that cover more of the input space.` : "";
-        const qtm_message = (has_qtm_in_test || has_qtm_out_test)
-          ? `The ${qtm_submessage} are <span class="valid">valid and consistent</span> with the assignment handout. ${input_space_submessage}`
-          : `Quartermaster was not run. Refer to the documentation on how to use the <code>*-in-ok</code> and <code>*-out-ok</code> functions to check your inputs and outputs.`;
+        const qtm_message = `The ${qtm_submessage} are <span class="valid">valid and consistent</span> with the assignment handout. ${input_space_submessage}`;
         
         message_elt.innerHTML = is_qtm_block
           ? qtm_message 
@@ -433,6 +438,7 @@
 
             let c = document.createElement("div");
             c.classList += ["container-fluid"];
+            c.id = "hint_box";
 
               c.innerHTML = (num_wfe == 1) ?
                 ` <div class="card-body> 
@@ -446,9 +452,6 @@
                 when there is exactly one invalid test. </p>    
                 </p> </div>`;
 
-            // TODO: This is not good practice.
-            c.style.padding = '5px'; 
-            c.style.backgroundColor = "white";
             message_elt.parentElement.appendChild(c);
           }
         }
@@ -766,14 +769,14 @@
             if (wheat.length == 0) return document.createElement("div");
 
             let examplar_header = document.createElement("h3");
-            examplar_header.textContent = "Examplar Tests";
+            examplar_header.textContent = "Examplar";
             let examplar_summary = drawExamplarResults(blocks, regular_results, is_qtm_block=false);
             header.parentNode.insertBefore(examplar_summary, header.nextSibling);
             header.parentNode.insertBefore(examplar_header, examplar_summary);
 
             if (qtm_results.chaff.length > 0) {
               let qtm_header = document.createElement("h3");
-              qtm_header.textContent = "Quartermaster Tests";
+              qtm_header.textContent = "Quartermaster";
               let qtm_summary = drawExamplarResults(blocks, qtm_results, is_qtm_block=true);
               qtm_summary.style.marginBottom = "3em";
               header.parentNode.insertBefore(qtm_summary, header.nextSibling);
