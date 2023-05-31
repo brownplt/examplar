@@ -2878,14 +2878,9 @@ ul.qtm-chaff_list
 }
 
 .wheat_list .wheat,
-<<<<<<< HEAD
-.chaff_list .chaff {
-  /* display:block; */
-=======
 .chaff_list .chaff,
 .qtm-chaff_list .chaff {
-  display:block;
->>>>>>> b4c2955 (Visual and textual distinctions)
+  /* display:block; */
   color: white;
   text-decoration: none;
   padding:0.5em;
