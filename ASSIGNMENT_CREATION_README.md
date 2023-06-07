@@ -7,7 +7,7 @@
 1. Make folders for wheats and chaffs that should be included in Examplar,
    note their IDs, and set them (temporarily) to be publicly accessible via link
 
-2. Load the Examplar dummy assignment (https://pyret.cs.brown.edu/assignment/1QIZ_LpROVf4yzWTlfTIJcturEyIs71u_)
+2. Load the Examplar dummy assignment ([https://pyret.cs.brown.edu/assignment/1QIZ_LpROVf4yzWTlfTIJcturEyIs71u_](https://pyret.cs.brown.edu/assignment/1QIZ_LpROVf4yzWTlfTIJcturEyIs71u_))
    and open the console
 
 3. Compile the wheats by executing
