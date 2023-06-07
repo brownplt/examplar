@@ -103,11 +103,10 @@
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
     function get_chaff_name(chaff_result) {
-        const js_prefix = "gdrive-js://";
         const arr_prefix = "shared-gdrive://";
         const arr_suffix = ".arr";
         const output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-        const output_module = Object.entries(output).find(x => x[0].startsWith(js_prefix))[1];
+        const output_module = Object.entries(output).find(x => x[0].includes("chaff"))[1];
         const module_map = JSON.parse(output_module["theMap"]);
         const source_name = module_map["sources"][0];
         const start_index = arr_prefix.length;
