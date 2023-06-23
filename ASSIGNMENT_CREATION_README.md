@@ -1,6 +1,6 @@
 # Examplar Assignment Creation:
 
-0. Prepare the wheats and chaffs. If the assignment requires hints, also prepare all mutants for which you will provide hints.
+1. Prepare the wheats, chaffs, and mutants.
     * Given a spec that requires one or more functions, the
       wheat and chaff files are implementation of these
       functions. These files should explicitly provide only the
@@ -14,49 +14,51 @@
     * If any tests are provided within these implementations they
       should be commented out
 
+    * **Mutants** are the set of chaffs that represent meaningful student misconceptions. These are used to generate hints in the case that
+      a student writes an invalid test. Each mutant comes pairs with a hint, which are displayed to students if they write a corresponding invalid test.
 
-1. Make folders for wheats, chaffs, and mutants that should be included in Examplar,
+2. Make folders for wheats, chaffs, and mutants that should be included in Examplar,
    note their IDs, and set them (temporarily) to be publicly accessible via link
 
-2. Load the Examplar dummy assignment (https://pyret.cs.brown.edu/assignment/1QIZ_LpROVf4yzWTlfTIJcturEyIs71u_)
+3. Load the Examplar dummy assignment (https://pyret.cs.brown.edu/assignment/1QIZ_LpROVf4yzWTlfTIJcturEyIs71u_)
    and open the JavaScript console. Note: The following Steps 3-6
    are to be
    done in the JS console, not in the Pyret interaction
    window!
 
-3. Compile the wheats by executing
+4. Compile the wheats by executing
     ```javascript
     const wheats = compileFiles(<wheat source folder id>)
     ```
 
-4. Click the Run button in the interaction window
+5. Click the Run button in the interaction window
 
-5. Compile the chaffs by executing
+6. Compile the chaffs by executing
     ```javascript
     const chaffs = compileFiles(<chaff source folder id>)
     ```
-6. Click the Run button in the interaction window
+7. Click the Run button in the interaction window
 
-7. Compile the mutants by executing
+8. Compile the mutants by executing
     ```javascript
     const mutants = compileFiles(<mutant source folder id>)
     ```
-8. Click the Run button in the interaction window
+9. Click the Run button in the interaction window
 
-9. Make a public subdirectory in the assignment folder with the public facing
+10. Make a public subdirectory in the assignment folder with the public facing
    name for the assignment (e.g. 'docdiff') with subdirectories 'wheat', 'chaff', and 'mutant'.
 
-10. After determining the folder IDs for 'wheat' and 'chaff', execute
+11. After determining the folder IDs for 'wheat' and 'chaff', execute
     ```javascript
     copyCompiled(wheats, <'wheat' folder ID>, chaffs, <'chaff' folder ID>, mutants,  <'mutant' folder ID> )
     ```
 
-11.  Check that the files, which should now have names ending in '.js',
+12.  Check that the files, which should now have names ending in '.js',
    are present in the 'wheat', 'chaff', and 'mutant' folders
 
-12. Remove link sharing from the wheat and chaff source folders from step 1 (optional)
+13. Remove link sharing from the wheat and chaff source folders from step 1 (optional)
 
-13. In the folder created in step 7, create the following files:
+14. In the folder created in step 7, create the following files:
     * \<assignment>-code.arr
         ```
         provide *
