@@ -1,3 +1,5 @@
+const { isNull } = require("lodash");
+
 function compileFiles(source) {
     return gapi.client.drive.files.list({
         q: `not trashed and "${source}" in parents and title contains '.arr'`
@@ -16,7 +18,7 @@ function compileFiles(source) {
     });
 }
 
-function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget) {
+function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget, mutantFiles = null, mutantTarget = null) {
     storageAPI.then(api => api.getCacheCollectionFolderId()).then(folderId => {
         function copyFiles(files, targetFolder) {
             const nameSelector = files
@@ -45,6 +47,10 @@ function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget) {
         Promise.all([wheatFiles, chaffFiles]).then(([wheatFiles, chaffFiles]) => {
             copyFiles(wheatFiles, wheatTarget);
             copyFiles(chaffFiles, chaffTarget);
+
+            if (!isNull(mutantFiles)) {
+                copyFiles(mutantFiles, mutantTarget);
+            }
         });
     })
 }
