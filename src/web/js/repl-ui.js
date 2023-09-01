@@ -103,15 +103,14 @@
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
     function get_chaff_name(chaff_result) {
-        const arr_prefix = "shared-gdrive://";
-        const arr_suffix = ".arr";
-        const output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-        const output_module = Object.entries(output).find(x => x[0].includes("chaff"))[1];
-        const module_map = JSON.parse(output_module["theMap"]);
-        const source_name = module_map["sources"][0];
-        const start_index = arr_prefix.length;
-        const end_index = source_name.indexOf(arr_suffix);
-        return source_name.substring(start_index, end_index);
+      const all_modules = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
+      const module_filenames = Object.entries(all_modules).map(x => JSON.parse(x[1]["theMap"])["file"]);
+      const filename = module_filenames.find(x => x.includes("chaff"));
+      const split_prefix = "://";
+      const split_suffix = ".arr";
+      const start_index = filename.indexOf(split_prefix) + split_prefix.length;
+      const end_index = filename.indexOf(split_suffix, start_index);
+      return filename.substring(start_index, end_index);
     }
 
     function get_failing_test_locations(result) {
