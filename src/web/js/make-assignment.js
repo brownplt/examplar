@@ -1,4 +1,3 @@
-const { isNull } = require("lodash");
 
 function compileFiles(source) {
     return gapi.client.drive.files.list({
@@ -48,7 +47,9 @@ function copyCompiled(wheatFiles, wheatTarget, chaffFiles, chaffTarget, mutantFi
             copyFiles(wheatFiles, wheatTarget);
             copyFiles(chaffFiles, chaffTarget);
 
-            if (!isNull(mutantFiles)) {
+            if (mutantFiles != null) {
+
+                console.log("Copying mutants")
                 copyFiles(mutantFiles, mutantTarget);
             }
         });
