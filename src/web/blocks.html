@@ -2,13 +2,11 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <title>Examplar</title>
+  <title>code.pyret.org</title>
   <link rel="preload" href="{{&PYRET}}" as="script">
   <link rel="stylesheet" href="/css/reset.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Gochi+Hand&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/reset.css"></link>
   <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;700&family=Gochi+Hand&display=block" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:400,700" />
   <link rel="stylesheet" href="/css/codemirror.css" />
   <link rel="stylesheet" href="/css/foldgutter.css" />
   <link rel="stylesheet" href="/css/dialog.css" />
@@ -240,6 +238,12 @@
           <ul id="filemenuContents" class="menuContents submenu" role="menu" aria-hidden="true"
             aria-label="File Menu">
             <li role="presentation">
+              <div id="new" class="menuButton">
+                <a class="focusable" role="menuitem" aria-label="New file"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)" >New</a></div>
+            </li>
+            <li role="presentation">
               <div id="programs" class="menuButton">
                 <a  class="focusable" role="menuitem" aria-label="My Programs"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
@@ -254,14 +258,6 @@
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Open Original</a></div>
             </li>
-            <li role="presentation" class="loginOnly">
-              <div id="insert" class="loginOnly menuButton disabled">
-                <a class="loginOnly focusable disabled" role="menuitem" aria-label="Insert"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Insert
-                </a>
-              </div>
-            </li>
             <li role="presentation">
               <div id="save" class="menuButton disabled">
                 <a class="focusable disabled" role="menuitem" aria-label="Save file"
@@ -269,17 +265,34 @@
                   tabindex="-1" href="javascript:void(0)">Save</a></div>
             </li>
             <li role="presentation">
+              <div id="saveas" class="menuButton">
+                <a class="focusable" role="menuitem" aria-label="Save a Copy"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)">Save a copy</a></div>
+            </li>
+            <li role="presentation">
               <div id="download" class="menuButton">
                 <a class="focusable" role="menuitem" aria-label="Download"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Download</a></div>
             </li>
+            <li role="presentation">
+              <div id="rename" class="menuButton disabled">
+                <a class="focusable disabled" role="menuitem" aria-label="Rename file"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)">Rename</a></div>
+            </li>
           </ul>
         </li>
 
-        <li role="presentation" class="topTier" id="files-tabs-container">
-          <ul id="files-tabs">
-          </ul>
+        <li role="presentation" class="loginOnly topTier" id="insertli">
+          <div id="insertPart" class="loginOnly menu menuitemtitle">
+            <button role="menuitem"
+              aria-describedby="mhelp-menus mhelp-activate mhelp-escape"
+              aria-label="Insert, F11" id="insert" class="focusable blueButton loginOnly"  tabindex="-1">Insert</button>
+          </div>
+          <!-- <button id="saveButton" class="blueButton loginOnly">Save</button> -->
+          <!-- <button id="openFile" class="blueButton loginOnly">Open</button> -->
         </li>
 
         <li role="presentation" class="topTier" id="publishli" style="display: none;">
@@ -309,13 +322,23 @@
           </div>
           <ul id="run-dropdown-content" class="submenu" role="menu" aria-hidden="true"
             aria-label="Run Options">
-            <li>
-              <input id="option-tc" type="checkbox" name="option-tc-mode" />
-              <label for="option-tc">Type Check</label>
+            <li id="select-run-old" >
+              <div id="select-run" >
+                <a class="focusable"
+                  role="menuitem"
+                  aria-label="Run" aria-setsize="2" aria-posinset="1"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)">Run</a>
+              </div>
             </li>
-            <li>
-              <input id="option-check-mode" type="checkbox" name="option-check-mode" />
-              <label for="option-check-mode">Skip Tests</label>
+            <li id="select-tc-run-old">
+              <div id="select-tc-run" >
+                <a class="focusable"
+                  role="menuitem"
+                  aria-label="Type-check and run" aria-setsize="2" aria-posinset="2"
+                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
+                  tabindex="-1" href="javascript:void(0)">Type-check and run<sup>(beta)</sup></a>
+              </div>
             </li>
           </ul>
         </li>
@@ -335,6 +358,7 @@
 <div id="toolbar"></div>
 <div id="loader"><p>Raising the masts...</p></div>
 <div id="main">
+<div class="replMain" role="region" aria-label="Definitions"> </div>
 <!-- MODAL PROMPT (Adapted from W3Schools' example) -->
 <div id="promptModal" class="modal">
   <div class="modal-content">
@@ -419,6 +443,7 @@ var GIT_BRANCH = "{{ &GIT_BRANCH }}";
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
 <script src="/js/editor-misc.min.js"></script>
+
 <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
 <script>
 var apiKey = "{{ GOOGLE_API_KEY }}";
@@ -432,17 +457,36 @@ function handleGoogLoad() {
 <script type="text/javascript" src="https://apis.google.com/js/client.js?onload=handleGoogLoad"></script>
 <script>
 var POSTMESSAGE_ORIGIN = "{{{ POSTMESSAGE_ORIGIN }}}";
-console.log(window.performance.now())
+console.log(window.performance.now());
 </script>
-<script src="/js/events.js"></script>
-<script src="/js/beforePyret.js"></script>
-<script src="/js/make-assignment.js"></script>
+<script src="js/events.js"></script>
+<script src="js/beforeBlocks.js"></script>
+<script src="js/snap/src/morphic.js"></script>
+<script src="js/snap/src/symbols.js"></script>
+<script src="js/snap/src/widgets.js"></script>
+<script src="js/snap/src/blocks.js"></script>
+<script src="js/snap/src/threads.js"></script>
+<script src="js/snap/src/objects.js"></script>
+<script src="js/snap/src/scenes.js"></script>
+<script src="js/snap/src/gui.js"></script>
+<script src="js/snap/src/paint.js"></script>
+<script src="js/snap/src/lists.js"></script>
+<script src="js/snap/src/byob.js"></script>
+<script src="js/snap/src/tables.js"></script>
+<script src="js/snap/src/sketch.js"></script>
+<script src="js/snap/src/video.js"></script>
+<script src="js/snap/src/maps.js"></script>
+<script src="js/snap/src/extensions.js?"></script>
+<script src="js/snap/src/xml.js"></script>
+<script src="js/snap/src/store.js"></script>
+<script src="js/snap/src/locale.js"></script>
+<script src="js/snap/src/cloud.js"></script>
+<script src="js/snap/src/api.js"></script>
+<script src="js/snap/src/sha512.js"></script>
+<script src="js/snap/src/FileSaver.min.js"></script>
 <script>
 var APP_BASE_URL = "{{{ BASE_URL }}}";
 var CSRF_TOKEN = "{{{ CSRF_TOKEN }}}";
-var CURRENT_VERSION = "{{{ CURRENT_VERSION }}}"
-var ASSIGNMENT_ID = "{{{ ASSIGNMENT_ID }}}"
-
 $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
   var a = document.createElement("a");
   a.href = options.url;
@@ -450,6 +494,62 @@ $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
     jqXHR.setRequestHeader('X-CSRF-Token', CSRF_TOKEN);
   }
 });
+</script>
+<script>
+  var replMain = $(".replMain");
+  var canvas = $("<canvas>")
+    .addClass("snapCanvas")
+    .attr("id", "world")
+    .attr("width", replMain.width())
+    .attr("height", replMain.height())
+    .attr("style", " position: absolute; left: 0; right: 0; z-index:8500; border: 1px solid black;");
+  replMain.prepend(canvas);
+  // Found docs here: https://github.com/jmoenig/morphic.js/blob/master/morphic.txt
+  function onEditorResize() {
+    canvas.attr("width", replMain.width())
+          .attr("height", replMain.height());
+    CPO.blocksIDE.setWidth(replMain.width());
+    CPO.blocksIDE.setHeight(replMain.height());
+    CPO.blocksIDE.rerender();
+    world.setWidth(replMain.width());
+    world.setHeight(replMain.height());
+    world.rerender();
+  }
+  var r = new ResizeObserver(onEditorResize);
+  r.observe(replMain[0]);
+  var localStorageKey = "snap-blocks-draft"
+  var onBlocksIDELoaded;
+  CPO.blocksIDELoaded = new Promise((resolve) => {
+    onBlocksIDELoaded = resolve;
+  })
+  CPO.blocksIDE = new IDE_Morph({
+    path: 'js/snap',
+    load: 'js/transpile.xml',
+    design: "classic",
+    border: 1,
+    hideControls: true,
+    hideCategories: false,
+    noSprites: true,
+    noImports: true,
+    noOwnBlocks: true,
+    noRingify: true,
+    noUserSettings: true,
+    onload: () => {
+      onBlocksIDELoaded(CPO.blocksIDE);
+    }
+  });
+  var loop = () => {
+    requestAnimationFrame(loop);
+    world.doOneCycle();
+  };
+  world = new WorldMorph(document.getElementById('world'), false);
+  CPO.blocksIDE.openIn(world);
+  CPO.blocksIDE.addMessageListener('update', txt => {
+    console.log('current source\n', txt);
+    CPO.editor.cm.setValue(txt);
+    localStorage.setItem(localStorageKey, CPO.blocksIDE.currentSprite.scriptsOnlyXML());
+  });
+  requestAnimationFrame(loop);
 </script>
 
   </main>

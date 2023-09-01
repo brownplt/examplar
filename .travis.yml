@@ -51,8 +51,7 @@ before_install:
 - nvm install 16.13.0
 - nvm use 16.13.0
 - npm install -g heroku-cli
-- npm install -g chromedriver
-- export CHROME_BIN=chromium-browser
+- npm install -g chromedriver@`/usr/bin/google-chrome-stable --version | cut -d "." -f 1 | cut -d " " -f 3`
 - export PATH=$PATH:node_modules/.bin/
 before_deploy:
 - export GIT_REV=`echo $TRAVIS_COMMIT`
@@ -61,6 +60,8 @@ before_deploy:
 - heroku config:set --app pyret-horizon GIT_BRANCH=$GIT_REV
 - rvm $(travis_internal_ruby) --fuzzy do ruby -S gem install faraday -v 1.8.0 # https://travis-ci.community/t/heroku-deploy-fails-installing-dpl-heroku-encounters-faraday-error/12563/2
 install:
+- git submodule init
+- git submodule update
 - npm update # to update Pyret to the newest version
 - npm ci --ignore-scripts
 - make web
