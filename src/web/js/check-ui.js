@@ -756,14 +756,14 @@
               };
             });
           }
-          const qtm_results = {
+          const qtm_results = examplar_results != null ? {
             wheat: examplar_results.wheat.map(x => implementationFilter(x, true)),
             chaff: examplar_results.chaff.filter(isQtmChaff).map(x => implementationFilter(x, true))
-          };
-          const regular_results = {
+          } : null;
+          const regular_results = examplar_results != null ? {
             wheat: examplar_results.wheat.map(x => implementationFilter(x, false)),
             chaff: examplar_results.chaff.filter(cb_array => !isQtmChaff(cb_array)).map(x => implementationFilter(x, false))
-          };
+          } : null;
 
           let examplar_summary = window.wheat.then(wheat => {
             if (wheat.length == 0) return document.createElement("div");
@@ -774,7 +774,7 @@
             header.parentNode.insertBefore(examplar_summary, header.nextSibling);
             header.parentNode.insertBefore(examplar_header, examplar_summary);
 
-            if (qtm_results.chaff.length > 0) {
+            if (qtm_results != null && qtm_results.chaff.length > 0) {
               let qtm_header = document.createElement("h3");
               qtm_header.textContent = "Quartermaster";
               let qtm_summary = drawExamplarResults(blocks, qtm_results, is_qtm_block=true);
