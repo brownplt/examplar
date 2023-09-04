@@ -103,14 +103,14 @@
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
     function get_chaff_name(chaff_result) {
-        let output = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-        let output_as_string = JSON.stringify(output);
-        let prefix = "shared-gdrive://";
-        let start_index = output_as_string.indexOf(prefix) + prefix.length;
-        let to_search = output_as_string.substring(start_index);
-        let end_index = to_search.indexOf(".arr");
-
-        return output_as_string.substring(start_index, start_index + end_index);
+      const all_modules = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
+      const module_filenames = Object.entries(all_modules).map(x => JSON.parse(x[1]["theMap"])["file"]);
+      const filename = module_filenames.find(x => x.includes("chaff"));
+      const split_prefix = "://";
+      const split_suffix = ".arr";
+      const start_index = filename.indexOf(split_prefix) + split_prefix.length;
+      const end_index = filename.indexOf(split_suffix, start_index);
+      return filename.substring(start_index, end_index);
     }
 
     function get_failing_test_locations(result) {
@@ -1246,7 +1246,12 @@
                                        {error: true, wheat: wheat_results.map(r => r.json)});
                 }
                 if (chaff_results) {
-                  chaff_results = chaff_results.map(r => r.json)
+                  chaff_results = chaff_results.map(r => {
+                    return r.json.map(cb_obj => {
+                      cb_obj["filename"] = get_chaff_name(r);
+                      return cb_obj;
+                    });
+                  });
                 }
                 return displayResult(output, runtime, repl.runtime, true, updateItems)(test_results.pyret,
                                      {wheat: wheat_results.map(r => r.json), chaff: chaff_results});

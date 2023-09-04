@@ -26,6 +26,67 @@
     function isTestResult(val) { return runtime.unwrap(runtime.getField(CH, "TestResult").app(val)); }
     function isTestSuccess(val) { return runtime.unwrap(runtime.getField(CH, "is-success").app(val)); }
 
+    function getStrFromLocObj(l) {
+      const name = JSON.parse(l.str);
+      const startLine = name[1].line;
+      const startChar = name[1].ch;
+      const endLine = name[2].line;
+      const endChar = name[2].ch;
+
+      const fileLines = l.doc.children[0].lines;
+      
+      if (startLine == endLine) {
+        return fileLines[startLine].text.substring(startChar, endChar);
+      }
+
+      const firstStr = fileLines[startLine].text.substring(startChar);
+      const betweenLinesStr = fileLines.slice(startLine + 1, endLine).map(l => l.text).join("\n");
+      const lastStr = fileLines[endLine].text.substring(0, endChar);
+
+      return `${firstStr}${betweenLinesStr}${lastStr}`;
+    }
+    const QTM_IN_SUFFIX = "-in-ok";
+    const QTM_OUT_SUFFIX = "-out-ok";
+    function testedFuncHasSuffix(testAstStr, suffix) {
+      // TODO @eerivera: This really needs to be parsed properly. I'm surprised the AST info isn't already available somewhere.
+      const attempt1 = testAstStr.split(" satisfies ");
+      if (attempt1.length == 2) {
+        return attempt1[1].endsWith(suffix);
+      }
+
+      const attempt2 = testAstStr.split(" violates ");
+      if (attempt2.length == 2) {
+        return attempt2[1].endsWith(suffix);
+      }
+
+      const attempt3 = testAstStr.split(" is ");
+      if (attempt3.length == 2) {
+        const funcall = attempt3[1].split("(")[0];
+        return funcall.endsWith(suffix);
+      }
+
+      // If it's not one of the three kinds of tests above, we just assume it's not an in/out-ok test
+      return false;
+    }
+    function isQtmInputTest(test) {
+      let testAsStr = getStrFromLocObj(test.loc);
+      return testedFuncHasSuffix(testAsStr, QTM_IN_SUFFIX);
+    }
+    function isQtmOutputTest(test) {
+      let testAsStr = getStrFromLocObj(test.loc);
+      return testedFuncHasSuffix(testAsStr, QTM_OUT_SUFFIX);
+    }
+    function isQtmTest(test) {
+      let testAsStr = getStrFromLocObj(test.loc);
+      return testedFuncHasSuffix(testAsStr, QTM_IN_SUFFIX) || testedFuncHasSuffix(testAsStr, QTM_OUT_SUFFIX);
+    }
+    function isQtmChaff(cb_array) {
+      let name = cb_array[0].filename;
+      return name.includes(QTM_IN_SUFFIX) || name.includes(QTM_OUT_SUFFIX);
+    }
+
+
+
     // https://stackoverflow.com/a/38327540/7501301
     function groupBy(list, keyGetter) {
         const map = new Map();
@@ -200,7 +261,8 @@
                examplar_results.wheat.length == 0));
     }
 
-    function drawExamplarResults(check_blocks, examplar_results) {
+    function drawExamplarResults(check_blocks, examplar_results, is_qtm_block=false) {
+      const class_prefix = is_qtm_block ? "qtm-" : "";
 
       let container_elt = document.createElement("div");
       container_elt.classList.add("file-examplar-summary");
@@ -227,8 +289,8 @@
       } else if (examplar_results.error) {
         thoroughness_elt.textContent = "ERROR ENCOUNTERED";
         validity_elt.textContent = "INVALID";
-        validity_elt.classList.add("invalid");
-        container_elt.classList.add("invalid");
+        validity_elt.classList.add(`${class_prefix}invalid`);
+        container_elt.classList.add(`${class_prefix}invalid`);
         message_elt.textContent = "A check block encountered an error.";
 
         return container_elt;
@@ -247,8 +309,19 @@
       let all_passed = num_wheats == num_passed;
 
       if (all_passed) {
+        const implementation_to_check = (wheats.length > 0) ? wheats[0] : ((chaffs.length > 0) ? chaffs[0] : undefined);
+        const has_qtm_in_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmInputTest)) : false;
+        const has_qtm_out_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmOutputTest)) : false;
+
+        if (is_qtm_block && !(has_qtm_in_test || has_qtm_out_test)) {
+          validity_elt.textContent = "VALIDITY UNKNOWN";
+          validity_elt.classList.add("maybe-valid");
+          message_elt.innerHTML = `Quartermaster was not run. Refer to the documentation on how to use the <code>*-in-ok</code> and <code>*-out-ok</code> functions to check your inputs and outputs.`;
+          return container_elt;
+        }
+
         validity_elt.textContent = "VALID";
-        validity_elt.classList.add("valid");
+        validity_elt.classList.add(`${class_prefix}valid`);
 
         let num_chaffs = chaffs.length;
 
@@ -271,13 +344,13 @@
                 .reduce((acc, val) => acc.concat(val), []));
 
         let chaff_list = document.createElement('ul');
-        chaff_list.classList.add('chaff_list');
+        chaff_list.classList.add(`${class_prefix}chaff_list`);
 
         function render_chaff(catchers) {
           let chaff = document.createElement('a');
           chaff.setAttribute('href','#');
           chaff.classList.add('chaff');
-          chaff.textContent = '🐛';
+          chaff.textContent = is_qtm_block ? '🌠' : '🐛';
 
           if (catchers.length > 0) {
             chaff.classList.add('caught');
@@ -306,68 +379,82 @@
             chaff_list.appendChild(li);
           });
 
-        message_elt.innerHTML = `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
-
+        const qtm_submessage = has_qtm_in_test
+          ? (has_qtm_out_test
+            ? "inputs and ouputs checked with the <code>*-in-ok</code> and <code>*-out-ok</code> functions"
+            : "inputs checked with the <code>*-in-ok</code> functions")
+          : (has_qtm_out_test
+            ? "outputs checked with the <code>*-out-ok</code> functions"
+            : undefined); // unreachable
+        const input_space_submessage = has_qtm_in_test ? `They also explored ${num_caught} of our ${num_chaffs} envisioned partitions of the input space. Add more inputs that cover more of the input space.` : "";
+        const qtm_message = `The ${qtm_submessage} are <span class="valid">valid and consistent</span> with the assignment handout. ${input_space_submessage}`;
+        
+        message_elt.innerHTML = is_qtm_block
+          ? qtm_message 
+          : `These tests are <span class="valid">valid and consistent</span> with the assignment handout. They caught ${num_caught} of ${num_chaffs} sample buggy programs. Add more test cases to improve this test suite's thoroughness.`;
         thoroughness_elt.appendChild(chaff_list);
 
       } else {
-        // this is unreachable right now :/
+        const things_mismatched = is_qtm_block ? "inputs and/or outputs" : "tests";
+
         thoroughness_elt.textContent = "CONSEQUENTLY, THOROUGHNESS IS UNKNOWN";
         validity_elt.textContent = "INCORRECT";
-        validity_elt.classList.add("invalid");
-        container_elt.classList.add("invalid");
-        message_elt.textContent = "These tests do not match intended behavior:";
+        validity_elt.classList.add(`${class_prefix}invalid`);
+        container_elt.classList.add(`${class_prefix}invalid`);
+        message_elt.textContent = `These ${things_mismatched} do not match intended behavior:`;
 
-        // Only count wfes that are failing across all wheats.
-        // TODO: Handle wfes that are in the inter-wheat space.
-        // Perhaps we should flag them differently in examplar.
-        let num_wfe =
-        wheats.map(
-          wheat => wheat.reduce(
-            (acc, block) => acc + block.tests.reduce(
-              (wfes_in_block, test) => wfes_in_block + (test.passed ? 0 : 1),
-              0), 0))             
-            .reduce((a, b) => Math.max(a, b), -Infinity);
+        // Only display hints outside of Quartermaster
+        if (!is_qtm_block) {
+          // Only count wfes that are failing across all wheats.
+          // TODO: Handle wfes that are in the inter-wheat space.
+          // Perhaps we should flag them differently in examplar.
+          let num_wfe =
+          wheats.map(
+            wheat => wheat.reduce(
+              (acc, block) => acc + block.tests.reduce(
+                (wfes_in_block, test) => wfes_in_block + (test.passed ? 0 : 1),
+                0), 0))             
+              .reduce((a, b) => Math.max(a, b), -Infinity);
 
-        if (window.hint_run) {        
-          try {
-            let hint = getHint();       
-            message_elt.parentElement.appendChild(hint);
+          if (window.hint_run) {        
+            try {
+              let hint = getHint();       
+              message_elt.parentElement.appendChild(hint);
+            }
+            catch (e) {
+              console.error(`Error generating hint: ${e}`)
+            }
+            finally {
+              window.hint_run = false;
+              window.hint_candidates = null;
+            }
           }
-          catch (e) {
-            console.error(`Error generating hint: ${e}`)
-          }
-          finally {
-            window.hint_run = false;
-            window.hint_candidates = null;
+          else { 
+            window.gen_hints =  function () {
+              window.hint_run = true; 
+              window.cloud_log("GEN_HINT", "");
+              document.getElementById('runButton').click()
+            }
+
+            let c = document.createElement("div");
+            c.classList += ["container-fluid"];
+            c.id = "hint_box";
+
+              c.innerHTML = (num_wfe == 1) ?
+                ` <div class="card-body> 
+                      <p class="card-text">
+                        The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
+                        <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
+                        </p> </div>`
+              : `<div class="card-body> <p class="card-text">
+                There are currently too many invalid tests to provide further feedback.
+                The system may be able to provide more directed feedback
+                when there is exactly one invalid test. </p>    
+                </p> </div>`;
+
+            message_elt.parentElement.appendChild(c);
           }
         }
-        else { 
-          window.gen_hints =  function () {
-            window.hint_run = true; 
-            window.cloud_log("GEN_HINT", "");
-            document.getElementById('runButton').click()
-          }
-
-          let c = document.createElement("div");
-          c.classList += ["container-fluid"];
-          c.id = "hint_box";
-
-            c.innerHTML = (num_wfe == 1) ?
-               ` <div class="card-body> 
-                    <p class="card-text">
-                      The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
-                      <button id='hint_button' class="btn btn-success" onclick="window.gen_hints()"> Try to find a hint! </button>
-                      </p> </div>`
-            : `<div class="card-body> <p class="card-text">
-              There are currently too many invalid tests to provide further feedback.
-              The system may be able to provide more directed feedback
-              when there is exactly one invalid test. </p>    
-              </p> </div>`;
-
-          message_elt.parentElement.appendChild(c);
-        }
-
 
         let wheat_catchers =
           wheats.map(
@@ -656,10 +743,46 @@
           header.textContent = this.name;
           container.appendChild(header);
 
+          function implementationFilter(blocks, lookingForQtm) {
+            return blocks.map(block => {
+              return {
+                ...block,
+                tests: block.tests.filter(x => isQtmTest(x) == lookingForQtm).map(x => {
+                  return {
+                    ...x,
+                    name: getStrFromLocObj(x.loc)
+                  };
+                })
+              };
+            });
+          }
+          const qtm_results = examplar_results != null ? {
+            wheat: examplar_results.wheat.map(x => implementationFilter(x, true)),
+            chaff: examplar_results.chaff.filter(isQtmChaff).map(x => implementationFilter(x, true))
+          } : null;
+          const regular_results = examplar_results != null ? {
+            wheat: examplar_results.wheat.map(x => implementationFilter(x, false)),
+            chaff: examplar_results.chaff.filter(cb_array => !isQtmChaff(cb_array)).map(x => implementationFilter(x, false))
+          } : null;
+
           let examplar_summary = window.wheat.then(wheat => {
             if (wheat.length == 0) return document.createElement("div");
-            let examplar_summary = drawExamplarResults(blocks, examplar_results);
+
+            let examplar_header = document.createElement("h3");
+            examplar_header.textContent = "Examplar";
+            let examplar_summary = drawExamplarResults(blocks, regular_results, is_qtm_block=false);
             header.parentNode.insertBefore(examplar_summary, header.nextSibling);
+            header.parentNode.insertBefore(examplar_header, examplar_summary);
+
+            if (qtm_results != null && qtm_results.chaff.length > 0) {
+              let qtm_header = document.createElement("h3");
+              qtm_header.textContent = "Quartermaster";
+              let qtm_summary = drawExamplarResults(blocks, qtm_results, is_qtm_block=true);
+              qtm_summary.style.marginBottom = "3em";
+              header.parentNode.insertBefore(qtm_summary, header.nextSibling);
+              header.parentNode.insertBefore(qtm_header, qtm_summary);
+            }
+            
             return examplar_summary;
           });
 
