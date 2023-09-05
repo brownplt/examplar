@@ -110,11 +110,9 @@
     }
 
     function get_chaff_name(chaff_result) {
-      console.info("chaff_result", chaff_result);
       const program = chaff_result['pyret']['result']['dict']['v']['val']['program'];
       const all_module_keys = program['toLoad'];
       const module_key = all_module_keys.findLast(k => !is_not_codefilename(k));
-      console.info("module_key", module_key);
       const module = program['staticModules'][module_key];
       const filename = JSON.parse(module['theMap'])['file'];
       const split_prefix = "://";
