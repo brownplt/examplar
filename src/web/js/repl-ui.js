@@ -1076,6 +1076,7 @@
                   : s.name.includes("common") ? "common"
                   : null,
                 contents: s.contents,
+                hint_gen: window.hint_run
               }))
         });
 
