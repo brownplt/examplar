@@ -102,11 +102,19 @@
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
+    function is_not_codefilename(filename) {
+      return filename.includes("common.arr") ||
+             filename.includes("tests.arr") ||
+             filename.includes("validation.arr") ||
+             filename == "definitions://";
+    }
+
     function get_chaff_name(chaff_result) {
-      console.info(chaff_result);
+      console.info("chaff_result", chaff_result);
       const program = chaff_result['pyret']['result']['dict']['v']['val']['program'];
       const all_module_keys = program['toLoad'];
-      const module_key = all_module_keys[all_module_keys.length - 2];
+      const module_key = all_module_keys.findLast(k => !is_not_codefilename(k));
+      console.info("module_key", module_key);
       const module = program['staticModules'][module_key];
       const filename = JSON.parse(module['theMap'])['file'];
       const split_prefix = "://";
