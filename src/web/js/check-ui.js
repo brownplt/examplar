@@ -312,11 +312,19 @@
         const implementation_to_check = (wheats.length > 0) ? wheats[0] : ((chaffs.length > 0) ? chaffs[0] : undefined);
         const has_qtm_in_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmInputTest)) : false;
         const has_qtm_out_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(isQtmOutputTest)) : false;
+        const has_exmp_test = (implementation_to_check !== undefined) ? implementation_to_check.some(block => block.tests.some(test => !isQtmTest(test))) : false;
 
         if (is_qtm_block && !(has_qtm_in_test || has_qtm_out_test)) {
           validity_elt.textContent = "VALIDITY UNKNOWN";
           validity_elt.classList.add("maybe-valid");
           message_elt.innerHTML = `Quartermaster was not run. Refer to the documentation on how to use the <code>*-in-ok</code> and <code>*-out-ok</code> functions to check your inputs and outputs.`;
+          return container_elt;
+        }
+        if (!is_qtm_block && !has_exmp_test) {
+          validity_elt.textContent = "VALIDITY UNKNOWN";
+          thoroughness_elt.textContent = "CONSEQUENTLY, THOROUGHNESS IS UNKNOWN";
+          validity_elt.classList.add("maybe-valid");
+          message_elt.innerHTML = `There are no tests yet for Examplar`;
           return container_elt;
         }
 
@@ -756,13 +764,14 @@
               };
             });
           }
-          const qtm_results = examplar_results != null ? {
-            wheat: examplar_results.wheat.map(x => implementationFilter(x, true)),
-            chaff: examplar_results.chaff.filter(isQtmChaff).map(x => implementationFilter(x, true))
+
+          const qtm_results = examplar_results ? {
+            wheat: (examplar_results.wheat ? examplar_results.wheat.map(x => implementationFilter(x, true)) : null),
+            chaff: (examplar_results.chaff ? examplar_results.chaff.filter(isQtmChaff).map(x => implementationFilter(x, true)) : null)
           } : null;
-          const regular_results = examplar_results != null ? {
-            wheat: examplar_results.wheat.map(x => implementationFilter(x, false)),
-            chaff: examplar_results.chaff.filter(cb_array => !isQtmChaff(cb_array)).map(x => implementationFilter(x, false))
+          const regular_results = examplar_results ? {
+            wheat: (examplar_results.wheat ? examplar_results.wheat.map(x => implementationFilter(x, false)) : null),
+            chaff: (examplar_results.chaff ? examplar_results.chaff.filter(cb_array => !isQtmChaff(cb_array)).map(x => implementationFilter(x, false)) : null)
           } : null;
 
           let examplar_summary = window.wheat.then(wheat => {
