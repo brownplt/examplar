@@ -103,11 +103,14 @@
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
     function get_chaff_name(chaff_result) {
-      const all_modules = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-      const module_filenames = Object.entries(all_modules).map(x => JSON.parse(x[1]["theMap"])["file"]);
-      const filename = module_filenames.find(x => x.includes("chaff"));
+      console.info(chaff_result);
+      const program = chaff_result['pyret']['result']['dict']['v']['val']['program'];
+      const all_module_keys = program['toLoad'];
+      const module_key = all_module_keys[all_module_keys.length - 2];
+      const module = program['staticModules'][module_key];
+      const filename = JSON.parse(module['theMap'])['file'];
       const split_prefix = "://";
-      const split_suffix = ".arr";
+      const split_suffix = ".";
       const start_index = filename.indexOf(split_prefix) + split_prefix.length;
       const end_index = filename.indexOf(split_suffix, start_index);
       return filename.substring(start_index, end_index);
