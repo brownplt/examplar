@@ -102,12 +102,21 @@
     var RUNNING_SPINWHEEL_DELAY_MS = 1000;
 
     ///////// Sid: I'd like to put this elsewhere, but this is the quick solution. //////////
+    function is_not_codefilename(filename) {
+      return filename.includes("common.arr") ||
+             filename.includes("tests.arr") ||
+             filename.includes("validation.arr") ||
+             filename == "definitions://";
+    }
+
     function get_chaff_name(chaff_result) {
-      const all_modules = chaff_result['pyret']['result']['dict']['v']['val']['program']['staticModules'];
-      const module_filenames = Object.entries(all_modules).map(x => JSON.parse(x[1]["theMap"])["file"]);
-      const filename = module_filenames.find(x => x.includes("chaff"));
+      const program = chaff_result['pyret']['result']['dict']['v']['val']['program'];
+      const all_module_keys = program['toLoad'];
+      const module_key = all_module_keys.findLast(k => !is_not_codefilename(k));
+      const module = program['staticModules'][module_key];
+      const filename = JSON.parse(module['theMap'])['file'];
       const split_prefix = "://";
-      const split_suffix = ".arr";
+      const split_suffix = ".";
       const start_index = filename.indexOf(split_prefix) + split_prefix.length;
       const end_index = filename.indexOf(split_suffix, start_index);
       return filename.substring(start_index, end_index);
