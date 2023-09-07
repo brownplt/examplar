@@ -662,7 +662,7 @@ $(function() {
   Q.all([window.user, window.assignment_id])
     .then(function([email, id]) {
       function cloud_log_internal({event, time, payload}) {
-        console.info("LOG", {event, time, payload});
+        // console.info("LOG", {event, time, payload});
         navigator.sendBeacon("https://us-central1-pyret-examples.cloudfunctions.net/submit", JSON.stringify({
           email: email,
           assignment: id,
