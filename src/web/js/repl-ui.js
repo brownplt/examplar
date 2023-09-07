@@ -276,7 +276,7 @@
 
       // this function must NOT be called on the pyret stack
       return function(result, examplarResults) {
-        console.info("DISPLAY RESULT", result, examplarResults);
+        //console.info("DISPLAY RESULT", result, examplarResults);
         var doneDisplay = Q.defer();
         var didError = false;
         // Start a new pyret stack.
