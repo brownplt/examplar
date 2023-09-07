@@ -33,7 +33,7 @@
       const endLine = name[2].line;
       const endChar = name[2].ch;
 
-      const fileLines = l.doc.children[0].lines;
+      const fileLines = l.doc.children.map(c => c.lines).reduce((acc, val) => acc.concat(val), []);
       
       if (startLine == endLine) {
         return fileLines[startLine].text.substring(startChar, endChar);
@@ -484,7 +484,7 @@
 
     // NOTE: MUST BE CALLED WHILE RUNNING ON runtime's STACK
     function drawCheckResults(container, documents, runtime, checkResults, result, examplarResults) {
-      console.info("examplarResults", examplarResults);
+      // console.info("examplarResults", examplarResults);
       var ffi = runtime.ffi;
       var cases = ffi.cases;
       var get = runtime.getField;
