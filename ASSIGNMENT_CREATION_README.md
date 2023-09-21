@@ -53,6 +53,15 @@
     copyCompiled(wheats, <'wheat' folder ID>, chaffs, <'chaff' folder ID>, mutants,  <'mutant' folder ID> )
     ```
 
+    **This operation may fail on some web browsers. If so, please use the following workaround**
+    ```javascript
+    copyCompiled(wheats, <'wheat' folder ID>, chaffs, <'chaff' folder ID> )
+    copyCompiled(wheats, <'wheat' folder ID>, mutants,  <'mutant' folder ID> )
+    ```
+
+    If you use the workaround, please go to the target wheat folder and remove any duplicated files.
+
+
 12.  Check that the files, which should now have names ending in '.js',
    are present in the 'wheat', 'chaff', and 'mutant' folders
 
