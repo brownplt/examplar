@@ -201,10 +201,6 @@
 
         let text = "";
         for (var i in candidate_chaffs) {
-
-          console.log("Hint candidates were")
-          console.log(window.hints)
-
           let c = candidate_chaffs[i];
           let chaff_metadata = (c in window.hints) ? window.hints[c] : "Examplar was unable to find a hint.";
           let hint_text =
