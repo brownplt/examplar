@@ -201,8 +201,12 @@
 
         let text = "";
         for (var i in candidate_chaffs) {
+
+          console.log("Hint candidates were")
+          console.log(window.hints)
+
           let c = candidate_chaffs[i];
-          let chaff_metadata = (c in window.hints) ? window.hints[c] : "";
+          let chaff_metadata = (c in window.hints) ? window.hints[c] : "Examplar was unable to find a hint.";
           let hint_text =
             (typeof chaff_metadata === 'string' || chaff_metadata instanceof String)
             ? chaff_metadata // Backcompat: In 2022, there was no chaff metadata.
@@ -438,17 +442,21 @@
             }
           }
           else { 
+            
             window.gen_hints =  function () {
               window.hint_run = true; 
               window.cloud_log("GEN_HINT", "");
               document.getElementById('runButton').click()
             }
 
-            let c = document.createElement("div");
-            c.classList += ["container-fluid"];
-            c.id = "hint_box";
 
-              c.innerHTML = (num_wfe == 1) ?
+            let supports_hints = Object.keys(window.hints).length > 0;
+            if (supports_hints) {
+
+              let c = document.createElement("div");
+              c.classList += ["container-fluid"];
+              c.id = "hint_box";
+              c.innerHTML = (num_wfe == 1)  ?
                 ` <div class="card-body> 
                       <p class="card-text">
                         The system <em>may</em> be able to provide a hint about why this test is invalid.<br><br>
@@ -460,7 +468,8 @@
                 when there is exactly one invalid test. </p>    
                 </p> </div>`;
 
-            message_elt.parentElement.appendChild(c);
+              message_elt.parentElement.appendChild(c);
+              }
           }
         }
 
