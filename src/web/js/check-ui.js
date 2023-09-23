@@ -26,6 +26,14 @@
     function isTestResult(val) { return runtime.unwrap(runtime.getField(CH, "TestResult").app(val)); }
     function isTestSuccess(val) { return runtime.unwrap(runtime.getField(CH, "is-success").app(val)); }
 
+    function getAllLines(doc) {
+      if (doc.lines === undefined) {
+        return doc.children.map(getAllLines).reduce((acc, val) => acc.concat(val), []);
+      } else {
+        return doc.lines;
+      }
+    }
+
     function getStrFromLocObj(l) {
       const name = JSON.parse(l.str);
       const startLine = name[1].line;
@@ -33,7 +41,7 @@
       const endLine = name[2].line;
       const endChar = name[2].ch;
 
-      const fileLines = l.doc.children.map(c => c.lines).reduce((acc, val) => acc.concat(val), []);
+      const fileLines = getAllLines(l.doc);
       
       if (startLine == endLine) {
         return fileLines[startLine].text.substring(startChar, endChar);
