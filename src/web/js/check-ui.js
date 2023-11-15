@@ -89,6 +89,10 @@
       return testedFuncHasSuffix(testAsStr, QTM_IN_SUFFIX) || testedFuncHasSuffix(testAsStr, QTM_OUT_SUFFIX);
     }
     function isQtmChaff(cb_array) {
+      // TODO @eerivera: Need to figure out why this typecheck can sometimes fail.
+      if (!Array.isArray(cb_array) || cb_array.length == 0 || !cb_array[0].filename) {
+        return false;
+      }
       let name = cb_array[0].filename;
       return name.includes(QTM_IN_SUFFIX) || name.includes(QTM_OUT_SUFFIX);
     }
