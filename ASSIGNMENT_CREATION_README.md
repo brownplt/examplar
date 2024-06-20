@@ -8,7 +8,7 @@
       the spec are named `fact` and `fib`, then each of the
       wheat/chaff files should have as header:
       ```
-      provide { fact: fact, fib: fib }
+      provide { fact: fact, fib: fib } end
       provide-types *
       ```
     * If any tests are provided within these implementations they
