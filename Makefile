@@ -160,6 +160,12 @@ build/web/js/require.js: node_modules/requirejs/require.js
 build/web/js/codemirror.js: $(CM)/lib/codemirror.js
 	cp $< $@
 
+build/web/js/codemirror-vim.js: $(CM)/keymap/vim.js
+	cp $< $@
+
+build/web/js/codemirror-matchbrackets.js: $(CM)/addon/edit/matchbrackets.js
+	cp $< $@
+
 build/web/js/rulers.js: $(CM)/addon/display/rulers.js
 	cp $< $@
 
@@ -218,6 +224,8 @@ MISC_JS = build/web/js/q.js \
 	   build/web/js/url.js \
 	   build/web/js/require.js \
 	   build/web/js/codemirror.js \
+   	   build/web/js/codemirror-vim.js \
+   	   build/web/js/codemirror-matchbrackets.js \
 	   build/web/js/rulers.js \
 	   build/web/js/mark-selection.js \
 	   build/web/js/pyret-mode.js \
@@ -244,11 +252,13 @@ MISC_JS = build/web/js/q.js \
 	   build/web/js/lifecycle.js \
            build/web/js/jszip.js \
            build/web/js/FileSaver.js
-  
+
 
 EDITOR_MISC_JS = build/web/js/q.js \
 		  build/web/js/loader.js \
 		  build/web/js/codemirror.js \
+  		  build/web/js/codemirror-vim.js \
+  		  build/web/js/codemirror-matchbrackets.js \
 		  build/web/js/rulers.js \
 		  build/web/js/scrollpastend.js \
 		  build/web/js/foldcode.js \
