@@ -416,6 +416,11 @@
           console.log(payload);
           window.cloud_log(event_type, payload);
         }
+
+
+        // [SP TODO: Can we hook something similar up for CND feedback?]
+
+
       }
       catch (e) {
         console.error('Error generating hint:', e)
