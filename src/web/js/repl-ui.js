@@ -25,7 +25,8 @@
     },
     { "import-type": "builtin",
       name: "load-lib"
-    }
+    },
+    { "import-type": "builtin", "name": "image-lib" }
   ],
   nativeRequires: [
     "pyret-base/js/runtime-util"
@@ -34,7 +35,7 @@
   theModule: function(runtime, _, uri,
                       checkUI, outputUI, errorUI,
                       textHandlers, replHistory,
-                      worldLib, loadLib,
+                      worldLib, loadLib, imageLib,
                       util) {
     var ffi = runtime.ffi;
 
@@ -255,8 +256,15 @@
         // because of this call to `pauseStack`
         return runtime.pauseStack(function (restarter) {
           // error_to_html must not be called on the pyret stack
-          return error_to_html(runtime, CPO.documents, error, stack, result).
-            then(function (html) {
+          let html;
+          if(error instanceof Error) {
+            html = Q($("<span>").text(String(error)));
+          }
+          else {
+            html = error_to_html(runtime, CPO.documents, error, stack, result)
+          }
+          return html
+            .then(function (html) {
               html.on('click', function(){
                 $(".highlights-active").removeClass("highlights-active");
                 html.trigger('toggleHighlight');
@@ -289,7 +297,12 @@
             // Parse Errors
             // `renderAndDisplayError` must be called on the pyret stack
             // this application runs in the context of the above `callingRuntime.runThunk`
-            return renderAndDisplayError(callingRuntime, result.exn.exn, [], true, result);
+            let toRender = result.exn.exn;
+            if(!('exn' in result.exn)) {
+              console.error("Got an error that we're not sure how to render (render-reason would get undefined). Likely a JS error leaked through the Pyret runtime.", result);
+              toRender = result.exn;
+            }
+            return renderAndDisplayError(callingRuntime, toRender, [], true, result);
           }
           else if(callingRuntime.isSuccessResult(result)) {
             result = result.result;
@@ -535,7 +548,7 @@
           CM.focus();
         }
       });
-
+      
       function maybeShowOutputPending() {
         outputPendingHidden = false;
         setTimeout(function() {
@@ -670,8 +683,17 @@
                 savedOptions = options;
                 return $.extend({}, options, {chartArea: null});
               });
+              const img = document.createElement('img');
+              img.src = args.getImageURI();
+              const temp = document.createElement('canvas');
+              temp.width = img.width;
+              temp.height = img.height;
+              const ctx = temp.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+              const image = runtime.getField(imageLib, "internal");
+              const trimmed = image.trimCanvas(temp);
               const download = document.createElement('a');
-              download.href = args.getImageURI();
+              download.href = trimmed.toDataURL();
               download.download = 'chart.png';
               // from https://stackoverflow.com/questions/3906142/how-to-save-a-png-from-javascript-variable
               function fireEvent(obj, evt){
@@ -688,6 +710,10 @@
               fireEvent(download, 'click');
               args.draw(_ => savedOptions);
             });
+          },
+          resizeStop: (_, ui) => {
+            if (timeoutTrigger) clearTimeout(timeoutTrigger);
+            timeoutTrigger = setTimeout(args.draw, 100, ui);
           },
           resize: () => {
             if (timeoutTrigger) clearTimeout(timeoutTrigger);
@@ -789,7 +815,7 @@
       }
 
       var img = $("<img>").attr({
-        "src": "/img/pyret-spin.gif",
+        "src": window.APP_BASE_URL + "/img/pyret-spin.gif",
         "width": "25px",
       }).css({
         "vertical-align": "middle"
@@ -1290,9 +1316,9 @@
 
       var runner = function(code, synthetic) {
         if(!synthetic) {
-          CPO.triggerOnInteraction(code);
+          CPO.events.triggerOnInteraction(code);
         }
-        if(running) { return; }
+        if(running) { console.log("Skipping a run because a run is happening already: ", code, synthetic); return; }
         running = true;
         var thiscode = {code: code, erroroutput: false, start: false, end: false, dup: false};
         history.addToHistory(thiscode);
@@ -1395,7 +1421,8 @@
         refresh: function() { CM.refresh(); },
         runCode: runMainCode,
         runner: runner,
-        focus: function() { CM.focus(); }
+        focus: function() { CM.focus(); },
+        stop: onBreak
       };
     }
 

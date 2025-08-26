@@ -320,12 +320,17 @@ body {
   font-size: var(--numbers-font-size);
   text-decoration: var(--numbers-text-decoration);
 }
-.cm-s-default .cm-roughnum { 
+.cm-s-default .cm-roughnum, .cm-s-default .cm-roughnum-start { 
   color: var(--rough-nums);
   font-weight: var(--rough-nums-font-weight);
   font-style: var(--rough-nums-font-style);
   font-size: var(--rough-nums-font-size);
   text-decoration: var(--rough-nums-text-decoration);
+}
+.cm-s-default .cm-roughnum-start {
+  display: inline-block;
+  transform: rotate(-15deg) scale(1.5);
+  margin-right: 0.125em;
 }
 .cm-s-default .cm-bad-number { 
   color: var(--bad-numbers);
@@ -477,6 +482,7 @@ div.CodeMirror span.CodeMirror-nonmatchingbracket-region {
 
 div.trace {
   overflow-x: auto;
+  padding-top: 1px;
 }
 div.trace.error {
    background-color: var(--trace-err-bg);
@@ -1558,14 +1564,14 @@ code div {
 .warning-upper {
   animation-name: arrow-upper-bounce;
   background-image:
-      url('/img/up-arrow.png'),
+      url('../img/up-arrow.png'),
       linear-gradient(to bottom,  var(--warning-gradient-1) 0%,var(--warning-gradient-2) 50%);
 }
 
 .warning-lower {
   animation-name: arrow-lower-bounce;
   background-image:
-      url('/img/down-arrow.png'),
+      url('../img/down-arrow.png'),
       linear-gradient(to top,  var(--warning-gradient-1) 0%,var(--warning-gradient-2) 50%);
 }
 
@@ -1618,6 +1624,10 @@ code div {
   background-color: var(--ui-dialog-default);
   border-radius: 5px;
   z-index: 15000;
+}
+
+#vg-tooltip-element {
+  z-index: 15100;
 }
 
 .ui-dialog-titlebar {
@@ -1694,10 +1704,16 @@ body.smallHeader #handle {
 }
 
 #runButton, #breakButton {
-  min-width: 180px;
   padding-left: 30px;
   padding-right: 30px;
   box-shadow: 0px -5px 5px 1px var(--shadow-color);
+}
+
+
+@media only screen and (min-width: 700px) {
+  #runButton, #breakButton {
+    min-width: 180px;
+  }
 }
 
 body.smallHeader #runButton, body.smallHeader #breakButton {
@@ -1967,7 +1983,7 @@ body.smallHeader #run-dropdown-content {
   display: block;
   min-height: 3em;
   min-width: 3em;
-  background-image: url(/img/pyret-spin.gif);
+  background-image: url(../img/pyret-spin.gif);
   background-size: contain;
   background-repeat: no-repeat;
   flex: 1;
@@ -2154,6 +2170,9 @@ body.smallHeader #run-dropdown-content {
   transition: .1s background-color linear .3s;
   background-color: var(--surrounding-check-spotlight-bg);
 }
+#main.spotlight .replOutput {
+  opacity: 0.5;
+}
 
 .stacktrace > div .CodeMirror-vscrollbar {
   display:none!important;
@@ -2177,6 +2196,7 @@ table {
     display: table!important;
     border:1px var(--table-border) solid;
     border-radius:1em;
+    border-collapse: separate;
     overflow:hidden;
     background:var(--table-bg);
 }
@@ -2280,6 +2300,12 @@ table.pyret-table th,
 table.pyret-table td {
   border-right: 1px var(--pyret-table-col-dividers) solid;
   border-bottom: 1px var(--pyret-table-row-dividers) solid;
+}
+table.pyret-table.pyret-matrix {
+  border-top-width: 0px;
+  border-bottom-width: 0px;
+  border-left-width: 2px;
+  border-right-width: 2px;
 }
 
 table.pyret-table thead {
@@ -2404,7 +2430,7 @@ table.pyret-row {
 .modal .close{
   border: 1px solid #ccc;
   background: white;
-  color: #999;
+  color: var(--run-bg);
   margin-right: 16px;
 }
 

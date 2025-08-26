@@ -124,7 +124,7 @@ window.CPO = {
   documents : new Documents()
 };
 $(function() {
-  const CONTEXT_FOR_NEW_FILES = '<scriptsonly app="Snap! 9.0, https://snap.berkeley.edu" version="2"><script x="0" y="0"><custom-block s="use context essentials2021"></custom-block></script></scriptsonly>';
+  const CONTEXT_FOR_NEW_FILES = '<scriptsonly app="Snap! 9.0, https://snap.berkeley.edu" version="2"><script x="0" y="0"><custom-block s="use context starter2024"></custom-block></script></scriptsonly>';
   function merge(obj, extension) {
     var newobj = {};
     Object.keys(obj).forEach(function(k) {
@@ -454,7 +454,7 @@ $(function() {
       const shared = $("<tt>shared-gdrive(...)</tt>");
       const currentContextElt = $("<tt>" + currentContext + "</tt>");
       greeting.append("Enter the context to use for the program, or choose “Cancel” to keep the current context of ", currentContextElt, ".");
-      const essentials = $("<tt>essentials2021</tt>");
+      const essentials = $("<tt>starter2024</tt>");
       const list = $("<ul>")
         .append($("<li>").append("The default is ", essentials, "."))
         .append($("<li>").append("You might use something like ", shared, " if one was provided as part of a course."));
@@ -501,6 +501,7 @@ $(function() {
   function updateName(p) {
     filename = p.getName();
     $("#filename").text(" (" + truncateName(filename) + ")");
+    $("#filename").attr('title', filename);
     setTitle(filename);
     showShareContainer(p);
   }
@@ -795,6 +796,7 @@ $(function() {
         title: "Rename this file",
         style: "text",
         narrow: true,
+        submitText: "Rename",
         options: [
           {
             message: "The new name for the file:",
@@ -1372,21 +1374,19 @@ $(function() {
 
   });
 
-  const onRunHandlers = [];
-  function onRun(handler) {
-    onRunHandlers.push(handler);
+  function makeEvent() {
+    const handlers = [];
+    function on(handler) {
+      handlers.push(handler);
+    }
+    function trigger(v) {
+      handlers.forEach(h => h(v));
+    }
+    return [on, trigger];
   }
-  function triggerOnRun() {
-    onRunHandlers.forEach(h => h());
-  }
-
-  const onInteractionHandlers = [];
-  function onInteraction(handler) {
-    onInteractionHandlers.push(handler);
-  }
-  function triggerOnInteraction(interaction) {
-    onInteractionHandlers.forEach(h => h(interaction));
-  }
+  let [ onRun, triggerOnRun ] = makeEvent();
+  let [ onInteraction, triggerOnInteraction ] = makeEvent();
+  let [ onLoad, triggerOnLoad ] = makeEvent();
 
   programLoaded.fin(function() {
     CPO.editor.focus();
@@ -1398,14 +1398,32 @@ $(function() {
   CPO.updateName = updateName;
   CPO.showShareContainer = showShareContainer;
   CPO.loadProgram = loadProgram;
+  CPO.storageAPI = storageAPI;
   CPO.cycleFocus = cycleFocus;
   CPO.say = say;
   CPO.sayAndForget = sayAndForget;
-  CPO.onRun = onRun;
-  CPO.triggerOnRun = triggerOnRun;
-  CPO.onInteraction = onInteraction;
-  CPO.triggerOnInteraction = triggerOnInteraction;
+  CPO.events = {
+    onRun,
+    triggerOnRun,
+    onInteraction,
+    triggerOnInteraction,
+    onLoad,
+    triggerOnLoad
+  };
 
+  let initialState = params["get"]["initialState"];
+
+  if (typeof acquireVsCodeApi === "function") {
+    window.MESSAGES = makeEvents({
+      CPO: CPO,
+      sendPort: acquireVsCodeApi(),
+      receivePort: window,
+      initialState
+    });
+  }
+  else if((window.parent && (window.parent !== window)) || process.env.NODE_ENV === "development") {
+    window.MESSAGES = makeEvents({ CPO: CPO, sendPort: window.parent, receivePort: window, initialState });
+  }
   if(localSettings.getItem("sawSummer2021Message") !== "saw-summer-2021-message") {
     const message = $("<span>");
     const notes = $("<a target='_blank' style='color: white'>").attr("href", "https://www.pyret.org/release-notes/summer-2021.html").text("release notes");

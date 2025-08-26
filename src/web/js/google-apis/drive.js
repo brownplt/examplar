@@ -60,7 +60,6 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
     + "https://www.googleapis.com/auth/drive.install";
   var FOLDER_MIME =  "application/vnd.google-apps.folder";
   var BACKREF_KEY = "originalProgram";
-  var PUBLIC_LINK = "pubLink";
 
   function createAPI(baseCollection) {
     var shareCollection = findOrCreateDirectory(collectionName + ".shared");
@@ -229,14 +228,22 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           return newFile.then(fileBuilder);
         },
         save: function(contents, newRevision) {
-          // NOTE(joe): newRevision: false will cause badRequest errors as of
-          // April 30, 2014
-          if(newRevision) {
-            var params = { 'newRevision': true };
-          }
-          else {
-            var params = {};
-          }
+          const boundary = '-------314159265358979323846';
+          const delimiter = "\r\n--" + boundary + "\r\n";
+          const close_delim = "\r\n--" + boundary + "--";
+          var metadata = {
+            'mimeType': mimeType,
+            'fileExtension': fileExtension
+          };
+          var multipartRequestBody =
+              delimiter +
+              'Content-Type: application/json\r\n\r\n' +
+              JSON.stringify(metadata) +
+              delimiter +
+              'Content-Type: text/plain\r\n' +
+              '\r\n' +
+              contents +
+              close_delim;
 
           var request = gwrap.request({
             'path': '/upload/drive/v2/files/' + googFileObject.id,
@@ -290,7 +297,13 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
           let req = drive.files.get({fileId: id}).then(fileBuilder);
           file_cache.set(id, req);
           return req;
-        }
+        } 
+      },
+      makeUrlFile: function(url) {
+        return makeUrlFile(url);
+      },
+      makeUrlFile: function(url) {
+        return makeUrlFile(url);
       },
       getFileByName: function(name) {
         return this.getAllFiles().then(function(files) {
@@ -303,12 +316,16 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
         });
       },
       getSharedFileById: function(id) {
-        var fromDrive = drive.files.get({fileId: id}, true).then(function(googFileObject) {
-          return makeSharedFile(googFileObject, true);
-        });
-        fromDrive.catch(function(e){
-          console.error("BAH", e);
-        });
+        if(!publicOnly) {
+          var fromDrive = drive.files.get({fileId: id}, true).then(function(googFileObject) {
+            return makeSharedFile(googFileObject, true);
+          });
+        }
+        else {
+          var fromDriveQ = Q.defer();
+          fromDriveQ.reject("No shared files directly from client with publicOnly=true");
+          var fromDrive = fromDriveQ.promise;
+        }
         var fromServer = fromDrive.fail(function() {
           return Q($.get("/shared-file", {
             sharedProgramId: id
@@ -548,6 +565,19 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
       }
     };
 
+    if(!publicOnly) {
+      var shareCollection = findOrCreateDirectory(collectionName + ".shared");
+      var cacheCollection = findOrCreateCacheDirectory(collectionName + ".compiled");
+    }
+    else {
+      var shareCollectionQ = Q.defer();
+      var cacheCollectionQ = Q.defer();
+      shareCollectionQ.reject("No share collection with publicOnly=true");
+      cacheCollectionQ.reject("No cache collection with publicOnly=true");
+      shareCollection = shareCollectionQ.promise;
+      cacheCollection = cacheCollectionQ.promise;
+    }
+
     return {
       api: api,
       collection: baseCollection,
@@ -588,7 +618,14 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
 
   function initialize(wrappedDrive) {
     drive = wrappedDrive;
-    var baseCollection = findOrCreateDirectory(collectionName);
+    if(!publicOnly) {
+      var baseCollection = findOrCreateDirectory(collectionName);
+    }
+    else {
+      var baseCollectionQ = Q.defer();
+      baseCollectionQ.reject("No base collection with publicOnly=true");
+      var baseCollection = baseCollectionQ.promise;
+    }
     return createAPI(baseCollection);
   }
 
@@ -596,10 +633,45 @@ window.createProgramCollectionAPI = function createProgramCollectionAPI(collecti
   gwrap.load({name: 'drive',
               version: 'v2',
               reauth: {
-                immediate: immediate
+                immediate: immediate,
+                publicOnly
               },
               callback: function(drive) {
                 ret.resolve(initialize(drive));
               }});
   return ret.promise;
+}
+
+function makeUrlFile(url) {
+  const p = Q.defer();
+  p.resolve({
+    shared: true,
+    getOriginal: function() {
+      throw new Error("Cannot getOriginal for a file created from a URL")
+    },
+    getContents: function() {
+      const ans = Q.defer();
+      fetch(url).then(async function(contents) {
+        ans.resolve(await contents.text());
+      })
+      .catch(function(err) {
+        ans.reject(err);
+      });
+      return ans.promise;
+    },
+    getName: function() {
+      const lastSlash = String(url).lastIndexOf("/");
+      if(lastSlash === -1) {
+        return url;
+      }
+      return url.slice(lastSlash + 1);
+    },
+    getModifiedTime: function() {
+      return new Date();
+    },
+    getUniqueId: function() {
+      return url;
+    }
+  });
+  return p.promise;
 }

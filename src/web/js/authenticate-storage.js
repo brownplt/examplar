@@ -4,7 +4,13 @@ var sheetsAPIDeferred = Q.defer();
 window.storageAPI = storageAPIDeferred.promise;
 window.sheetsAPI = sheetsAPIDeferred.promise;
 
-window.handleClientLoad = function handleClientLoad(apiKey) {
+window.handleClientLoad = function handleClientLoad(apiKey, publicOnly) {
+  if(!window.gapi || !window.gapi.client) {
+    storageAPIDeferred.reject("no gapi.client");
+    sheetsAPIDeferred.reject("no gapi.client");
+    console.log("Not logged in; proceeding without login info");
+    return;
+  }
   gapi.client.setApiKey(apiKey);
   var api = createProgramCollectionAPI("pyret.cs.brown.edu", true);
 

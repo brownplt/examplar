@@ -19,12 +19,21 @@ em {
   width: 100%;
   height: 100%;
   z-index: 8700;
-  background: url(/img/pyret-spin.gif) 50% 50% no-repeat,
-    url(/img/loading.svg);
-  background-size: auto 20%, 100px 100px;
+  background: url('../img/pyret-spin.gif') 50% 30% no-repeat rgba(249, 249, 249, 0.5);
+  background-size: 50px 50px;
 }
 
 body.hideDefinitions #loader, body.hideDefinitions .replContainer {
+  left: -5px;
+  width: 100%;
+}
+
+body.hideDefinitions .replMain, body.hideDefinitions #handle,
+body.hideInteractions .replContainer, body.hideDefinitions #handle {
+  display: none;
+}
+
+body.hideInteractions #loader, body.hideInteractions .replMain {
   left: -5px;
   width: 100%;
 }
@@ -33,9 +42,6 @@ body.hideFooter #loader {
   bottom: 0px;
 }
 
-body.hideDefinitions .replMain, body.hideDefinitions #handle {
-  display: none;
-}
 
 #help-keys {
   position: fixed;

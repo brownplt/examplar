@@ -98,6 +98,7 @@ fun check-image(v :: IM.Image) -> Nothing: nothing end
 
 fst = raw-array-get(_, 0)
 snd = raw-array-get(_, 1)
+thd = raw-array-get(_, 2)
 posn = {(x :: Number, y :: Number): [raw-array: x, y]}
 
 sprintf = (lam():
@@ -331,6 +332,13 @@ line-width-method = method(self, lineWidth :: Number) block:
     raise("line-width: Line Width must be non-negative")
   end
   self.constr()(self.obj.{lineWidth: lineWidth})
+end
+
+style-method = method(self, style :: String) block:
+  when not(string-equal(style, "sticks")) and not(string-equal(style, "bars")) and not(string-equal(style, "boxes")):
+    raise("style: must be either sticks, bars, or boxes")
+  end
+  self.constr()(self.obj.{style: style})
 end
 
 curve-method = method(self, curved :: Boolean):
@@ -964,6 +972,29 @@ fun get-bounding-box(ps :: List<Posn>) -> BoundingBox:
   end
 end
 
+fun get-list-of-bounding-boxes(list-of-plots, self, other-accessor) -> List<BoundingBox>:
+  for map(plot-pts from list-of-plots):
+    for filter(pt from plot-pts):
+      cases (Option) self.x-min:
+        | none => true
+        | some(v) => fst(pt) >= v
+      end and
+      cases (Option) self.x-max:
+        | none => true
+        | some(v) => fst(pt) <= v
+      end and
+      cases (Option) self.y-min:
+        | none => true
+        | some(v) => other-accessor(pt) >= v
+      end and
+      cases (Option) self.y-max:
+        | none => true
+        | some(v) => other-accessor(pt) <= v
+      end
+    end ^ get-bounding-box
+  end
+end
+
 fun merge-bounding-box(bs :: List<BoundingBox>) -> BoundingBox:
   for fold(prev from default-bounding-box, e from bs):
     ask:
@@ -1026,7 +1057,8 @@ type BarChartSeries = {
   horizontal :: Boolean,
   annotations :: RawArray<RawArray<Option<String>>>,
   intervals :: RawArray<RawArray<RawArray<Number>>>,
-  default-interval-color :: Option<I.Color>
+  default-interval-color :: Option<I.Color>,
+  dot-chart :: Boolean,
 }
 
 default-bar-chart-series = {
@@ -1036,7 +1068,8 @@ default-bar-chart-series = {
   pointer-color: none,
   axisdata: none, 
   horizontal: false, 
-  default-interval-color: none
+  default-interval-color: none,
+  dot-chart: false,
 }
 
 type MultiBarChartSeries = { 
@@ -1096,6 +1129,7 @@ type LinePlotSeries = {
   pointshapeSides :: NumInteger, 
   pointshapeDent :: Number, 
   pointshapeRotation :: Number,
+  dot-chart :: Boolean,
 }
 
 default-line-plot-series = {
@@ -1115,6 +1149,7 @@ default-line-plot-series = {
   pointshapeSides: 5,
   pointshapeDent: 0.5,
   pointshapeRotation: 0,
+  dot-chart: false,
 }
 
 type ScatterPlotSeries = {
@@ -1131,6 +1166,7 @@ type ScatterPlotSeries = {
   pointshapeSides :: NumInteger, 
   pointshapeDent :: Number, 
   pointshapeRotation :: Number,
+  dot-chart :: Boolean,
 }
 
 default-scatter-plot-series = {
@@ -1146,6 +1182,61 @@ default-scatter-plot-series = {
   trendlineWidth: 3, 
   trendlineOpacity: 0.3,
   trendlineDegree: 3,  
+  dot-chart: false
+}
+
+type IntervalChartSeries = {
+  tab :: TableIntern,
+  axisdata :: Option<AxisData>,
+  color :: Option<I.Color>,
+  pointers :: Option<RawArray<Pointer>>,
+  pointer-color :: Option<I.Color>,
+  point-size :: Number,
+  lineWidth :: Number,
+  stick-width :: Number,
+  style :: String,
+  horizontal :: Boolean,
+  default-interval-color :: Option<I.Color>,
+  legend :: String,
+  trendlineType :: Option<String>,
+  trendlineColor :: Option<I.Color>,
+  trendlineWidth :: Number,
+  trendlineOpacity :: Number,
+  trendlineDegree :: NumInteger,
+  # curved :: String,
+  # dashedLine :: Boolean,
+  # dashlineStyle :: RawArray<NumInteger>,
+  pointshapeType :: String,
+  pointshapeSides :: NumInteger,
+  pointshapeDent :: Number,
+  pointshapeRotation :: Number,
+  bothys :: List<Posn>,
+  ps :: List<Posn>,
+  dot-chart :: Boolean,
+}
+
+default-interval-chart-series = {
+  color: some(C.red),
+  pointers: none,
+  pointer-color: some(C.color(228, 147, 7, 1)),
+  point-size: 4,
+  lineWidth: 0,
+  stick-width: 1,
+  axisdata: none,
+  horizontal: false,
+  style: "bars",
+  default-interval-color: none,
+  legend: '',
+  trendlineType: none,
+  trendlineColor: none,
+  trendlineWidth: 3,
+  trendlineOpacity: 0.3,
+  trendlineDegree: 3,
+  pointshapeType: 'circle',
+  pointshapeSides: 5,
+  pointshapeDent: 0.5,
+  pointshapeRotation: 0,
+  dot-chart: false,
 }
 
 type FunctionPlotSeries = {
@@ -1229,6 +1320,27 @@ type BarChartWindowObject = {
 }
 
 default-bar-chart-window-object :: BarChartWindowObject = default-chart-window-object.{
+  x-axis: '',
+  y-axis: '',
+  y-min: none,
+  y-max: none,
+}
+
+type IntervalChartWindowObject = {
+  title :: String,
+  width :: Number,
+  height :: Number,
+  backgroundColor :: Option<I.Color>,
+  borderSize :: Number,
+  borderColor :: Option<I.Color>,
+  render :: ( -> IM.Image),
+  x-axis :: String,
+  y-axis :: String,
+  y-min :: Option<Number>,
+  y-max :: Option<Number>,
+}
+
+default-interval-chart-window-object :: IntervalChartWindowObject = default-chart-window-object.{
   x-axis: '',
   y-axis: '',
   y-min: none,
@@ -1378,6 +1490,36 @@ data DataSeries:
     error-bars: single-error-bars-method,
     interval-color: interval-color-method, 
     constr: {(): bar-chart-series},
+  | interval-chart-series(obj :: IntervalChartSeries) with:
+    is-single: false,
+    color: color-method,
+    colors: color-list-method,
+    legend: legend-method,
+    sort: default-sort-method,
+    sort-by: sort-method,
+    sort-by-label: label-sort-method,
+    add-pointers: axis-pointer-method,
+    pointer-color: pointer-color-method,
+    format-axis: format-axis-data-method,
+    make-axis: make-axis-data-method,
+    scale: scale-method,
+    lineWidth: line-width-method,
+    style: style-method,
+    trendline-type: trendline-type-method,
+    method point-size(self, point-size :: Number) block:
+      when point-size < 0:
+        raise("point-size: Point Size must be non-negative")
+      end
+      self.constr()(self.obj.{point-size: point-size})
+    end,
+    method horizontal(self, b :: Boolean):
+      self.constr()(self.obj.{horizontal: b})
+    end,
+    annotations: single-annotations-method,
+    intervals: single-intervals-method,
+    error-bars: single-error-bars-method,
+    interval-color: interval-color-method,
+    constr: {(): interval-chart-series},
   | multi-bar-chart-series(obj :: MultiBarChartSeries) with: 
     is-single: true,
     colors: color-list-method,
@@ -1459,6 +1601,12 @@ data ChartWindow:
     max: max-method,
   | bar-chart-window(obj :: BarChartWindowObject) with:
     constr: {(): bar-chart-window},
+    x-axis: x-axis-method,
+    y-axis: y-axis-method,
+    y-min: y-min-method,
+    y-max: y-max-method,
+  | interval-chart-window(obj :: IntervalChartWindowObject) with:
+    constr: {(): interval-chart-window},
     x-axis: x-axis-method,
     y-axis: y-axis-method,
     y-min: y-min-method,
@@ -1776,6 +1924,92 @@ fun bar-chart-from-list(labels :: P.LoS, values :: P.LoN) -> DataSeries block:
   data-series.make-axis(max-positive-height, max-negative-height)
 end
 
+fun num-dot-chart-from-list(x-values :: P.LoN) -> DataSeries block:
+  doc: ```
+       Consume a (possibly repeating, unordered) list of numbers
+       and construct a dot chart
+       ```
+  x-values.each(check-num)
+  when x-values.length() == 0:
+    raise("num-dot-chart: can't have empty data")
+  end
+  scatter-plot-ys = x-values.map(lam(_): 0 end)
+  default-scatter-plot-series.{
+    ps: map4({(x, y, z, img): [raw-array: x, y, z, img]},
+      x-values, scatter-plot-ys,
+      x-values.map({(_): ''}), x-values.map({(_): false})),
+    dot-chart: true
+  } ^ scatter-plot-series
+end
+
+fun labeled-num-dot-chart-from-list(labels :: P.LoS, x-values :: P.LoN) -> DataSeries block:
+  doc: ```
+       Consume unordered, possibly-repeating lists of labels and numbers, 
+       and construct a dot chart
+       ```
+  x-values.each(check-num)
+  when x-values.length() == 0:
+    raise("num-dot-chart: can't have empty data")
+  end
+  labels.each(check-string)
+  when labels.length() <> x-values.length():
+    raise("num-dot-chart: the lists of numbers and labels must have the same length")
+  end
+  scatter-plot-ys = x-values.map(lam(_): 0 end)
+  default-scatter-plot-series.{
+    ps: map4({(x, y, z, img): [raw-array: x, y, z, img]},
+      x-values, scatter-plot-ys, labels,
+      x-values.map({(_): false})),
+    dot-chart: true
+  } ^ scatter-plot-series
+end
+
+fun dot-chart-from-list(input-labels :: P.LoS) -> DataSeries block:
+  doc: ```
+       Consume a list of string-values and construct a dot chart
+       ```
+
+  # Edge Case Error Checking
+  when input-labels.length() == 0:
+    raise("dot-chart: can't have empty data")
+  end
+
+  # Type Checking
+  input-labels.each(check-string)
+
+  # Walk through the (sorted) values, creating lists of labels and counts
+  unique-counts = foldl(
+    lam(acc, elt):
+      labels = acc.{0}
+      counts = acc.{1}
+      if labels.member(elt):
+        {labels; counts.set(0, counts.get(0) + 1)}
+      else:
+        {link(elt, labels); link(1, counts)}
+      end
+    end,
+    {[list: ]; [list: ]},
+    input-labels.sort())
+
+  labels = unique-counts.{0}
+  values = unique-counts.{1}
+  rational-values = map(num-to-rational, values)
+
+  # set the vAxis values, and create the data series
+  {max-positive-height; max-negative-height} = prep-axis(rational-values)
+
+  data-series = default-bar-chart-series.{
+    tab: to-table2-n(labels, rational-values),
+    dot-chart: true,
+    axis-top: max-positive-height,
+    axis-bottom: max-negative-height,
+    annotations: values.map({(_): [list: none]}) ^ list-to-table2,
+    intervals: values.map({(_): [list: [raw-array: ]]}) ^ list-to-table2,
+  } ^ bar-chart-series
+
+  data-series.make-axis(max-positive-height, max-negative-height)
+end
+
 fun grouped-bar-chart-from-list(
   labels :: P.LoS,
   value-lists :: P.LoLoN,
@@ -1871,6 +2105,40 @@ fun stacked-bar-chart-from-list(
   } ^ multi-bar-chart-series
 
   data-series.make-axis(max-positive-height, max-negative-height)
+end
+
+fun interval-chart-from-list(
+  xs :: P.LoN,
+  ys :: P.LoN,
+  deltas :: P.LoN
+) -> DataSeries block:
+  doc: ```
+       Consumes a list of x's, a list of y's, and a list of deltas
+       and constructs an line plot with stick intervals pointing
+       from each y to the corresponding delta
+       ```
+  xs-length = xs.length()
+  ys-length = ys.length()
+  deltas-length = deltas.length()
+  when xs-length <> ys-length:
+    raise('interval-chart: xs and ys should have the same length')
+  end
+  when xs-length <> deltas-length:
+    raise('interval-chart: deltas should have the same length as xs and ys')
+  end
+  when xs-length == 0:
+    raise('interval-chart: need at least one datum')
+  end
+  xs.each(check-num)
+  ys.each(check-num)
+  deltas.each(check-num)
+  yprimes = map2(lam(y, delta): y - delta end, ys, deltas)
+
+  default-interval-chart-series.{
+    tab: to-table3-n(xs, ys, yprimes), #new
+    bothys: map3({(x, y, yp): [raw-array: x, y, yp]}, xs, ys, yprimes),
+    ps: map4({(x, y, z, img): [raw-array: x, y, z, img]}, xs, ys, xs.map({(_): ''}), xs.map({(_): false})),
+  } ^ interval-chart-series
 end
 
 fun box-plot-from-list(values :: P.LoLoN) -> DataSeries:
@@ -2015,6 +2283,7 @@ fun render-chart(s :: DataSeries) -> ChartWindow:
     | line-plot-series(_) => render-charts([list: s])
     | function-plot-series(_) => render-charts([list: s])
     | scatter-plot-series(_) => render-charts([list: s])
+    | interval-chart-series(_) => render-charts([list: s])
     | pie-chart-series(obj) =>
       default-pie-chart-window-object.{
         method render(self): P.pie-chart(self, obj) end
@@ -2329,7 +2598,9 @@ fun render-charts(lst :: List<DataSeries>) -> ChartWindow:
   is-show-samples = is-link(function-plots)
   shadow partitioned = partition(is-line-plot-series, partitioned.is-false)
   line-plots = partitioned.is-true.map(_.obj)
-  scatter-plots = partitioned.is-false.map(_.obj)
+  shadow partitioned = partition(is-scatter-plot-series, partitioned.is-false)
+  scatter-plots = partitioned.is-true.map(_.obj)
+  interval-plots = partitioned.is-false.map(_.obj)
 
   default-plot-chart-window-object.{
     method render(self):
@@ -2341,27 +2612,15 @@ fun render-charts(lst :: List<DataSeries>) -> ChartWindow:
       _ = check-render-x-axis(self)
       _ = check-render-y-axis(self)
 
-      bbox = for map(plot-pts from line-plots.map(_.ps) +
-                                   scatter-plots.map(_.ps)):
-        for filter(pt from plot-pts):
-          cases (Option) self.x-min:
-            | none => true
-            | some(v) => fst(pt) >= v
-          end and
-          cases (Option) self.x-max:
-            | none => true
-            | some(v) => fst(pt) <= v
-          end and
-          cases (Option) self.y-min:
-            | none => true
-            | some(v) => snd(pt) >= v
-          end and
-          cases (Option) self.y-max:
-            | none => true
-            | some(v) => snd(pt) <= v
-          end
-        end ^ get-bounding-box
-      end ^ merge-bounding-box
+      bboxes-ls = get-list-of-bounding-boxes(line-plots.map(_.ps) + scatter-plots.map(_.ps), self, snd)
+
+      i-xyy = interval-plots.map(_.bothys) # list of list of xyy arrays
+
+      bboxes-i-1 = get-list-of-bounding-boxes(i-xyy, self, snd)
+         
+      bboxes-i-2 = get-list-of-bounding-boxes(i-xyy, self, thd)
+
+      bbox = (bboxes-ls.append(bboxes-i-1).append(bboxes-i-2)) ^ merge-bounding-box
 
       {x-min; x-max} = bound-result-to-bounds(
         get-bound-result(self.x-min, bbox, _.x-min),
@@ -2396,7 +2655,11 @@ fun render-charts(lst :: List<DataSeries>) -> ChartWindow:
           ps-to-arr(p.{ps: line-plot-edge-cut(p.ps, self)})
         end ^ reverse ^ builtins.raw-array-from-list
 
-        ret = P.plot(self, {scatters: scatters-arr, lines: lines-arr})
+        intervals-arr = for map(p from interval-plots):
+          ps-to-arr(p.{ps: p.ps.filter(in-bound-xy(_, self))})
+        end ^ reverse ^ builtins.raw-array-from-list
+
+        ret = P.plot(self, {scatters: scatters-arr, lines: lines-arr, intervals: intervals-arr})
         cases (E.Either<Any, IM.Image>) ret:
           | left(new-self) => helper(new-self, none)
           | right(image) => image
@@ -2443,10 +2706,14 @@ from-list = {
   exploding-pie-chart: exploding-pie-chart-from-list,
   image-pie-chart: image-pie-chart-from-list,
   bar-chart: bar-chart-from-list,
+  dot-chart: dot-chart-from-list,
+  num-dot-chart: num-dot-chart-from-list,
+  labeled-num-dot-chart: labeled-num-dot-chart-from-list,
   image-bar-chart: image-bar-chart-from-list,
   grouped-bar-chart: grouped-bar-chart-from-list,
   stacked-bar-chart: stacked-bar-chart-from-list,
   freq-bar-chart: freq-bar-chart-from-list,
   labeled-box-plot: labeled-box-plot-from-list,
   box-plot: box-plot-from-list,
+  interval-chart: interval-chart-from-list,
 }

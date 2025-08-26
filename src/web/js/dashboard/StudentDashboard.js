@@ -2,6 +2,8 @@ import React, { Component } from 'react';
 import GoogleAPI from './GoogleAPI.js';
 import {CLIENT_ID, FILE_EXT, APP_NAME, COLLECTION_NAME, API_KEY} from './config.js';
 import Assignment from './Assignment';
+import File from './File';
+
 
 const NOT_SIGNED_IN = 1;
 const WAITING_FOR_SIGNIN = 2;
@@ -154,7 +156,7 @@ class StudentDashboard extends Component {
         </div>
         <div className='footer middle'>
           <p className='right'>
-            <a target="_blank" href="https://www.pyret.org">pyret.org</a> | <a target="_blank" href="/privacy/">Privacy</a> | <a target="_blank" href="https://www.github.com/brownplt/code.pyret.org">Software</a></p>
+            <a target="_blank" href="https://www.pyret.org">pyret.org</a> | <a target="_blank" href="https://pyret.org/cpo-faq/">Privacy</a> | <a target="_blank" href="https://www.github.com/brownplt/code.pyret.org">Software</a></p>
         </div>
 
       </div>

@@ -41,6 +41,14 @@
       return converter([74, a, b]);
     }
 
+    // Snap wants colors specified as "r,g,b(,a)" where each is [0-255]
+    var snapConverter = $.colorspaces.converter('CIELAB', 'sRGB')
+    function hueToSnapColor(hue) {
+      var a = 40*Math.cos(hue);
+      var b = 40*Math.sin(hue)
+      return snapConverter([74, a, b]).map(x => Math.floor(x * 255)).join(",")
+    }
+
     var goldenAngle = 2.39996322972865332;
     var lastHue = 0;
 
@@ -1089,8 +1097,20 @@
                 window.requestAnimationFrame(function() {
                   logger.log("highlight_anchor_hover",
                     { error_id: context, anchor_id: id });
-                  if (positions[0] !== undefined)
-                    positions[0].hint();
+
+                  if (positions[0] !== undefined) {
+                    if(CPO.blocksIDE) {
+                      // Blocks editor case
+                      var snapColor = hueToSnapColor(color);
+                      CPO.blocksIDE.flashSpriteScriptAt(
+                        locsArray[0].dict['start-char'] + 1,
+                        undefined,
+                        snapColor);
+                    } else {
+                      // Non-Blocks editor
+                      positions[0].hint();
+                    }
+                  }
                   emphasize(color);
                 });
               });
@@ -1098,7 +1118,14 @@
                 logger.log("highlight_anchor_mouseleave",
                   { error_id: context, anchor_id: id });
                 window.requestAnimationFrame(function() {
-                  unhintLoc();
+                  // Blocks editor case
+                  if(CPO.blocksIDE) {
+                    if(positions.length > 0) {
+                      CPO.blocksIDE.unflashSpriteScripts();
+                    }
+                  } else {
+                    unhintLoc();
+                  }
                   demphasize(color);
                 });
               });
@@ -1416,7 +1443,10 @@
           });
         } else if (jsnums.isRoughnum(num)) {
           ariaText = num.n.toString() + ', roughly';
-          outText = $('<span>').addClass('replTextOutput roughNumber').text(num.toString());
+          var roughnumStr = num.toString().slice(1);
+          outText = $('<span>').addClass('replTextOutput roughNumber');
+          outText.append($('<span>').addClass('cm-roughnum-start').text('~'));
+          outText.append($('<span>').addClass('cm-roughnum').text(roughnumStr));
         } else {
           ariaText = num.toString();
           outText = renderText(sooper(renderers, "number", num));
@@ -1625,7 +1655,12 @@
         $(this).toggleClass("collection");
         $(this).toggleClass("inlineCollection");
       }
-      function helper(container, val, values, wantCommaAtEnd) {
+      const thisContext = "cpo";
+      function isInRendererContext(val) {
+        var renderers = runtime.getField(val, "renderers");
+        return runtime.hasField(renderers, thisContext);
+      }
+      function helper(container, val, values, wantCommaAtEnd, renderedValues) {
         var ariaText;
         if (runtime.ffi.isVSValue(val)) {
           //console.log('helper i', val);
@@ -1634,16 +1669,16 @@
           //console.log('ariaT=', ariaText);
           container[0].ariaText = ariaText;
           container[0].setAttribute('aria-label', ariaText);
-          container.append(val1); }
-        else if (runtime.ffi.isVSStr(val)) {
+          container.append(val1); 
+        } else if (runtime.ffi.isVSStr(val)) {
           //console.log('helper ii', val);
           var val1 = runtime.unwrap(runtime.getField(val, "s"));
           ariaText = val1;
           //console.log('ariaT=', ariaText);
           container[0].ariaText = ariaText;
           container[0].setAttribute('aria-label', ariaText);
-          container.append($("<span>").text(val1)); }
-        else if (runtime.ffi.isVSCollection(val)) {
+          container.append($("<span>").text(val1)); 
+        } else if (runtime.ffi.isVSCollection(val)) {
           //console.log('helper iii');
           var name = runtime.unwrap(runtime.getField(val, "name"));
           container.addClass("replToggle");
@@ -1671,7 +1706,7 @@
             ul.each(makeInline);
             e.stopPropagation();
           });
-        } else if (runtime.ffi.isVSConstr(val)) {
+        } else if (runtime.ffi.isVSConstr(val) || (runtime.ffi.isVSConstrRender(val) && !isInRendererContext(val))) {
           //console.log('helper iv');
           container.append($("<span>").text(runtime.unwrap(runtime.getField(val, "name")) + "("));
           var items = runtime.ffi.toArray(runtime.getField(val, "args"));
@@ -1679,6 +1714,26 @@
             helper(container, items[i], values, (i + 1 < items.length));
           }
           container.append($("<span>").text(")"));
+        } else if (runtime.ffi.isVSConstrRender(val)) {
+
+
+          // We know we are on the CPO stack here (within a runThink that's running toReprJS).
+          // This means we can safely call CPO here.
+
+
+          // A good improvement here would be to build some kind of fallthrough mechanism when 
+          // isInRendererContext being false to just use vsconstr
+
+          var items = runtime.ffi.toArray(runtime.getField(val, "args"));
+          var currentContainer;
+          const elements = [];
+          for (var i = 0; i < items.length; i++) {
+            currentContainer = $("<span>").addClass("replOutput");
+            elements.push(currentContainer[0]);
+            helper(currentContainer, items[i], values, false);
+          }
+          const result = runtime.getField(runtime.getField(val, "renderers"), "cpo").app(elements);
+          container.append(result);
         } else if (runtime.ffi.isVSSeq(val)) {
           //console.log('helper v');
           var items = runtime.ffi.toArray(runtime.getField(val, "items"));
@@ -1715,8 +1770,26 @@
           }
 
           container.append(table);
-
-        } else if (runtime.ffi.isVSTable(val)) {
+        } else if (runtime.ffi.isVSMatrix(val)) {
+          var table = document.createElement("table");
+          table.className = "pyret-table pyret-matrix";
+          var rows = runtime.getField(val, "rows");
+          var cols = runtime.getField(val, "cols");
+          var items = runtime.getField(val, "items");
+          var tbody = document.createElement("tbody");
+          table.appendChild(tbody);
+          var i = 0;
+          for (var row = 0; row < rows; row++) {
+            var tr = document.createElement("tr");
+            for (var col = 0; col < cols; col++) {
+              var datum = document.createElement("td");
+              helper($(datum), items[i++], values);
+              tr.appendChild(datum);
+            }
+            tbody.appendChild(tr);
+          }
+          container.append(table);
+        } else if (runtime.ffi.isVSTable(val) || runtime.ffi.isVSTableTruncated(val)) {
           //console.log('helper vii; TABLE is', val, ' , container is', container);
           ariaText = 'table with ';
           var showText = document.createElement("a");
@@ -1812,6 +1885,7 @@
               body.appendChild(rowel);
             }
           }
+          const footer = document.createElement("tfoot");
           var previewLimit = 10;
           if(rows.length <= previewLimit) {
             drawRows(0, rows.length);
@@ -1823,7 +1897,7 @@
             if (remaining == 1) {
               clickForMore.textContent = "Click to show the remaining row";
             } else {
-              clickForMore.textContent = "Click to show the remaining " + remaining + " rows...";
+              clickForMore.textContent = "Click to show the remaining " + remaining + " available rows...";
             }
             var clickTR = document.createElement("tr");
             var clickTD = document.createElement("td");
@@ -1831,14 +1905,27 @@
             clickTR.appendChild(clickTD);
             clickTD.appendChild(clickForMore);
             $(clickForMore).on("click", function() {
-              body.removeChild(clickTR);
+              footer.removeChild(clickTR);
               drawRows(previewLimit, rows.length);
             });
             drawRows(0, previewLimit);
-            body.appendChild(clickTR);
+            footer.appendChild(clickTR);
+          }
+          if(runtime.ffi.isVSTableTruncated(val)) {
+            const totalRows = runtime.getField(val, "total-rows");
+            const truncatedRows = rows.length;
+            const truncatedTR = document.createElement("tr");
+            const truncatedTD = document.createElement("td");
+            truncatedTD.colSpan = String(rows[0].length);
+            truncatedTR.appendChild(truncatedTD);
+            const message = `(${truncatedRows} rows available of ${totalRows} in table)`;
+            truncatedTD.innerText = message;
+            footer.appendChild(truncatedTR);
+            ariaText += message;
           }
           ariaText += ' end table.';
           table.appendChild(body);
+          table.appendChild(footer);
           container[0].ariaText = ariaText;
           container[0].setAttribute('aria-label', ariaText);
           container.append(table);

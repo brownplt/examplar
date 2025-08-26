@@ -141,6 +141,27 @@ check "color-lists":
 
   color-list-to-bitmap([list: red, green, blue], 2, 2) raises ""
   color-list-to-bitmap([list: red, green, blue, black], 2, 2) satisfies is-image
+
+  color-list-to-image([list: ], 0, 0, 0, 0) does-not-raise
+end
+
+check "trimming":
+  sqr = square(40, mode-solid, red)
+  image-width(sqr) is 40
+  trim-image(sqr) satisfies is-image
+  image-width(trim-image(sqr)) is 40
+  image-height(sqr) is 40
+  image-height(trim-image(sqr)) is 40
+
+  blank = rectangle(40, 20, mode-solid, transparent)
+  image-width(blank) is 40
+  trim-image(blank) satisfies is-image
+  image-width(trim-image(blank)) is 0
+  image-height(blank) is 20
+  image-height(trim-image(blank)) is 0
+
+  trim-image(trim-image(blank)) satisfies is-image
+
 end
 
 check "properties":
@@ -153,10 +174,18 @@ check "properties":
   image-height(even-overlay) is 40
   image-width(even-overlay) is 40
 
-  indigo-text = text-font("Goodbye", 48, indigo, "Helvetica", ff-modern, fs-normal, fw-normal, false)
-  image-height(indigo-text) is%(within-abs(5)) 50
-  image-baseline(indigo-text) is%(within-abs(2)) 43
+ indigo-Good = text-font("Goodbye", 48, indigo, "Helvetica", ff-modern, fs-normal, fw-normal, false)
+  image-height(indigo-Good) is%(within-abs(5)) 45
+  image-baseline(indigo-Good) is%(within-abs(2)) 35
 
+  indigo-good = text-font("goodbye", 48, indigo, "Helvetica", ff-modern, fs-normal, fw-normal, false)
+  image-height(indigo-good) is%(within-abs(5)) 41
+  image-baseline(indigo-good) is%(within-abs(2)) 33
+
+  indigo-mm = text-font("mm", 48, indigo, "Helvetica", ff-modern, fs-normal, fw-normal, false)
+  spy: h: image-height(indigo-mm) end
+  image-height(indigo-mm) is%(within-abs(5)) 25
+  image-baseline(indigo-mm) is%(within-abs(2)) 25
   image-baseline(rectangle(100, 100, mode-solid, black)) is 100
 
   image-height(rectangle(100, 100, mode-solid, black)) is 100
