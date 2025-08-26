@@ -349,7 +349,7 @@ libpyret:
 
 $(BUNDLED_DEPS): src/scripts/npm-dependencies.js
 	# Explicitly exclude crypto, buffer, and stylus, nested npm dependencies that aren't needed
-	node_modules/.bin/browserify src/scripts/npm-dependencies.js -x crypto -x buffer -x stylus -o $(BUNDLED_DEPS)
+	node_modules/.bin/browserify src/scripts/npm-dependencies.js -x crypto -x stylus -o $(BUNDLED_DEPS)
 
 $(CPOMAIN): $(BUNDLED_DEPS) $(TROVE_JS) $(TROVE_ARR) $(WEBJS) src/web/js/*.js src/web/arr/*.arr cpo-standalone.js cpo-config.json src/web/arr/cpo-main.arr $(PHASEA)
 	mkdir -p compiled/;
