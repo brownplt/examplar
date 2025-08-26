@@ -331,6 +331,10 @@
         return replWidget.runner(src, true);
       };
 
+
+      // Exposing this for dom-render.js to use for input.
+      window.__internalRepl = repl;
+
       /*
       $("#runDropdown").click(function() {
         $("#run-dropdown-content").toggle();
