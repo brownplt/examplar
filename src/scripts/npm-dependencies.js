@@ -7,6 +7,10 @@
 // See the browserify options in the Makefile, which currently prevent the 
 // crypto, buffer, and stylus libraries from being bundled, saving ~700kb.
 
+buffer = require("buffer");
+define("buffer", [], function() { return buffer; });
+
+
 sexpr = require("s-expression");
 define("s-expression", [], function() {return sexpr;});
 
