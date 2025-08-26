@@ -362,7 +362,7 @@
               "type-check": options.typeCheck,
               "check-all": options.checkAll,
               "on-compile": onCompile,
-              "checks": "main"
+              "checks": "main",
               "type-check": !!options.typeCheck,
               "check-mode": !!options.checkMode,
               "check-all": !!options.checkAll,
