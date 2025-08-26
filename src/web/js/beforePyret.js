@@ -871,6 +871,27 @@ $(function() {
     }
   }
 
+  function loadProgram(p) {
+    programToSave = p;
+    return p.then(function(prog) {
+      if(prog !== null) {
+        updateName(prog);
+        if(prog.shared) {
+          window.stickMessage("You are viewing a shared program. Any changes you make will not be saved. You can use File -> Save a copy to save your own version with any edits you make.");
+        }
+        return prog.getContents();
+      }
+      else {
+        if(params["get"]["editorContents"] && !(params["get"]["program"] || params["get"]["share"])) {
+          return params["get"]["editorContents"];
+        }
+        else {
+          return CONTEXT_FOR_NEW_FILES;
+        }
+      }
+    });
+  }
+
   function nameOrUntitled() {
     return filename || "Untitled";
   }
