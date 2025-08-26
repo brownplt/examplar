@@ -544,9 +544,6 @@
     // ASSERT: if we're using custom images, the third column will be an object
     const hasImage = typeof table[0][3] == 'object';
 
-    // ASSERT: if we're using custom images, the third column will be an object
-    const hasImage = typeof table[0][3] == 'object';
-
     const data = new google.visualization.DataTable();
     data.addColumn('string', 'Label');
     data.addColumn('number', 'Value');
