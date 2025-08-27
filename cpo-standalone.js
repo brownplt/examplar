@@ -79,7 +79,7 @@ requirejs(["pyret-base/js/runtime", "pyret-base/js/post-load-hooks", "pyret-base
     var toCall = runtime.getField(checker, "render-check-results-stack");
     var checks = runtime.getField(answer, "checks");
     return runtime.safeCall(function() {
-      return toCall.app(checks, getStackP);
+      return toCall.app(checks, getStackP, "text");
     }, function(printedCheckResult) {
       if(runtime.isString(printedCheckResult)) {
         console.log(printedCheckResult);
