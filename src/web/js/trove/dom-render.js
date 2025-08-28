@@ -84,9 +84,35 @@
                 // Add the graph container to the main container
                 container.appendChild(graphContainer);
 
+                // Create reset button for the graph toolbar
+                const resetButton = document.createElement("button");
+                resetButton.textContent = "Reset Layout";
+                resetButton.style.padding = "4px 8px";
+                resetButton.style.fontSize = "12px";
+                resetButton.style.cursor = "pointer";
+                // resetButton.style.border = "1px solid #dc3545";
+                resetButton.style.borderRadius = "3px";
+                resetButton.style.backgroundColor = "#f8f9fa";
+                resetButton.style.color = "#dc3545";
+                resetButton.style.marginLeft = "5px";
+                resetButton.title = "Reset graph layout to original position";
+
+                // Add click handler for reset button
+                resetButton.addEventListener("click", () => {
+                    console.log("Resetting graph layout");
+                    graphElement.renderLayout(currentInstanceLayout).then(() => {
+                        console.log("Graph layout reset successfully");
+                    }).catch((err) => {
+                        console.error("Error resetting graph layout:", err);
+                    });
+                });
+
                 // Render the graph layout
                 graphElement.renderLayout(currentInstanceLayout).then(() => {
                     console.log("Graph layout rendered");
+
+                    // Add the reset button to the graph toolbar after rendering
+                    graphElement.addToolbarControl(resetButton);
 
                     // Mount additional React components after rendering
                     if (window.mountErrorMessageModal) {
