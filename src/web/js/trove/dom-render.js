@@ -10,7 +10,7 @@
 
 
         ///// Layout Generation /////
-        function genlayout(v, cndSpec) {
+        function genlayout(v, cndSpec, stringsIdempotent=true, numbersIdempotent=true, booleansIdempotent=true, showFunctions=false) {
 
             const container = document.createElement("div");
             container.style.border = "1px solid #ccc";
@@ -23,9 +23,24 @@
             errorDiv.id = "error-message-container-" + Math.random().toString(36).slice(2);
             container.appendChild(errorDiv);
 
+
+
+
+            let options = {
+                /** Whether to make string values idempotent (reuse atoms for same string values) */
+                stringsIdempotent: stringsIdempotent,
+                /** Whether to make number values idempotent (reuse atoms for same number values) */
+                numbersIdempotent: numbersIdempotent,
+                /** Whether to make boolean values idempotent (reuse atoms for same boolean values) */
+                booleansIdempotent: booleansIdempotent,
+                /** Whether to include function/method fields in parsing */
+                showFunctions: showFunctions
+            }
+
+
             try {
                 // CnDCore logic
-                const dataInstance = new window.CndCore.PyretDataInstance(v, false, window.__internalRepl); // Pass the external repl.
+                const dataInstance = new window.CndCore.PyretDataInstance(v, options, window.__internalRepl);
                 const evaluationContext = { sourceData: dataInstance };
                 const evaluator = new CndCore.Evaluators.SGraphQueryEvaluator();
                 evaluator.initialize(evaluationContext);
