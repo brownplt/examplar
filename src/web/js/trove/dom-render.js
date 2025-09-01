@@ -39,6 +39,9 @@
 
 
             try {
+                // Start timing the CnDCore logic
+                const layoutStartTime = performance.now();
+                
                 // CnDCore logic
                 const dataInstance = new window.CndCore.PyretDataInstance(v, options, window.__internalRepl);
                 const evaluationContext = { sourceData: dataInstance };
@@ -57,6 +60,10 @@
                 const projections = {};
                 const layoutResult = layoutInstance.generateLayout(dataInstance, projections);
                 const currentInstanceLayout = layoutResult.layout;
+                
+                // End layout generation timing
+                const layoutEndTime = performance.now();
+                const layoutGenerationTime = layoutEndTime - layoutStartTime;
 
                 // String view
                 const stringView = document.createElement("pre");
@@ -123,7 +130,25 @@
                 });
 
                 // Render the graph layout
+                const renderStartTime = performance.now();
                 graphElement.renderLayout(currentInstanceLayout).then(() => {
+                    const renderEndTime = performance.now();
+                    const renderTime = renderEndTime - renderStartTime;
+                    
+                    // Log the complete dom-render call with all timing data
+                    const logPayload = {
+                        "v": v,
+                        "cndSpec": cndSpec,
+                        "options": options,
+                        "reifiedData": r,
+                        "layoutGenerationTimeMs": layoutGenerationTime,
+                        "renderTimeMs": renderTime,
+                    };
+                    console.log("dom-render completed with:", logPayload);
+                    if (window.cloud_log) {
+                        window.cloud_log("dom-render", logPayload);
+                    }
+                    
                     console.log("Graph layout rendered");
 
                     // Add the reset button to the graph toolbar after rendering
@@ -135,6 +160,24 @@
                         window.mountErrorMessageModal(errorDiv.id);
                     }
                 }).catch((err) => {
+                    const renderEndTime = performance.now();
+                    const renderTime = renderEndTime - renderStartTime;
+                    
+                    // Log even on error with timing data
+                    const logPayload = {
+                        "v": v,
+                        "cndSpec": cndSpec,
+                        "options": options,
+                        "reifiedData": r,
+                        "layoutGenerationTimeMs": layoutGenerationTime,
+                        "renderTimeMs": renderTime,
+                        "renderError": err.message || err.toString(),
+                    };
+                    console.log("dom-render failed with:", logPayload);
+                    if (window.cloud_log) {
+                        window.cloud_log("dom-render-error", logPayload);
+                    }
+                    
                     console.error("Error rendering graph layout:", err);
                 });
 
@@ -146,6 +189,24 @@
                 });
 
             } catch (error) {
+                const layoutEndTime = performance.now();
+                const layoutGenerationTime = layoutEndTime - layoutStartTime;
+                
+                // Log the error with timing data
+                const logPayload = {
+                    "v": v,
+                    "cndSpec": cndSpec,
+                    "options": options,
+                    "reifiedData": null, // Can't reify if there was an error
+                    "layoutGenerationTimeMs": layoutGenerationTime,
+                    "renderTimeMs": null, // Never got to rendering
+                    "layoutError": error.message || error.toString()
+                };
+                console.log("dom-render layout failed with:", logPayload);
+                if (window.cloud_log) {
+                    window.cloud_log("dom-render-layout-error", logPayload);
+                }
+                
                 console.error("Error in genlayout:", error);
 
                 // Display the error in the errorDiv
