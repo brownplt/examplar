@@ -36,11 +36,11 @@
                 /** Whether to include function/method fields in parsing */
                 showFunctions: showFunctions
             }
-
+                            // Start timing the CnDCore logic
+            const layoutStartTime = performance.now();
 
             try {
-                // Start timing the CnDCore logic
-                const layoutStartTime = performance.now();
+
                 
                 // CnDCore logic
                 const dataInstance = new window.CndCore.PyretDataInstance(v, options, window.__internalRepl);
