@@ -46,11 +46,8 @@
                 const dataInstance = new window.CndCore.PyretDataInstance(v, options, window.__internalRepl);
 
                 const numAtoms = dataInstance.getAtoms().length || 0;
-                console.log(`Data instance has ${numAtoms} atoms.`);
                 const numTypes = dataInstance.getTypes().length || 0;
-                console.log(`Data instance has ${numTypes} types.`);
                 const numRelations = dataInstance.getRelations().length || 0;
-                console.log(`Data instance has ${numRelations} relations.`);
 
 
                 const evaluationContext = { sourceData: dataInstance };
