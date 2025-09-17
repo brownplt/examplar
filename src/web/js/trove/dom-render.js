@@ -65,13 +65,7 @@
                 const layoutEndTime = performance.now();
                 const layoutGenerationTime = layoutEndTime - layoutStartTime;
 
-                // String view
-                const stringView = document.createElement("pre");
-                stringView.textContent = String(r);
-                stringView.style.margin = "0 0 10px 0"; // Add spacing between the string view and the graph
-                container.appendChild(stringView);
-
-                // Graph container (to hold the graph and the toggle button)
+                // Graph container
                 const graphContainer = document.createElement("div");
                 graphContainer.style.position = "relative";
                 graphContainer.style.marginTop = "10px";
@@ -93,23 +87,6 @@
 
                 // Add the graph element to the graph container
                 graphContainer.appendChild(graphElement);
-
-                // Collapse/Expand button (small + / - in the top-right corner of the graph container)
-                const toggleButton = document.createElement("button");
-                toggleButton.textContent = "-"; // Default state is expanded
-                toggleButton.style.position = "absolute";
-                toggleButton.style.top = "5px";
-                toggleButton.style.right = "5px";
-                toggleButton.style.padding = "2px 5px";
-                toggleButton.style.fontSize = "12px";
-                toggleButton.style.cursor = "pointer";
-                toggleButton.style.border = "1px solid #007BFF"; // Blue outline for visibility
-                toggleButton.style.borderRadius = "3px";
-                toggleButton.style.backgroundColor = "#f0f8ff"; // Light blue background
-                toggleButton.style.color = "#007BFF"; // Blue text for better contrast
-
-                // Add the toggle button to the graph container
-                graphContainer.appendChild(toggleButton);
 
                 // Add the graph container to the main container
                 container.appendChild(graphContainer);
@@ -213,13 +190,6 @@
                     }
                     
                     console.error("Error rendering graph layout:", err);
-                });
-
-                // Toggle visibility of the graph element
-                toggleButton.addEventListener("click", () => {
-                    const isCollapsed = graphElement.style.display === "none";
-                    graphElement.style.display = isCollapsed ? "block" : "none";
-                    toggleButton.textContent = isCollapsed ? "-" : "+"; // Update button text
                 });
 
             } catch (error) {
