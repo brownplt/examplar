@@ -44,10 +44,20 @@
                 
                 // CnDCore logic
                 const dataInstance = new window.CndCore.PyretDataInstance(v, options, window.__internalRepl);
+
+                const numAtoms = dataInstance.getAtoms().length || 0;
+                console.log(`Data instance has ${numAtoms} atoms.`);
+                const numTypes = dataInstance.getTypes().length || 0;
+                console.log(`Data instance has ${numTypes} types.`);
+                const numRelations = dataInstance.getRelations().length || 0;
+                console.log(`Data instance has ${numRelations} relations.`);
+
+
                 const evaluationContext = { sourceData: dataInstance };
                 const evaluator = new CndCore.Evaluators.SGraphQueryEvaluator();
                 evaluator.initialize(evaluationContext);
                 const r = dataInstance.reify();
+                const pyretDataAsString = String(r);
                 const layoutSpec = CndCore.parseLayoutSpec(cndSpec);
                 const ENABLE_ALIGNMENT_EDGES = true;
                 const instanceNumber = 0;
@@ -72,6 +82,8 @@
                 graphContainer.style.width = "45vw";
                 graphContainer.style.height = "60vh";
                 graphContainer.style.overflow = "hidden"; // No scrolling within graph container
+
+
 
                 // Graph element (initially visible)
                 const graphElement = document.createElement("webcola-cnd-graph");
@@ -104,6 +116,18 @@
                 resetButton.style.marginLeft = "5px";
                 resetButton.title = "Reset graph layout to original position";
 
+                // Create "See Pyret Data" button to toggle a horizontally-scrollable text view
+                const seeDataButton = document.createElement("button");
+                seeDataButton.textContent = "See Pyret Data";
+                seeDataButton.style.padding = "4px 8px";
+                seeDataButton.style.fontSize = "12px";
+                seeDataButton.style.cursor = "pointer";
+                seeDataButton.style.borderRadius = "3px";
+                seeDataButton.style.backgroundColor = "#f8f9fa";
+                seeDataButton.style.color = "#007bff";
+                seeDataButton.style.marginLeft = "5px";
+                seeDataButton.title = "Show/hide the Pyret data used to generate this graph";
+
                 // Add click handler for reset button
                 resetButton.addEventListener("click", () => {
                     console.log("Resetting graph layout");
@@ -125,6 +149,35 @@
                     }).catch((err) => {
                         console.error("Error resetting graph layout:", err);
                     });
+                });
+
+                // Add click handler for See Pyret Data button
+                let stringView = null;
+                seeDataButton.addEventListener("click", () => {
+                    if (stringView && stringView.parentElement) {
+                        // If visible, remove it
+                        stringView.parentElement.removeChild(stringView);
+                        stringView = null;
+                        seeDataButton.textContent = "See Pyret Datum";
+                        return;
+                    }
+
+                    // Create the string view pre element and style it to allow horizontal scrolling only
+                    stringView = document.createElement("pre");
+                    stringView.textContent = String(r);
+                    stringView.style.margin = "0 0 10px 0"; // Spacing between string view and the graph
+                    stringView.style.maxHeight = "30vh"; // Prevent it from taking too much vertical space
+                    stringView.style.overflowX = "auto"; // Allow horizontal scroll
+                    stringView.style.overflowY = "hidden"; // No vertical scroll
+                    stringView.style.whiteSpace = "pre"; // Preserve whitespace
+                    stringView.style.background = "#fff";
+                    stringView.style.border = "1px solid #e9ecef";
+                    stringView.style.padding = "8px";
+                    stringView.style.boxSizing = "border-box";
+
+                    // Insert the string view above the graph container
+                    container.insertBefore(stringView, graphContainer);
+                    seeDataButton.textContent = "Hide Pyret Datum";
                 });
 
                 // Render the graph layout
@@ -154,6 +207,9 @@
                         "reifiedData": r,
                         "layoutGenerationTimeMs": layoutGenerationTime,
                         "renderTimeMs": renderTime,
+                        "numAtoms": numAtoms,
+                        "numTypes": numTypes,
+                        "numRelations": numRelations
                     };
                     console.log("dom-render completed with:", logPayload);
                     if (window.cloud_log) {
@@ -164,6 +220,8 @@
 
                     // Add the reset button to the graph toolbar after rendering
                     graphElement.addToolbarControl(resetButton);
+                    // Add the See Pyret Data button to the toolbar as well
+                    graphElement.addToolbarControl(seeDataButton);
 
                     // Mount additional React components after rendering
                     if (window.mountErrorMessageModal) {
@@ -204,7 +262,10 @@
                     "reifiedData": null, // Can't reify if there was an error
                     "layoutGenerationTimeMs": layoutGenerationTime,
                     "renderTimeMs": null, // Never got to rendering
-                    "layoutError": error.message || error.toString()
+                    "layoutError": error.message || error.toString(),
+                    "numAtoms": numAtoms,
+                    "numTypes": numTypes,
+                    "numRelations": numRelations
                 };
                 console.log("dom-render layout failed with:", logPayload);
                 if (window.cloud_log) {
