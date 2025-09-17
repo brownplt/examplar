@@ -73,15 +73,23 @@
 
                 // Graph container (to hold the graph and the toggle button)
                 const graphContainer = document.createElement("div");
-                graphContainer.style.position = "relative"; // For positioning the toggle button
+                graphContainer.style.position = "relative";
                 graphContainer.style.marginTop = "10px";
+                graphContainer.style.width = "45vw";
+                graphContainer.style.height = "60vh";
+                graphContainer.style.overflow = "hidden"; // No scrolling within graph container
 
                 // Graph element (initially visible)
                 const graphElement = document.createElement("webcola-cnd-graph");
-                graphElement.setAttribute("width", "400");
-                graphElement.setAttribute("height", "400");
-                graphElement.style.display = "block"; // Start visible
-                graphElement.style.margin = "0 auto"; // Center the graph within the container
+                graphElement.setAttribute("width", "45vw");
+                graphElement.setAttribute("height", "60vh");
+                graphElement.style.display = "block";
+                graphElement.style.margin = "0 auto";
+                graphElement.style.width = "45vw";
+                graphElement.style.height = "60vh";
+                graphElement.style.boxSizing = "border-box";
+                graphElement.style.backgroundColor = "#fff";
+
 
                 // Add the graph element to the graph container
                 graphContainer.appendChild(graphElement);
@@ -124,6 +132,19 @@
                     console.log("Resetting graph layout");
                     graphElement.renderLayout(currentInstanceLayout).then(() => {
                         console.log("Graph layout reset successfully");
+                        // Let SVG handle its own scaling via viewBox
+                        const svg = graphElement.shadowRoot?.querySelector('svg');
+                        if (svg) {
+                            svg.style.width = "100%";
+                            svg.style.height = "100%";
+                            svg.style.display = "block";
+                            if (svg.parentElement) {
+                                svg.parentElement.style.overflow = "hidden";
+                                svg.parentElement.style.width = "45vw";
+                                svg.parentElement.style.height = "65vh";
+                            }
+                        }
+
                     }).catch((err) => {
                         console.error("Error resetting graph layout:", err);
                     });
@@ -134,6 +155,19 @@
                 graphElement.renderLayout(currentInstanceLayout).then(() => {
                     const renderEndTime = performance.now();
                     const renderTime = renderEndTime - renderStartTime;
+
+
+                    const svg = graphElement.shadowRoot?.querySelector('svg');
+                    if (svg) {
+                        svg.style.width = "100%";
+                        svg.style.height = "100%";
+                        svg.style.display = "block";
+                        if (svg.parentElement) {
+                            svg.parentElement.style.overflow = "hidden";
+                            svg.parentElement.style.width = "45vw";
+                            svg.parentElement.style.height = "65vh";
+                        }
+                    }
                     
                     // Log the complete dom-render call with all timing data
                     const logPayload = {
