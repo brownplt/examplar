@@ -38,16 +38,16 @@
             }
                             // Start timing the CnDCore logic
             const layoutStartTime = performance.now();
-
+            let numAtoms = -1, numTypes = -1, numRelations = -1;
             try {
 
                 
                 // CnDCore logic
                 const dataInstance = new window.CndCore.PyretDataInstance(v, options, window.__internalRepl);
 
-                const numAtoms = dataInstance.getAtoms().length || 0;
-                const numTypes = dataInstance.getTypes().length || 0;
-                const numRelations = dataInstance.getRelations().length || 0;
+                numAtoms = dataInstance.getAtoms().length || 0;
+                numTypes = dataInstance.getTypes().length || 0;
+                numRelations = dataInstance.getRelations().length || 0;
 
 
                 const evaluationContext = { sourceData: dataInstance };
