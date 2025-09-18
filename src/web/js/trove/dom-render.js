@@ -66,11 +66,81 @@
                 );
                 const projections = {};
                 const layoutResult = layoutInstance.generateLayout(dataInstance, projections);
+                
+                // Check for layout errors (similar to visualizer template)
+                let hasLayoutError = false;
+                if (layoutResult.error) {
+                    hasLayoutError = true;
+                    console.error('Layout generation error:', layoutResult.error);
+
+                    // Always use the fallback error display since React components may not be available
+                    errorDiv.style.color = "red";
+                    errorDiv.style.padding = "10px";
+                    errorDiv.style.border = "1px solid red";
+                    errorDiv.style.marginBottom = "10px";
+                    errorDiv.style.backgroundColor = "#ffe6e6";
+                    
+                    // Check error type and display appropriate message
+                    if (layoutResult.error.errorMessages) {
+                        errorDiv.innerHTML = `<h3>Positional Constraint Conflict</h3><p>${layoutResult.error.message}</p>`;
+                        // Try React component if available, but don't rely on it
+                        if (window.showPositionalError) {
+                            try {
+                                window.showPositionalError(layoutResult.error.errorMessages);
+                            } catch (e) {
+                                console.warn("React error component failed:", e);
+                            }
+                        }
+                    } else if (layoutResult.error.overlappingNodes) {
+                        errorDiv.innerHTML = `<h3>Group Overlap Error</h3><p>${layoutResult.error.message}</p>`;
+                        // Try React component if available, but don't rely on it
+                        if (window.showGroupOverlapError) {
+                            try {
+                                window.showGroupOverlapError(layoutResult.error.message);
+                            } catch (e) {
+                                console.warn("React error component failed:", e);
+                            }
+                        }
+                    } else {
+                        errorDiv.innerHTML = `<h3>Layout Generation Error</h3><p>${layoutResult.error.message}</p>`;
+                        // Try React component if available, but don't rely on it
+                        if (window.showGeneralError) {
+                            try {
+                                window.showGeneralError(`Layout generation error: ${layoutResult.error.message}`);
+                            } catch (e) {
+                                console.warn("React error component failed:", e);
+                            }
+                        }
+                    }
+                }
+
                 const currentInstanceLayout = layoutResult.layout;
                 
                 // End layout generation timing
                 const layoutEndTime = performance.now();
                 const layoutGenerationTime = layoutEndTime - layoutStartTime;
+                
+                // Log layout errors with timing data if there was an error
+                if (hasLayoutError) {
+                    const logPayload = {
+                        "v": v,
+                        "cndSpec": cndSpec,
+                        "options": options,
+                        "reifiedData": r,
+                        "layoutGenerationTimeMs": layoutGenerationTime,
+                        "renderTimeMs": null,
+                        "layoutError": layoutResult.error.message || layoutResult.error.toString(),
+                        "errorType": layoutResult.error.errorMessages ? "positional-constraint" : 
+                                   layoutResult.error.overlappingNodes ? "group-overlap" : "general",
+                        "numAtoms": numAtoms,
+                        "numTypes": numTypes,
+                        "numRelations": numRelations
+                    };
+                    console.log("dom-render layout error:", logPayload);
+                    if (window.cloud_log) {
+                        window.cloud_log("dom-render-layout-error", logPayload);
+                    }
+                }
 
                 // Graph container
                 const graphContainer = document.createElement("div");
@@ -92,6 +162,13 @@
                 graphElement.style.height = "60vh";
                 graphElement.style.boxSizing = "border-box";
                 graphElement.style.backgroundColor = "#fff";
+                
+                // Set unsat state if there's a layout error, otherwise clear it
+                if (hasLayoutError) {
+                    graphElement.setAttribute('unsat', "");
+                } else {
+                    graphElement.removeAttribute('unsat');
+                }
 
 
                 // Add the graph element to the graph container
