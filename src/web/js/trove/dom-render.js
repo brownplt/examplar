@@ -12,6 +12,8 @@
         ///// Layout Generation /////
         function genlayout(v, cndSpec, stringsIdempotent=true, numbersIdempotent=true, booleansIdempotent=true, showFunctions=false) {
 
+            // Each render starts with a fresh container and error state
+
             const container = document.createElement("div");
             container.style.border = "1px solid #ccc";
             container.style.padding = "5px";
@@ -82,35 +84,11 @@
                     
                     // Check error type and display appropriate message
                     if (layoutResult.error.errorMessages) {
-                        errorDiv.innerHTML = `<h3>Positional Constraint Conflict</h3><p>${layoutResult.error.message}</p>`;
-                        // Try React component if available, but don't rely on it
-                        if (window.showPositionalError) {
-                            try {
-                                window.showPositionalError(layoutResult.error.errorMessages);
-                            } catch (e) {
-                                console.warn("React error component failed:", e);
-                            }
-                        }
+                        errorDiv.innerHTML = `<p> Some positional layout rules could not be satisfied. Affected nodes are highlighted in the graph with a moving dashed boundary.</p>`;
                     } else if (layoutResult.error.overlappingNodes) {
-                        errorDiv.innerHTML = `<h3>Group Overlap Error</h3><p>${layoutResult.error.message}</p>`;
-                        // Try React component if available, but don't rely on it
-                        if (window.showGroupOverlapError) {
-                            try {
-                                window.showGroupOverlapError(layoutResult.error.message);
-                            } catch (e) {
-                                console.warn("React error component failed:", e);
-                            }
-                        }
+                        errorDiv.innerHTML = `<p>Some grouping layout rules could not be satisfied.</p>`;
                     } else {
                         errorDiv.innerHTML = `<h3>Layout Generation Error</h3><p>${layoutResult.error.message}</p>`;
-                        // Try React component if available, but don't rely on it
-                        if (window.showGeneralError) {
-                            try {
-                                window.showGeneralError(`Layout generation error: ${layoutResult.error.message}`);
-                            } catch (e) {
-                                console.warn("React error component failed:", e);
-                            }
-                        }
                     }
                 }
 
@@ -297,11 +275,7 @@
                     // Add the See Pyret Data button to the toolbar as well
                     graphElement.addToolbarControl(seeDataButton);
 
-                    // Mount additional React components after rendering
-                    if (window.mountErrorMessageModal) {
-                        console.log("Mounting Error Message Modal");
-                        window.mountErrorMessageModal(errorDiv.id);
-                    }
+                    // Error states are handled via the unsat attribute on the graph element
                 }).catch((err) => {
                     const renderEndTime = performance.now();
                     const renderTime = renderEndTime - renderStartTime;
