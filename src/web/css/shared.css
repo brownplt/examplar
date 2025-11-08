@@ -546,12 +546,3 @@ code {
   display: block;
 }
 
-.focusable {
-/* NOTE(joe): removing these seems natural, though discussion at
- * https://github.com/brownplt/code.pyret.org/commit/5bbfcefcd25cad92e969b3f1d2c6df6a85b55639#r33381324
- * may change this
-
-  margin: 0;
-  padding: 0;
-*/
-}
