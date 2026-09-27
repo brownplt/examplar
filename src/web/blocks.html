@@ -2,8 +2,9 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <title>code.pyret.org</title>
-  <link rel="preload" href="{{&PYRET}}" as="script">
+  <title>{{APP_NAME}}</title>
+  <link crossorigin="anonymous" rel="preload" href="{{&PYRET}}" as="script">
+  <script>window.PYRET = "{{&PYRET}}"; window.APP_NAME = "{{APP_NAME}}"; window.APP_DOMAIN = "{{APP_DOMAIN}}";</script>
   <link rel="stylesheet" href="/css/reset.css" />
   <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:400,700" />
@@ -21,8 +22,10 @@
   <link rel="stylesheet" href="/css/themes/panda-syntax.css" />
   <link rel="stylesheet" href="/css/themes/high-contrast-light.css" />
   <link rel="stylesheet" href="/css/themes/high-contrast-dark.css" />
-  <link rel="icon" type="image/png" href="/img/pyret-icon.png" />
+  <link rel="icon" type="image/png" href="{{ &BASE_URL }}/img/pyret-icon.png" />
   <style id="highlight-styles"></style>
+  <script src="{{ &BASE_URL }}/js/vega.min.js"></script>
+  <script src="{{ &BASE_URL }}/js/vega-tooltip.min.js"></script>
   <script>var APP_LOG_URL = "{{{ LOG_URL }}}";</script>
   <script src="/js/localSettings.js"></script>
 </head>
@@ -96,7 +99,7 @@
                     tabindex="-1"
                     class="blueButton focusable">
               <span>▾</span>
-              <img class="logo" src="/img/pyret-logo.png" />
+              <img class="logo" src="{{ &BASE_URL }}/img/pyret-logo.png" />
             </button>
           </div>
           <ul id="bonniemenuContents" class="menuContents submenu" role="menu" aria-hidden="true"
@@ -116,40 +119,10 @@
               </div>
             </li>
             <li role="presentation">
-              <div id="discuss" class="menuButton">
-                <a class="focusable" role="menuitem"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" target="_blank" href="https://groups.google.com/forum/#!forum/pyret-discuss">Discuss Pyret</a>
-              </div>
-            </li>
-            <li role="presentation">
-              <div id="fullConnectButton" class="menuButton loginOnly">
-                <a class="focusable" role="menuitem"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Enable Full Google Access</a>
-              </div>
-            </li>
-            <li role="presentation">
               <div id="choose-context" class="menuButton">
                 <a class="focusable" role="menuitem"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Choose Context</a>
-              </div>
-            </li>
-            <li role="presentation">
-              <div id="logging" class="menuButton">
-                <span>
-                  <input class="focusable" role="menuitem" tabindex="-1" id="detailed-logging"
-                  aria-labelledby="detailed-logging-label"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  type="checkbox" aria-pressed="false"
-                  aria-label="Contribute detailed usage information"/>
-                  <label for="detailed-logging" id="detailed-logging-label">
-                    Contribute detailed usage information.</label>
-                  <a href="https://www.pyret.org/cpo-faq#(part._logging)" target="_blank" rel="noopener noreferrer" class="focusable info-btn" role="menuitem" tabindex="-1"
-                    id="detailed-logging-learn-more"
-                    title="Learn More" aria-label="Learn More">?</a>
-                </span>
               </div>
             </li>
             <li role="presentation">
@@ -203,6 +176,7 @@
                 <option value="panda">Panda</option>
                 <option value="high-contrast-light">High Contrast Light</option>
                 <option value="high-contrast-dark">High Contrast Dark</option>
+                <option value="pink">Pink</option>
               </select>
             </li>
           </ul>
@@ -485,6 +459,7 @@ console.log(window.performance.now());
 <script src="js/snap/src/sha512.js"></script>
 <script src="js/snap/src/FileSaver.min.js"></script>
 <script>
+var IMAGE_PROXY_BYPASS = "{{ &IMAGE_PROXY_BYPASS }}" === "true";
 var APP_BASE_URL = "{{{ BASE_URL }}}";
 var CSRF_TOKEN = "{{{ CSRF_TOKEN }}}";
 $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
@@ -494,6 +469,7 @@ $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
     jqXHR.setRequestHeader('X-CSRF-Token', CSRF_TOKEN);
   }
 });
+var URL_FILE_MODE = window.URL_FILE_MODE = "{{ URL_FILE_MODE }}";
 </script>
 <script>
   var replMain = $(".replMain");

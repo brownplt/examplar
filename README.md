@@ -1,6 +1,10 @@
 [![Build Status](https://travis-ci.org/brownplt/code.pyret.org.svg)](https://travis-ci.org/brownplt/code.pyret.org)
 
-# code.pyret.org
+# Examplar
+
+For `2026-experiment`, follow [the current setup, migration notes and Drive-free
+Spyret example](EXPERIMENT_2026.md). The historical instructions below describe
+the older CPO dependency layout.
 
 ## Simple Configuration
 
@@ -10,7 +14,7 @@ everything in `.env` is just an environment variable if you really want to
 manage things yourself, but using Heroku tools makes sure you run like things
 do in production.
 
-First, get the [Heroku toolbelt](https://toolbelt.heroku.com/).
+First, get the [Heroku CLI](https://devcenter.heroku.com/articles/heroku-cli).
 
 Then, copy `.env.example` to `.env`.  If all you want to do is run Pyret code
 and test out the REPL, you only need to edit a few variables.  If you want to
@@ -59,6 +63,44 @@ could just run this from the CPO directory:
 ```
 $ ln -s ../pyret-lang pyret
 ```
+
+## Running with the TypeScript compiler (experimental)
+
+CPO can also run on the TypeScript port of the Pyret compiler
+(`pyret/src/ts-compiler`), compiled in the page exactly like the stock
+compiler. This is strictly additive: the default build and behavior are
+unchanged.
+
+Build the parallel artifacts (in addition to the normal build):
+
+```
+$ make web-ts
+```
+
+This produces `build/web/js/ts-compiler.js` (a browserify bundle of the
+TS compiler, exposing the `PyretTSCompiler` global) and
+`build/web/js/cpo-main-ts.jarr` (the same editor UI and builtin modules
+as `cpo-main.jarr`, minus the Pyret-hosted compiler modules, with the
+TS-compiler glue from `src/web/js/cpo-main-ts.js` and
+`src/web/js/ts-compiler-lib.js`).
+
+Select the compiler at page startup:
+
+- per page load: open `/editor?compiler=ts` (or `?compiler=pyret`);
+- server-wide default: set `CPO_COMPILER=ts` in the environment (see
+  `PYRET_TS` / `PYRET_TS_COMPILER` in `src/server.js` for overriding the
+  artifact URLs).
+
+Execution, check results, and runtime errors go through the same runtime,
+realm, and UI code as the stock build; parse errors are re-raised as the
+same Pyret exceptions, and compile errors render through
+`builtin://error-display` values bridged from the TS compiler's error
+structures. The whole mocha suite passes in both configurations (run it
+with `CPO_COMPILER=ts` set on the server for the TS flavor). Known
+limits: `my-gdrive`/`shared-gdrive`/`gdrive-js` imports are not yet
+supported with the TS compiler (url/url-file imports are), and very long
+programs (beyond roughly 5000 statements) can still exhaust the browser's
+fixed JS stack during compilation.
 
 ## Configuration with Google Auth and Storage
 
@@ -187,4 +229,48 @@ https://devcenter.heroku.com/articles/getting-started-with-nodejs
         $ heroku ps:scale web=1
 
 7.	Now run `heroku open` or visit appname.herokuapp.com.
+
 8.  Tips for redeploy: if you don't see a successful build under heroku webiste's activity tab, but get "everything is up-to-date" when you run `git push heroku <localbranch>:master`, or your build doesn't look up-to-date, you can do an empty commit: `git commit --allow-empty -m "force deploy"`
+
+## Production Deployment
+
+This branch (`release`) is pushed to in order to trigger deploys of the "real"
+version of code.pyret.org.  If you have permission to push to this branch, you
+can cause code.pyret.org to update simply by pushing.
+
+There are several encrypted credentials stored in Travis.  Anyone's will work,
+they just need to have access to the right places.
+
+- The access key id and access token for an appropriate S3 bucket.  This is
+  where the built and compressed `cpo-main.jarr.gz` file will go.
+- The access key for a Heroku account, which goes in two places; first, in the
+  `global` section so the heroku toolbelt can run, and second in the api\_key
+  field of the Heroku deployment itself.  This needs to be a Heroku account
+  that has access to the `code-pyret-org` project
+
+The build creates `cpo-main.jarr.gz`, stores it in
+`build/release/<short-commit-id>/cpo-main.jarr.gz`, and then copies that
+directory over to the given S3 bucket.
+
+It then sets the current Heroku `PYRET` variable to point to the appropriate
+URL – in the current deployment, this URL is an AWS CloudFront endpoint that
+is backed by a S3 bucket, but any path to the bucket with the right ending
+commit hash will work.  Note that it is quite useful to update this variable
+because it changes the URL that is fetched on loading CPO, so it will bypass
+the users' browser cache the next time they visit.  It's a Good Idea to have
+very long cache settings on the CPO main JavaScript file, and also good to make
+sure folks get the update.
+
+In addition, this means that it's easy to roll back using Heroku's rollback
+feature, since all the copies of the built standalones are available.
+
+This branch doesn't run the Selenium tests; the various development branches
+and master do that.  Mainly this is for expedience, since all commits go
+through a development branch that runs tests anyway, so it would merely
+lengthen the path to deploying.  Also, running the tests on multiple browsers
+causes the heroku build to fire twice, which causes an error (see
+https://github.com/travis-ci/travis-ci/issues/929).
+
+This branch is access-controlled to admins of brownplt and a few others.  This
+is mainly to prevent _mistakes_ (Oops!  I pushed to `release` and it broke!)
+more than to lock anyone out.

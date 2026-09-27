@@ -13,8 +13,9 @@ include from BASIC: *, type *, data * end
 include tables
 include chart 
 import statistics as S 
-# import lists as L
+#  import lists as L
 import sets as ST
+import constants as C
 
 provide: 
   get-row,
@@ -42,7 +43,15 @@ provide:
   group,
   count,
   count-many,
-  render-chart
+  render-chart,
+  pie-chart,
+  bar-chart,
+  dot-plot,
+  labeled-dot-plot
+end
+
+provide from C:
+  E
 end
 
 # ----------- TABLE FUNCTIONS -----------

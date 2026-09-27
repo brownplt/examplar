@@ -269,11 +269,6 @@ nav ul a, nav ul button {
   padding-right: 2em;
 }
 
-#detailed-logging-learn-more {
-  padding: 0.25em;
-  margin-top: -0.25em;
-}
-
 nav a, nav button {
   color: #111;
   font-family: var(--ui-font-stack);
@@ -370,7 +365,7 @@ nav > div > ul ul a, nav > div > ul ul button {
 
 #logo{
   height:100%;
-  background: url("/img/pyret-logo.png") 15px 5px no-repeat;
+  background: url("../img/pyret-logo.png") 15px 5px no-repeat;
   background-size: 30px 30px;
   display:block;
   float:left;

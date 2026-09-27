@@ -196,14 +196,17 @@ define("cpo/gdrive-locators", [], function() {
         })]);
 
         contentsP.fail(function(failure) {
-          getModRestart.error(runtime.ffi.makeMessageException(contentRequestFailure(failure)));
+          restarter.error(runtime.ffi.makeMessageException(contentRequestFailure(failure)));
         });
 
-        fileP.then(function(file) {
-          var file = file;
-          var contents = file.contents;
+        contentsP.then(function(fileAndContents) {
+          var file = fileAndContents[0];
+          var contents = fileAndContents[1];
 
-          var uri = "shared-gdrive://" + file.name + ":" + file.file.getUniqueId();
+          var uri = "shared-gdrive://" + file.getName() + ":" + file.getUniqueId();
+          var doc = new CodeMirror.Doc(contents, "pyret");
+          CPO.documents.set(uri, doc);
+          CPO.sourceAPI.from_doc(uri, doc);
 
           function needsCompile() { return true; }
 

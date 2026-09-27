@@ -3,6 +3,143 @@
 var originalPageLoad = Date.now();
 console.log("originalPageLoad: ", originalPageLoad);
 
+// Transparently route browser fetches to allowlisted hosts through the
+// server-side proxy at /load-shareurl, but only when the direct path doesn't
+// work.
+//
+// Strategy: the FIRST fetch to an allowlisted host fires direct + proxied in
+// parallel. We decide shouldProxy for the rest of the page-load from direct's
+// response *headers*:
+//   - direct returned 2xx with content-type text/plain  -> shouldProxy=false:
+//     serve direct's response, abort the in-flight proxy fetch.
+//   - direct failed, hung past timeout, or returned anything else
+//                                                        -> shouldProxy=true:
+//     serve proxy's response.
+// A key idea is that network-blocky things sometimes return 200 with a
+// message page about blocking (or an error, but that counts as a fail). We
+// don't want to accidentally think that's a success.
+// shouldProxy state is in-memory and per-host — never persisted, since
+// reachability changes between networks and a stale value would silently
+// break loads.
+//
+// Installed on the global fetch as early as possible so it catches every fetch
+// caller; some of them are in the pyret-lang runtime and would be otherwise
+// difficult to configure.
+const SHAREURL_PROXY_HOSTS = new Set(['raw.githubusercontent.com']);
+const SHAREURL_DIRECT_TIMEOUT_MS = 5000;
+const _origFetch = window.fetch.bind(window);
+
+const _shareurlShouldProxy = new Map();          // host -> boolean
+const _shareurlShouldProxyInflight = new Map();  // host -> Promise<boolean>
+
+function _shareurlProxyUrl(fetchInput) {
+  return '/load-shareurl?url=' + encodeURIComponent(_shareurlInputToUrl(fetchInput));
+}
+
+function _shareurlInputToUrl(fetchInput) {
+  return (typeof fetchInput === 'string') ? fetchInput
+         : (typeof Request !== 'undefined' && fetchInput instanceof Request) ? fetchInput.url
+         : String(fetchInput);
+}
+
+function _shareurlVerifyDirect(r) {
+  if (!r.ok) return false;
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  // Source files served from raw.githubusercontent.com come back as
+  // text/plain (.arr, .json, .csv, .md all do). Anything else — HTML block
+  // pages, captive portals, surprise content types — we don't trust as a
+  // real upstream response.
+  return ct.startsWith('text/plain');
+}
+
+function _shareurlFetch(shouldProxy, fetchInput, fetchInit) {
+  const maybeProxyInput = shouldProxy ? _shareurlProxyUrl(fetchInput) : fetchInput;
+  return _origFetch(maybeProxyInput, fetchInit);
+}
+
+function _shareurlRace(fetchInput, fetchInit) {
+  const proxyCtrl = new AbortController();
+  // NOTE(joe): The signal overwrite is technically not the right fetch()
+  // polyfill. If the caller elsewhere in the codebase provided a different
+  // signal (which in the fetch API is only for aborting as of April '26), that
+  // caller aborting through that signal won't cancel the proxy fetch.
+  // I'm OK letting that case slip through here in exchange for not having a
+  // bunch of extra event handler forwarding
+  const proxyP = _origFetch(_shareurlProxyUrl(fetchInput),
+    Object.assign({}, fetchInit, { signal: proxyCtrl.signal }));
+  const directP = _origFetch(fetchInput, fetchInit).then(r => {
+    if (!_shareurlVerifyDirect(r)) throw new Error('direct request failed');
+    return r;
+  });
+
+  // shouldProxy: false iff direct verified before the timeout, else true.
+  // Whether to proxy is decided solely on whether direct succeeds or not
+  const shouldProxyPromise = Promise.race([
+    directP.then(() => false, () => true),
+    new Promise(resolve => setTimeout(() => resolve(true), SHAREURL_DIRECT_TIMEOUT_MS)),
+  ]);
+
+  // Settlement-order check: if direct verifies before proxy returns, abort
+  // the in-flight proxy to stop wasting server bandwidth. We must NOT
+  // abort once proxy has already returned, since by then the caller is
+  // reading proxy's body and aborting would error its stream mid-read.
+  const directFinishedSuccessfullyAndFirstP = Promise.race([
+    directP.then(() => true, () => false),
+    proxyP.then(() => false, () => false),
+  ]);
+  directFinishedSuccessfullyAndFirstP.then(directFirst => {
+    if (directFirst) proxyCtrl.abort();
+  });
+
+  // Caller's response: whichever of direct-verified or proxy-OK fulfills
+  // first. A non-ok proxy response must NOT win while direct is still
+  // pending: fetch fulfills on HTTP errors, and on hosts with no proxy
+  // endpoint at all (static serving: the vscode webview, embed-static) the
+  // local 404 arrives long before the real cross-origin response, which
+  // would hand the caller a bogus 404. If BOTH fail, surface proxy's
+  // response/error (the more authoritative upstream — direct's may just be
+  // 'direct-not-verified').
+  const responsePromise = Promise.any([
+    directP,
+    proxyP.then(r => {
+      if (!r.ok) { const e = new Error('proxy response not ok'); e._shareurlResponse = r; throw e; }
+      return r;
+    }),
+  ]).catch(aggErr => {
+    const proxyErr = aggErr.errors[1];
+    if (proxyErr && proxyErr._shareurlResponse) return proxyErr._shareurlResponse;
+    return Promise.reject(proxyErr || aggErr.errors[0]);
+  });
+
+  return { responsePromise, shouldProxyPromise };
+}
+
+window.fetch = function(fetchInput, fetchInit) {
+  let host;
+  try { host = new URL(_shareurlInputToUrl(fetchInput), window.location.href).hostname; }
+  catch (_) { return _origFetch(fetchInput, fetchInit); }
+  if (!SHAREURL_PROXY_HOSTS.has(host)) return _origFetch(fetchInput, fetchInit);
+
+  const shouldProxy = _shareurlShouldProxy.get(host);
+  const inflight = _shareurlShouldProxyInflight.get(host);
+  if (shouldProxy !== undefined) {
+    return _shareurlFetch(shouldProxy, fetchInput, fetchInit);
+  } else if (inflight) {
+    // shouldProxy pending: queue this fetch on it and issue a single fresh
+    // request once shouldProxy is decided.
+    return inflight.then(sp => _shareurlFetch(sp, fetchInput, fetchInit));
+  } else {
+    // First fetch to this host this page-load: run the race.
+    const { responsePromise, shouldProxyPromise } = _shareurlRace(fetchInput, fetchInit);
+    _shareurlShouldProxyInflight.set(host, shouldProxyPromise);
+    shouldProxyPromise.then(sp => {
+      _shareurlShouldProxy.set(host, sp);
+      _shareurlShouldProxyInflight.delete(host);
+    });
+    return responsePromise;
+  }
+};
+
 const isEmbedded = window.parent !== window;
 
 var shareAPI = makeShareAPI(process.env.CURRENT_PYRET_RELEASE);
@@ -36,6 +173,17 @@ window.ct_error = function(/* varargs */) {
 };
 var initialParams = url.parse(document.location.href);
 var params = url.parse("/?" + initialParams["hash"]);
+// Who owns this editor's initial contents? A standalone page installs its own
+// (programLoaded below). An embedded instance (the embed API's iframe, the
+// vscode webview) or a page booted from an initialState hash is host-fed: its
+// real contents arrive via the events.js `reset` protocol, and boot isn't
+// over until that reset fully settles -- reset() runs a warm-start program
+// before installing contents, and driving the editor during that window races
+// the host's own handshake. EDITOR_CONTENTS_SETTLED is the single "initial
+// contents are in and the editor is quiescent" fact, declared at whichever of
+// those two settle points applies (here for standalone; events.js reset() for
+// host-fed), so observers don't have to re-derive per-host boot behavior.
+window.EXPECTS_HOST_RESET = isEmbedded || !!params["get"]["initialState"];
 window.highlightMode = "mcmh"; // what is this for?
 window.clearFlash = function() {
   $(".notificationArea").empty();
@@ -244,6 +392,7 @@ $(function() {
       animationDiv = null;
     }
   }
+  let activeEditor = null;
   CPO.makeEditor = function(container, options) {
     var initial = "";
     if (options.hasOwnProperty("initial")) {
@@ -288,10 +437,9 @@ $(function() {
     console.log("Using keymap: ", CodeMirror.keyMap.default, "macDefault: ", CodeMirror.keyMap.macDefault, "mac: ", mac);
     const modifier = mac ? "Cmd" : "Ctrl";
 
-    var cmOptions = {
-      extraKeys: CodeMirror.normalizeKeyMap({
+    const extraKeys = {
         "Shift-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://").contents); },
-        "Shift-Ctrl-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://")); },
+        "Shift-Ctrl-Enter": function(cm) { runFun(sourceAPI.get_loaded("definitions://").contents); },
         "Tab": "indentAuto",
         "Ctrl-I": reindentAllLines,
         "Esc Left": "goBackwardSexp",
@@ -302,7 +450,21 @@ $(function() {
         "Ctrl-Right": "goForwardToken",
         [`${modifier}-F`]: "findPersistent",
         [`${modifier}-/`]: "toggleComment",
-      }),
+      };
+    if(window.PYRET_IN_VSCODE) {
+      // Disable undo and redo in vscode, since they mess with the host editor's undo/redo stack
+      // Oddly, it doesn't seem to work to add these to extraKeys; I have to
+      // override them in the default keymap
+      CodeMirror.keyMap.default[`${modifier}-Z`] = false;
+      CodeMirror.keyMap.default[`Shift-${modifier}-Z`] = false;
+      CodeMirror.keyMap.default[`${modifier}-Y`] = false;
+      // Ctrl-U is Undo within a range
+      CodeMirror.keyMap.default[`${modifier}-U`] = false;
+    }
+
+    var cmOptions = {
+      keyMap: 'default',
+      extraKeys: CodeMirror.normalizeKeyMap(extraKeys),
       indentUnit: 2,
       tabSize: 2,
       viewportMargin: Infinity,
@@ -322,6 +484,9 @@ $(function() {
     cmOptions = merge(cmOptions, options.cmOptions || {});
 
     var CM = CodeMirror.fromTextArea(textarea[0], cmOptions);
+    CM.on("focus", () => {
+      activeEditor = CM;
+    });
 
     function firstLineIsNamespace() {
       const firstline = CM.getLine(0);
@@ -417,16 +582,13 @@ $(function() {
   };
 
   function setUsername(target) {
-    return gwrap.load({name: 'plus',
-      version: 'v1',
-    }).then((api) => {
-      api.people.get({ userId: "me" }).then(function(user) {
-        var name = user.displayName;
-        if (user.emails && user.emails[0] && user.emails[0].value) {
-          name = user.emails[0].value;
-        }
-        target.text(name);
-      });
+    var token = window.gapi.auth.getToken().access_token;
+    return fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(info) {
+      target.text(info.email);
     });
   }
 
@@ -445,6 +607,42 @@ $(function() {
   storageAPI = storageAPI.then(function(api) { return api.api; });
   window.sourceAPI = window.createSourceManager(storageAPI);
   CPO.sourceAPI = window.sourceAPI;
+  $("#connectButton").click(function() {
+    $("#connectButton").text("Connecting...");
+    $("#connectButton").attr("disabled", "disabled");
+    $('#connectButtonli').attr('disabled', 'disabled');
+    $("#connectButton").attr("tabIndex", "-1");
+    //$("#topTierUl").attr("tabIndex", "0");
+    getTopTierMenuitems();
+    storageAPI = createProgramCollectionAPI("pyret.cs.brown.edu", false);
+    storageAPI.then(function(api) {
+      api.collection.then(function() {
+        $(".loginOnly").show();
+        $(".logoutOnly").hide();
+        document.activeElement.blur();
+        $("#bonniemenubutton").focus();
+        setUsername($("#username"));
+        if(params["get"] && params["get"]["program"]) {
+          var toLoad = api.api.getFileById(params["get"]["program"]);
+          console.log("Logged in and has program to load: ", toLoad);
+          loadProgram(toLoad);
+          programToSave = toLoad;
+        } else {
+          programToSave = Q.fcall(function() { return null; });
+        }
+      });
+      api.collection.fail(function() {
+        $("#connectButton").text("Connect to Google Drive");
+        $("#connectButton").attr("disabled", false);
+        $('#connectButtonli').attr('disabled', false);
+        //$("#connectButton").attr("tabIndex", "0");
+        document.activeElement.blur();
+        $("#connectButton").focus();
+        //$("#topTierUl").attr("tabIndex", "-1");
+      });
+    });
+    storageAPI = storageAPI.then(function(api) { return api.api; });
+  });
 
   let assignment;
 
@@ -452,13 +650,15 @@ $(function() {
   if (ASSIGNMENT_ID) {
     assignment = storageAPI.then(api => api.getTemplateFileById(ASSIGNMENT_ID));
   } else {
-    // Redirect to main page.
-    window.location.href = "/";
+    // A standalone scratch editor should not require Drive or an assignment.
+    assignment = Q({ assignment_name: "Untitled", wheat: [], chaff: [], mutant: [] });
+    cloud_log_d.resolve(function() {});
   }
+  window.EXAMPLAR_ASSIGNMENT = !!ASSIGNMENT_ID;
 
   
   function setTitle(progName) {
-    document.title = progName + " - code.pyret.org";
+    document.title = progName + " - " + process.env.APP_NAME;
     $("#showFilename").text("File: " + progName);
   }
   CPO.setTitle = setTitle;
@@ -714,6 +914,7 @@ $(function() {
 
   let assignment_code = Promise.all([assignment_tests, assignment.then(assn => assn.code)])
     .then(([tests, code]) => {
+      if (!code) return null;
       if (!tests) {
         code.edited();
         return sourceAPI.from_file(code);
@@ -749,6 +950,9 @@ $(function() {
             code_tab.activate();
             sourceAPI.set_definitions(code);
           }
+        } else if (!tests) {
+          CPO.editor.cm.setValue(CONTEXT_FOR_NEW_FILES);
+          sourceAPI.set_definitions(sourceAPI.from_doc("definitions://", CPO.editor.cm.getDoc()));
         }
       });
 
@@ -1276,24 +1480,10 @@ $(function() {
 
   programLoaded.then(function(c) {
     CPO.documents.set("definitions://", CPO.editor.cm.getDoc());
-    if(c === "") {
-      c = CONTEXT_FOR_NEW_FILES;
-    }
-
-    if (c.startsWith("<scriptsonly")) {
-      // this is blocks file. Open it with /blocks
-      window.location.href = window.location.href.replace('editor', 'blocks');
-    }
-
-    if(!params["get"]["controlled"]) {
-      // NOTE(joe): Clearing history to address https://github.com/brownplt/pyret-lang/issues/386,
-      // in which undo can revert the program back to empty
-      CPO.editor.cm.setValue(c);
-      CPO.editor.cm.clearHistory();
-    }
-    else {
+    // Examplar has already installed the active document through its tabs.
+    // programLoaded resolves to tab readiness, not CPO's source string.
+    if(params["get"]["controlled"]) {
       const hideWhenControlled = [
-        "#fullConnectButton",
         "#logging",
         "#logout"
       ];
@@ -1302,6 +1492,12 @@ $(function() {
       ];
       hideWhenControlled.forEach(s => $(s).hide());
       removeWhenControlled.forEach(s => $(s).remove());
+    }
+
+    // Standalone boot settles here; a host-fed editor settles at the end of
+    // events.js reset() instead (see EXPECTS_HOST_RESET above).
+    if(!window.EXPECTS_HOST_RESET) {
+      window.EDITOR_CONTENTS_SETTLED = true;
     }
 
   });
@@ -1313,14 +1509,195 @@ $(function() {
 
   console.log("About to load Pyret: ", originalPageLoad, Date.now());
 
+  // If the primary Pyret URL (usually a CDN) fails, we fall back to the
+  // same-origin copy at PYRET_BACKUP (always the plain compiler). The
+  // "error" event alone isn't enough to trigger that: school content
+  // filters have been seen both silently stalling the request (neither
+  // "load" nor "error" ever fires) and answering it with an empty 200
+  // (which fires "load"!). So two extra signals count as failure: going
+  // PYRET_LOAD_TIMEOUT_MS with no event, and a "load" after which the
+  // bundle's globals aren't actually defined. When the primary fails
+  // either way, we record it in localSettings; until that record expires,
+  // page loads swap the two URLs and go straight to the backup rather
+  // than failing over from scratch again. A successful load from the
+  // primary clears the record.
+  var PYRET_LOAD_TIMEOUT_MS = 20000;
+  var PYRET_FAILED_KEY = "pyret-primary-failed-at";
+  var PYRET_FAILED_TTL_MS = 24 * 60 * 60 * 1000;
+
+  function primaryFailedRecently() {
+    var stamp = Number(localSettings.getItem(PYRET_FAILED_KEY));
+    return stamp > 0 && (Date.now() - stamp) < PYRET_FAILED_TTL_MS;
+  }
+
+  function recordPrimaryFailure() {
+    if (primaryPyret === window.PYRET && !window.PYRET_GZIPPED && window.CPO_COMPILER !== "ts") {
+      localSettings.setItem(PYRET_FAILED_KEY, String(Date.now()));
+    }
+  }
+
+  // The bundle synchronously installs its module loader as `define` and
+  // `requirejs`; if neither exists after a script's "load" event, whatever
+  // the network handed us was not Pyret (e.g. a filter's empty 200).
+  function pyretActuallyLoaded() {
+    return !(typeof window.define === "undefined" && typeof window.requirejs === "undefined");
+  }
+
+  var primaryPyret = window.PYRET;
+  var backupPyret = process.env.PYRET_BACKUP;
+  // No swapping in the gzipped (webview) configuration, where the two URLs
+  // are fetched by different mechanisms, or in the ts flavor, where the
+  // primary is the ts jarr but every fallback goes to the plain compiler.
+  if (!window.PYRET_GZIPPED && window.CPO_COMPILER !== "ts" && backupPyret && primaryFailedRecently()) {
+    console.log("Primary Pyret URL failed recently; loading from backup first");
+    primaryPyret = process.env.PYRET_BACKUP;
+    backupPyret = window.PYRET;
+  }
+
   var pyretLoad = document.createElement('script');
-  console.log(window.PYRET);
-  pyretLoad.src = window.PYRET;
+  console.log(primaryPyret);
   pyretLoad.type = "text/javascript";
   pyretLoad.setAttribute("crossorigin", "anonymous");
-  document.body.appendChild(pyretLoad);
 
   var pyretLoad2 = document.createElement('script');
+
+  if (window.PYRET_GZIPPED) {
+    // The runtime bundle is gzipped and this host serves it WITHOUT an
+    // executable MIME type or Content-Encoding (e.g. a vscode webview whose
+    // resources come from Open VSX / the GitLab Web IDE). fetch ignores script
+    // MIME, so pull the .gz.js and inflate it in-page with the native
+    // DecompressionStream, then run it from a Blob URL. The `error` handler
+    // registered below (synchronously) fires before this async append resolves.
+    //
+    // In the ts flavor the compiler bundle has the same MIME problem (its
+    // <script src> in editor.html is skipped under PYRET_GZIPPED) and, like
+    // the jarr, is gzip bytes at rest (ts-compiler.gz.js) that this host
+    // serves without Content-Encoding -- so fetch, inflate, and Blob-execute
+    // it FIRST: the jarr expects window.PyretTSCompiler, matching the
+    // synchronous script order of the un-gzipped page.
+    var tsCompilerLoad = Promise.resolve();
+    if (window.CPO_COMPILER === "ts" && window.PYRET_TS_COMPILER) {
+      tsCompilerLoad = fetch(window.PYRET_TS_COMPILER)
+        .then(function (resp) {
+          if (!resp.ok) { throw new Error("status " + resp.status); }
+          return new Response(resp.body.pipeThrough(new DecompressionStream("gzip"))).blob();
+        })
+        .then(function (blob) {
+          return new Promise(function (resolve, reject) {
+            var tsLoad = document.createElement('script');
+            tsLoad.onload = resolve;
+            tsLoad.onerror = function () { reject(new Error("executing ts-compiler bundle failed")); };
+            tsLoad.src = URL.createObjectURL(new Blob([blob], { type: "application/javascript" }));
+            document.body.appendChild(tsLoad);
+          });
+        });
+    }
+    tsCompilerLoad
+      .then(function () {
+        return fetch(window.PYRET);
+      })
+      .then(function (resp) {
+        if (!resp.ok) { throw new Error("status " + resp.status); }
+        return new Response(resp.body.pipeThrough(new DecompressionStream("gzip"))).blob();
+      })
+      .then(function (blob) {
+        // If the fetch stalled long enough for the timeout to fire, the
+        // backup owns the page now; don't run a second copy.
+        if (backupStarted) { return; }
+        pyretLoad.src = URL.createObjectURL(new Blob([blob], { type: "application/javascript" }));
+        document.body.appendChild(pyretLoad);
+      })
+      .catch(function (e) {
+        clearTimeout(primaryTimer);
+        logFailureAndManualFetch(window.PYRET, e);
+        loadBackupPyret("fetching/decompressing " + window.PYRET + " failed: " + e.message);
+      });
+  } else {
+    pyretLoad.src = primaryPyret;
+    document.body.appendChild(pyretLoad);
+  }
+
+  var primaryTimer = setTimeout(function() {
+    logger.log('pyret-load-failure', {
+      event : 'timeout',
+      url : primaryPyret,
+      timeoutMs : PYRET_LOAD_TIMEOUT_MS
+    });
+    recordPrimaryFailure();
+    // Removing the element abandons the stalled request; a script element
+    // that is disconnected before it executes won't run, so a late arrival
+    // can't execute a second copy of Pyret alongside the backup.
+    pyretLoad.remove();
+    loadBackupPyret("the request for " + primaryPyret + " went " + PYRET_LOAD_TIMEOUT_MS + "ms with neither load nor error (stalled?)");
+  }, PYRET_LOAD_TIMEOUT_MS);
+
+  $(pyretLoad).on("load", function() {
+    clearTimeout(primaryTimer);
+    if (!pyretActuallyLoaded()) {
+      logger.log('pyret-load-failure', {
+        event : 'empty-load',
+        url : primaryPyret
+      });
+      recordPrimaryFailure();
+      loadBackupPyret("the response for " + primaryPyret + " loaded without defining Pyret's globals (empty or replaced body?)");
+      return;
+    }
+    if (primaryPyret === window.PYRET && localSettings.getItem(PYRET_FAILED_KEY)) {
+      localSettings.setItem(PYRET_FAILED_KEY, "");
+    }
+  });
+
+  // The page's terminal state: neither the runtime bundle nor its backup is
+  // coming. Alongside the user-facing banner, say WHY on the console -- in a
+  // vscode webview there is no logging server behind logger.log, so the
+  // console line is the only diagnostic that survives (and the browser-test
+  // harness now records it).
+  function terminalPyretLoadFailure(detail) {
+    console.error("Pyret failed to load: " + detail);
+    $("#loader").hide();
+    $("#runPart").hide();
+    $("#breakButton").hide();
+    window.stickError("Pyret failed to load; check your connection or try refreshing the page.  If this happens repeatedly, please report it as a bug.  (" + detail + ")");
+  }
+
+  var backupStarted = false;
+  function loadBackupPyret(primaryDetail) {
+    console.error("Pyret runtime bundle failed to load: " + primaryDetail);
+    if (backupStarted) { return; }
+    backupStarted = true;
+    // Builds without a configured PYRET_BACKUP (the vscode webview, anything
+    // built without the env var) used to assign it anyway, so the browser
+    // requested a literal "undefined" -- an instant 404 whose error event
+    // replaced the primary failure's story. No backup: go straight to the
+    // terminal state, carrying the reason the primary died.
+    if (!backupPyret) {
+      terminalPyretLoadFailure(primaryDetail);
+      return;
+    }
+    var backupTimer = setTimeout(function() {
+      // The backup request is left in flight, so if it does eventually
+      // finish, the page still becomes usable under the banner.
+      logger.log('pyret-load-failure', {
+        event : 'timeout',
+        url : backupPyret,
+        timeoutMs : PYRET_LOAD_TIMEOUT_MS
+      });
+      terminalPyretLoadFailure("the backup bundle " + backupPyret + " also went " + PYRET_LOAD_TIMEOUT_MS + "ms with neither load nor error");
+    }, PYRET_LOAD_TIMEOUT_MS);
+    $(pyretLoad2).on("load", function() {
+      clearTimeout(backupTimer);
+      if (!pyretActuallyLoaded()) {
+        logger.log('pyret-load-failure', {
+          event : 'empty-load',
+          url : backupPyret
+        });
+        terminalPyretLoadFailure("the backup bundle " + backupPyret + " loaded without defining Pyret's globals");
+      }
+    });
+    pyretLoad2.src = backupPyret;
+    pyretLoad2.type = "text/javascript";
+    document.body.appendChild(pyretLoad2);
+  }
 
   function logFailureAndManualFetch(url, e) {
 
@@ -1369,19 +1746,18 @@ $(function() {
   }
 
   $(pyretLoad).on("error", function(e) {
-    logFailureAndManualFetch(window.PYRET, e);
-    pyretLoad2.src = process.env.PYRET_BACKUP;
-    pyretLoad2.type = "text/javascript";
-    document.body.appendChild(pyretLoad2);
+    clearTimeout(primaryTimer);
+    logFailureAndManualFetch(primaryPyret, e);
+    loadBackupPyret("the script tag for " + primaryPyret + " fired its error event");
   });
 
   $(pyretLoad2).on("error", function(e) {
-    $("#loader").hide();
-    $("#runPart").hide();
-    $("#breakButton").hide();
-    window.stickError("Pyret failed to load; check your connection or try refreshing the page.  If this happens repeatedly, please report it as a bug.");
-    logFailureAndManualFetch(process.env.PYRET_BACKUP, e);
+    terminalPyretLoadFailure("the backup bundle " + backupPyret + " also failed");
+    logFailureAndManualFetch(backupPyret, e);
+  });
 
+  window.addEventListener("focus", (e) => {
+    if(activeEditor) { activeEditor.focus(); }
   });
 
   function makeEvent() {
@@ -1425,6 +1801,8 @@ $(function() {
 
   let initialState = params["get"]["initialState"];
 
+  window.PYRET_IS_EMBEDDED = false;
+  window.PYRET_IN_VSCODE = false;
   if (typeof acquireVsCodeApi === "function") {
     window.MESSAGES = makeEvents({
       CPO: CPO,
@@ -1432,8 +1810,11 @@ $(function() {
       receivePort: window,
       initialState
     });
+    window.PYRET_IS_EMBEDDED = true;
+    window.PYRET_IN_VSCODE = true;
   }
   else if((window.parent && (window.parent !== window))) {
     window.MESSAGES = makeEvents({ CPO: CPO, sendPort: window.parent, receivePort: window, initialState });
+    window.PYRET_IS_EMBEDDED = true;
   }
 });

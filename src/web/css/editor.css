@@ -480,9 +480,13 @@ div.CodeMirror span.CodeMirror-nonmatchingbracket-region {
   cursor: pointer;
 }
 
+div.repl-animation {
+  background-color: var(--background) !important;
+}
+
 div.trace {
   overflow-x: auto;
-  padding-top: 1px;
+  margin-top: 1px;
 }
 div.trace.error {
    background-color: var(--trace-err-bg);
@@ -907,6 +911,27 @@ body.hideFooter .replContainer {
   padding-bottom: 0rem;
 }
 
+/* Unobtrusive compiler-flavor indicator, pinned to the REPL's corner just
+   above the footer padding. Hidden unless the page resolved to the ts
+   flavor (editor.html adds .ts-mode to <html> in the same branch that
+   swaps PYRET), so the stock editor shows nothing new. */
+#compilerFlavorBadge {
+  display: none;
+  position: absolute;
+  right: 8px;
+  bottom: calc(2.5rem + 4px);
+  font-size: 11px;
+  color: #999;
+  z-index: 1;
+  user-select: none;
+}
+html.ts-mode #compilerFlavorBadge {
+  display: block;
+}
+body.hideFooter #compilerFlavorBadge {
+  bottom: 4px;
+}
+
 body.hideHeader .replContainer {
   padding-top: 0px;
 }
@@ -1300,6 +1325,7 @@ ul.inlineCollection > li > span.label {
    position: absolute;
    top: 0;
    right: 0;
+   z-index: 2;
 }
 
 .has-icon:hover .info-icon-top {
@@ -1628,6 +1654,18 @@ code div {
 
 #vg-tooltip-element {
   z-index: 15100;
+}
+#vg-tooltip-element.visible {
+  font-size: inherit;
+}
+
+#vg-tooltip-element.visible table tr td.key {
+  color: var(--repl-output);
+  padding-top: 0.5em;
+  padding-right: 0.5em;
+  padding-bottom: 0.5em;
+  /* Note: not setting background color, so that we get clearer rows */
+  font-weight: var(--th-font-weight);
 }
 
 .ui-dialog-titlebar {
@@ -2190,12 +2228,13 @@ body.smallHeader #run-dropdown-content {
 }
 
 table {
+    --table-radius: 1em;
     border-collapse: collapse;
     width: 100%;
     table-layout: auto;
     display: table!important;
     border:1px var(--table-border) solid;
-    border-radius:1em;
+    border-radius: var(--table-radius);
     border-collapse: separate;
     overflow:hidden;
     background:var(--table-bg);
@@ -2295,6 +2334,10 @@ th:last-child, td:last-child {
 
 tr:nth-child(even){background-color: var(--table-even-rows-bg)}
 
+.replOutput:has(> table.pyret-table) {
+  max-height: calc(100vh - 225px); display: block;
+}
+
 /* Borders on Pyret table cells */
 table.pyret-table th, 
 table.pyret-table td {
@@ -2308,9 +2351,89 @@ table.pyret-table.pyret-matrix {
   border-right-width: 2px;
 }
 
+
+table.pyret-table { width: 98%; overflow: scroll; border: none; }
+/* make sure rotated elts in the table (like roughnums!) don't punch through */
 table.pyret-table thead {
   box-shadow: 0px 2px 2px var(--shadow-color);
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
+
+/* top/bottom borders on the first and last rows */
+table.pyret-table th { border-top: solid 1px black; }
+table.pyret-table > :nth-last-child(1 of :has(tr)) > tr:last-child td {
+  border-bottom: solid 1px black;
+}
+
+/* left/right borders on the first and last cells */
+table.pyret-table td:first-child, table.pyret-table th:first-child {
+  border-left: solid 1px black;
+}
+table.pyret-table td:last-child, table.pyret-table th:last-child {
+  border-right: solid 1px black;
+}
+
+/* rounded borders for corners */
+table.pyret-table th:first-child {
+ border-top-left-radius: var(--table-radius);
+}
+table.pyret-table th:last-child {
+ border-top-right-radius: var(--table-radius);
+}
+table.pyret-table > :nth-last-child(1 of :has(tr)) > tr:last-child td:first-child {
+ border-bottom-left-radius: var(--table-radius);
+}
+table.pyret-table > :nth-last-child(1 of :has(tr)) > tr:last-child td:last-child {
+ border-bottom-right-radius: var(--table-radius);
+}
+
+
+
+/* Force tables to be the full height of the viewport, leaving 225px for other chrome */
+table.pyret-table tbody {
+  --bgRGB: 200, 210, 220;
+  --bg: rgb(var(--bgRGB));
+  --bgTrans: rgba(var(--bgRGB), 0);
+
+  --shadow: rgba(41, 50, 56, 0.5);
+
+  overflow: auto;
+
+  background:
+    /* Shadow Cover TOP */
+    linear-gradient(
+      var(--bg) 30%,
+      var(--bgTrans)
+    ) center top,
+
+    /* Shadow Cover BOTTOM */
+    linear-gradient(
+      var(--bgTrans),
+      var(--bg) 70%
+    ) center bottom,
+
+    /* Shadow TOP */
+    radial-gradient(
+      farthest-side at 50% 0,
+      var(--shadow),
+      rgba(0, 0, 0, 0)
+    ) center top,
+
+    /* Shadow BOTTOM */
+    radial-gradient(
+      farthest-side at 50% 100%,
+      var(--shadow),
+      rgba(0, 0, 0, 0)
+    ) center bottom;
+
+  background-repeat: no-repeat;
+  background-size: 100% 8px, 100% 5px, 100% 5px, 100% 8px;
+  background-attachment: local, local, scroll, scroll;
+}
+
+
 table.pyret-row th {
   box-shadow: 2px 0px 2px var(--shadow-color), -2px 0px 2px var(--shadow-color);
   border: none;
@@ -2553,8 +2676,8 @@ table.pyret-row {
    z-index: 1;
    vertical-align: baseline;
    display: inline-block;
-   -webkit-mask-image: url(/img/paint.svg);
-   mask-image: url(/img/paint.svg);
+   -webkit-mask-image: url(../img/paint.svg);
+   mask-image: url(../img/paint.svg);
    -webkit-mask-size: contain;
    mask-size: 100% 100%;
    mask-type: luminance;
@@ -2564,7 +2687,7 @@ table.pyret-row {
    width: 2.5em;
    height: 1.5em;
    position: relative;
-   background-image: url(/img/checkers.svg);
+   background-image: url(../img/checkers.svg);
    background-size: 2.5em 1.5em;
    display: inline-block;
 }

@@ -927,7 +927,8 @@
           container.classList.add("file-test-results");
 
           let header = document.createElement("header");
-          this.name = CPO.sourceAPI.get_loaded(name).file.getName();
+          const source = CPO.sourceAPI.get_loaded(name);
+          this.name = source ? source.name : name;
           header.textContent = this.name;
           container.appendChild(header);
 

@@ -234,12 +234,10 @@ class GoogleAPI {
   }
 
   getUsername = () => {
-    return gwrap.load({name: 'plus',
-      version: 'v1',
-    }).then((api) => {
-      console.log("Api: ", api);
-      return api.people.get({ userId: "me" });
-    });
+    var token = window.gapi.auth.getToken().access_token;
+    return fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: 'Bearer ' + token }
+    }).then((resp) => resp.json());
   }
 }
 

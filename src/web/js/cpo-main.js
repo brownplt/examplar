@@ -78,24 +78,6 @@
     //replContainer.attr("aria-hidden", "true");
     $("#REPL").append(replContainer);
 
-    var logDetailedOption = $("#detailed-logging");
-
-    if(localSettings.getItem('log-detailed') !== null) {
-      logDetailedOption.prop("checked",
-        localSettings.getItem('log-detailed') == 'true');
-    } else {
-      localSettings.setItem('log-detailed', false);
-    }
-
-    logDetailedOption.on('change', function () {
-      localSettings.setItem('log-detailed', this.checked);
-    });
-
-    localSettings.change("log-detailed", function(_, newValue) {
-      logDetailedOption[0].checked = newValue == 'true';
-      logDetailedOption.attr('aria-pressed', '' + (newValue == 'true'));
-    });
-
     runtime.setParam("imgUrlProxy", function(s) {
       var a = document.createElement("a");
       a.href = s;
@@ -105,9 +87,11 @@
       else if(window.IMAGE_PROXY_BYPASS) {
         return s;
       }
+      /*
       else if(a.hostname === "drive.google.com" && a.pathname === "/uc") {
         return s;
       }
+      */
       else {
         return window.APP_BASE_URL + "/downloadImg?" + s;
       }
@@ -148,10 +132,83 @@
     // NOTE(joe): this function just allocates a closure, so it's stack-safe
     var onCompile = gmf(cpo, "make-on-compile").app(runtime.makeFunction(saveGDriveCachedFile, "save-gdrive-cached-file"));
 
+    function maybeAppendSlash(s) {
+      if(s.endsWith("/")) { return s; }
+      return s + "/";
+    }
+
+    function urlResolve(path, base) {
+      return new URL(path, base).href;
+    }
+
+    function rememberURLSource(url, contents) {
+      const doc = new CodeMirror.Doc(contents, "pyret");
+      CPO.documents.set(url, doc);
+      CPO.sourceAPI.from_doc(url, doc);
+    }
+
+    // Module resolution is context-aware: a (url-)file import resolves relative
+    // to the directory of the importing module, NOT the open editor tab. We
+    // thread that directory as a "load-path" (kept relative to the tab, which is
+    // the base the embedding host resolves every fs path against, so no host-side
+    // change is needed to land on the right file).
+    //
+    // All path arithmetic goes through the same filesystem-internal RPC the
+    // running program uses (read-file / image-file / ...), so that
+    // `import url-file(...)` and runtime file operations resolve a given path
+    // identically -- one source of truth, in the embedding host. This mirrors
+    // get-real-path / locate-file in cli-module-loader.arr (which thread a
+    // current-load-path through the `filesystem` module the same way).
+    function getLoadPath(context) {
+      if (context && runtime.hasField(context, "load-path")) {
+        return runtime.getField(context, "load-path");
+      }
+      return ".";
+    }
+    function makeContext(loadPath) {
+      return runtime.makeObject({ "load-path": loadPath });
+    }
+    // get-real-path: an absolute REL is honored as-is, otherwise it is joined
+    // onto the importer's load-path. Returns a Promise (the path ops are RPCs).
+    function getRealPath(context, rel) {
+      return fsInternal.isAbsolute(rel).then(function(abs) {
+        if (abs) { return rel; }
+        return fsInternal.join(getLoadPath(context), rel);
+      });
+    }
+    // For a dependency, compute a Promise of { path, context }: the path to feed
+    // the file locator (null for non-file protocols) and the context to thread
+    // to that module when its own dependencies are resolved.
+    function dependencyResolveInfo(context, dependency, urlFileMode) {
+      return runtime.ffi.cases(gmf(compileStructs, "is-Dependency"), "Dependency", dependency,
+        {
+          builtin: function(name) { return Promise.resolve({ path: null, context: context }); },
+          dependency: function(protocol, args) {
+            var arr = runtime.ffi.toArray(args);
+            var rel = null;
+            if (protocol === "file" || protocol === "js-file") { rel = arr[0]; }
+            else if (protocol === "url-file" && urlFileMode !== "all-remote") { rel = arr[1]; }
+            if (rel === null || !window.MESSAGES) {
+              // builtin/gdrive/url and remote url-file: nothing local to track.
+              // Likewise without an embedding host (plain CPO in a browser)
+              // there is no filesystem to resolve against, so (url-)file paths
+              // stay untracked rather than erroring in the path RPCs.
+              // Thread the importer's context through unchanged.
+              return Promise.resolve({ path: null, context: context });
+            }
+            return getRealPath(context, rel).then(function(realPath) {
+              return fsInternal.dirname(realPath).then(function(dir) {
+                return { path: realPath, context: makeContext(dir) };
+              });
+            });
+          }
+        });
+    }
+
     // NOTE(joe/ben): this function _used_ to be trivially stack safe, but files
     // need to resolve their absolute path to calculate their URI, which
     // requires an RPC, so this function is no-longer trivially flat
-    function uriFromDependency(dependency) {
+    function uriFromDependency(dependency, info) {
       return runtime.ffi.cases(gmf(compileStructs, "is-Dependency"), "Dependency", dependency,
         {
           builtin: function(name) {
@@ -168,13 +225,19 @@
             else if (protocol === "gdrive-js") {
               return "gdrive-js://" + arr[1];
             }
+            else if (protocol === "js-http") {
+              try { return "js-http://" + http.moduleURL(arr); }
+              catch (error) { return runtime.ffi.throwMessageException(error.message); }
+            }
             else if (protocol === "js-file") {
               if(!window.MESSAGES) {
                 console.error("Unknown import: ", dependency);
                 return protocol + "://" + arr.join(":");
               }
+              // Identity uses the importer-relative path (info.path) so a
+              // module's URI matches the file actually loaded.
               return runtime.pauseStack((restarter) => {
-                const realpath = window.MESSAGES.sendRpc('path', 'resolve', [arr[0]]);
+                const realpath = window.MESSAGES.sendRpc('path', 'resolve', [info.path]);
                 realpath.then((realpath) => {
                   restarter.resume(`js-file://${realpath}`);
                 });
@@ -186,7 +249,7 @@
                 return protocol + "://" + arr.join(":");
               }
               return runtime.pauseStack((restarter) => {
-                const realpath = window.MESSAGES.sendRpc('path', 'resolve', [arr[0]]);
+                const realpath = window.MESSAGES.sendRpc('path', 'resolve', [info.path]);
                 realpath.then((realpath) => {
                   restarter.resume(`file://${realpath}`);
                 });
@@ -196,7 +259,7 @@
               return arr[0];
             }
             else if (protocol === "url-file") {
-              return arr[0] + "/" + arr[1];
+              return urlResolve(arr[1], maybeAppendSlash(arr[0]));
             }
             else {
               console.error("Unknown import: ", dependency);
@@ -210,12 +273,30 @@
       // The locatorCache memoizes locators for the duration of an
       // interactions run
       var locatorCache = {};
-      function findModule(contextIgnored, dependency) {
+      function findModule(context, dependency) {
+        return runtime.safeCall(function() {
+          // Resolve the import path via the host's filesystem RPC (a Promise),
+          // pausing the Pyret stack until it settles.
+          return runtime.pauseStack(function(restarter) {
+            dependencyResolveInfo(context, dependency, urlFileMode).then(function(info) {
+              restarter.resume(info);
+            }, function(err) {
+              // A Pyret exception value (e.g. from filesystem-internal) carries
+              // its own message; stringifying it would render [object Object].
+              if(runtime.isObject(err)) {
+                restarter.error(err);
+              }
+              else {
+                restarter.error(runtime.ffi.makeMessageException("Error resolving import path: " + String(err)));
+              }
+            });
+          });
+        }, function(info) {
         return runtime.safeCall(() => {
-          return uriFromDependency(dependency);
+          return uriFromDependency(dependency, info);
         }, function(uri) {
           if(locatorCache.hasOwnProperty(uri)) {
-            return gmf(compileLib, "located").app(locatorCache[uri], runtime.nothing);
+            return gmf(compileLib, "located").app(locatorCache[uri], info.context);
           }
           return runtime.safeCall(function() {
             return runtime.ffi.cases(gmf(compileStructs, "is-Dependency"), "Dependency", dependency,
@@ -240,21 +321,24 @@
                   else if (protocol === "gdrive-js") {
                     return constructors.makeGDriveJSLocator(arr[0], arr[1]);
                   }
+                  else if (protocol === "js-http") {
+                    return http.makeJSHTTPLocator(http.moduleURL(arr), runtime, builtinModules, cpo);
+                  }
                   else if (protocol === "js-file" && window.MESSAGES) {
-                    return gmf(jsfile, "make-jsfile-locator").app(arr[0]);
+                    return gmf(jsfile, "make-jsfile-locator").app(info.path);
                   }
                   else if (protocol === "file" && window.MESSAGES) {
                     var fileLocatorConstructor = fileLocator.makeFileLocatorConstructor(window.MESSAGES.sendRpc, runtime, compileLib, compileStructs, parsePyret, builtinModules, cpo);
-                    return fileLocatorConstructor.makeFileLocator(arr[0]);
+                    return fileLocatorConstructor.makeFileLocator(info.path);
                   }
                   else if (protocol === "url") {
                     fetch(arr[0]).then(async (response) => {
-                      CPO.documents.set(arr[0], new CodeMirror.Doc(await response.text(), "pyret"));
+                      rememberURLSource(arr[0], await response.text());
                     });
                     return runtime.getField(runtime.getField(urlLoc, "values"), "url-locator").app(arr[0], replGlobals);
                   }
                   else if (protocol === "url-file") {
-                    const fullUrl = arr[0] + "/" + arr[1];
+                    const fullUrl = urlResolve(arr[1], maybeAppendSlash(arr[0]));
                     switch(urlFileMode) {
                       case "all-remote":
                         fetch(fullUrl).then(async (response) => {
@@ -262,23 +346,23 @@
                         });
                         return runtime.getField(runtime.getField(urlLoc, "values"), "url-locator").app(fullUrl, replGlobals);
                       case "all-local":
-                        fsInternal.readFile(fullUrl).then((contents) => {
+                        fsInternal.readFile(info.path).then((contents) => {
                           const strContents = Buffer.from(contents).toString('utf8');
                           CPO.documents.set(fullUrl, new CodeMirror.Doc(strContents, "pyret"));
                         });
                         var fileLocatorConstructor = fileLocator.makeFileLocatorConstructor(window.MESSAGES.sendRpc, runtime, compileLib, compileStructs, parsePyret, builtinModules, cpo);
-                        return fileLocatorConstructor.makeFileLocator(arr[1]);
+                        return fileLocatorConstructor.makeFileLocator(info.path);
                       case "local-if-present":
                         return runtime.pauseStack(async (restarter) => {
-                          const exists = await fsInternal.exists(arr[1]);
+                          const exists = await fsInternal.exists(info.path);
                           if(exists) {
-                            fsInternal.readFile(fullUrl).then((contents) => {
+                            fsInternal.readFile(info.path).then((contents) => {
                               const strContents = Buffer.from(contents).toString('utf8');
                               CPO.documents.set(fullUrl, new CodeMirror.Doc(strContents, "pyret"));
                             });
                             return runtime.runThunk(() => {
                               var fileLocatorConstructor = fileLocator.makeFileLocatorConstructor(window.MESSAGES.sendRpc, runtime, compileLib, compileStructs, parsePyret, builtinModules, cpo);
-                              return fileLocatorConstructor.makeFileLocator(arr[1]);
+                              return fileLocatorConstructor.makeFileLocator(info.path);
                             }, (result) => {
                               if(runtime.isSuccessResult(result)) {
                                 restarter.resume(result.result);
@@ -305,9 +389,10 @@
             });
           }, function(l) {
               locatorCache[uri] = l;
-              return gmf(compileLib, "located").app(l, runtime.nothing);
+              return gmf(compileLib, "located").app(l, info.context);
           }, "findModule");
         });
+        }, "findModule-info");
       }
       return runtime.makeFunction(findModule, "cpo-find-module");
     }
@@ -360,9 +445,10 @@
           restartInteractions: function(source, options) {
             var pyOptions = defaultOptions.extendWith({
               "type-check": options.typeCheck,
+              "check-mode": options.checkMode !== false,
               "check-all": options.checkAll,
               "on-compile": onCompile,
-              "checks": "main"
+              "checks": options.checkMode === false ? "none" : (options.checkAll ? "all" : "main")
             });
             var ret = Q.defer();
             setTimeout(function() {
@@ -443,8 +529,6 @@
       };
       window.replWidget = CPO.replWidget = replWidget;
 
-      // Exposing this for dom-render.js to use for input.
-      window.__internalRepl = repl;
     
       /*
       $("#runDropdown").click(function() {
@@ -686,11 +770,17 @@
 
       // save
       // On Mac mod ends up mapping to command+s whereas on Windows and Linux it maps to ctrl+s.
-      Mousetrap.bindGlobal('mod+s', function(e) {
-        CPO.save();
-        e.stopImmediatePropagation();
-        e.preventDefault();
-      });
+      // Saving has a special condition: when embedded we want the Ctrl-S to
+      // propagate up. We could fire a special “save” event, but for contexts
+      // like VScode it is nice to have the “real” Cmd-S event fire to get
+      // good default behavior
+      if(!PYRET_IS_EMBEDDED) {
+        Mousetrap.bindGlobal('mod+s', function(e) {
+          CPO.save();
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        });
+      }
 
       // resize, Toggle sizing of the editor window between 50% and last resize
       Mousetrap.bindGlobal('ctrl+m', function(e){

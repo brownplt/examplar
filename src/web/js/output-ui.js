@@ -16,10 +16,10 @@
   provides: {},
   nativeRequires: [
     "pyret-base/js/runtime-util",
-    "pyret-base/js/js-numbers"
   ],
-  theModule: function(runtime, _, uri, parsePyret, errordisplayLib, srclocLib, astLib, imageLib, loadLib, util, jsnums) {
+  theModule: function(runtime, _, uri, parsePyret, errordisplayLib, srclocLib, astLib, imageLib, loadLib, util) {
 
+    var jsnums = runtime.jsnums;
     var image = runtime.getField(imageLib, "internal");
     var srcloc = runtime.getField(srclocLib, "values");
     var isSrcloc = runtime.getField(srcloc, "is-Srcloc");
@@ -198,7 +198,7 @@
              return new Error("Cannot get Position from builtin location", loc);
           },
           "srcloc": function(source, startL, startC, startCh, endL, endC, endCh) {
-            if (!sourceAPI.is_loaded("definitions://"))
+            if (!sourceAPI.is_loaded(source))
               return new Error("No document for this location: ", loc);
             else {
               var extraCharForZeroWidthLocs = endCh === startCh ? 1 : 0;
@@ -1276,7 +1276,7 @@
         var container = $("<span>").addClass("replToggle replOutput replCycle");
         var renderings = [];
 
-        var brush = $("<img>").addClass("paintBrush").attr("src", "/img/brush.svg");
+        var brush = $("<img>").addClass("paintBrush").attr("src", window.APP_BASE_URL + "/img/brush.svg");
         var raw_r = runtime.unwrap(runtime.getField(val, "red"));
         var raw_g = runtime.unwrap(runtime.getField(val, "green"));
         var raw_b = runtime.unwrap(runtime.getField(val, "blue"));
@@ -1362,7 +1362,7 @@
           var scaled = image.makeScaleImage(scaleFactor, scaleFactor, img);
           imageDom = scaled.toDomNode();
           container.append(imageDom);
-          container.append($("<img>").attr("src", "/img/magnifier.gif").addClass("info-icon"));
+          container.append($("<img>").attr("src", window.APP_BASE_URL + "/img/magnifier.gif").addClass("info-icon"));
           $(imageDom).trigger({type: 'afterAttach'});
           $('*', imageDom).trigger({type : 'afterAttach'});
           var originalImageDom = img.toDomNode();
@@ -1413,7 +1413,7 @@
           // after, and numerals to be repeated.
           var numr = num.numerator();
           var denr = num.denominator();
-          var decimal = jsnums.toRepeatingDecimal(numr, denr, runtime.NumberErrbacks);
+          var decimal = jsnums.toRepeatingDecimal(numr, denr);
           var prePointString = decimal[0];
           var postPointString = decimal[1];
           var decRpt = decimal[2];
@@ -1545,7 +1545,7 @@
         var valueContainer = $("<span>").addClass("replRef")
         container.append(valueContainer.append(top.done[0]));
         var warning = $("<img>")
-          .attr("src", "/img/warning.gif")
+          .attr("src", window.APP_BASE_URL + "/img/warning.gif")
           .attr("title", "May be stale! Click to refresh")
           .addClass("info-icon");
         container.append(warning);
@@ -1655,11 +1655,6 @@
         $(this).toggleClass("collection");
         $(this).toggleClass("inlineCollection");
       }
-      const thisContext = "cpo";
-      function isInRendererContext(val) {
-        var renderers = runtime.getField(val, "renderers");
-        return runtime.hasField(renderers, thisContext);
-      }
       function helper(container, val, values, wantCommaAtEnd, renderedValues) {
         var ariaText;
         if (runtime.ffi.isVSValue(val)) {
@@ -1706,7 +1701,7 @@
             ul.each(makeInline);
             e.stopPropagation();
           });
-        } else if (runtime.ffi.isVSConstr(val) || (runtime.ffi.isVSConstrRender(val) && !isInRendererContext(val))) {
+        } else if (runtime.ffi.isVSConstr(val)) {
           //console.log('helper iv');
           container.append($("<span>").text(runtime.unwrap(runtime.getField(val, "name")) + "("));
           var items = runtime.ffi.toArray(runtime.getField(val, "args"));
@@ -1714,26 +1709,6 @@
             helper(container, items[i], values, (i + 1 < items.length));
           }
           container.append($("<span>").text(")"));
-        } else if (runtime.ffi.isVSConstrRender(val)) {
-
-
-          // We know we are on the CPO stack here (within a runThink that's running toReprJS).
-          // This means we can safely call CPO here.
-
-
-          // A good improvement here would be to build some kind of fallthrough mechanism when 
-          // isInRendererContext being false to just use vsconstr
-
-          var items = runtime.ffi.toArray(runtime.getField(val, "args"));
-          var currentContainer;
-          const elements = [];
-          for (var i = 0; i < items.length; i++) {
-            currentContainer = $("<span>").addClass("replOutput");
-            elements.push(currentContainer[0]);
-            helper(currentContainer, items[i], values, false);
-          }
-          const result = runtime.getField(runtime.getField(val, "renderers"), "cpo").app(elements);
-          container.append(result);
         } else if (runtime.ffi.isVSSeq(val)) {
           //console.log('helper v');
           var items = runtime.ffi.toArray(runtime.getField(val, "items"));
@@ -1830,7 +1805,6 @@
           var tableAsText = [];
           var table = document.createElement("table");
           table.className = "pyret-table";
-          $(table).append(showText);
           $(table).addClass("has-icon");
           $(table).hover(function() {
             $(showText).show();
@@ -1862,6 +1836,7 @@
           //console.log('headerText =', ariaText);
           tableAsText.push(headersAsText);
           headers.appendChild(header);
+          $(headers).append(showText);
           table.appendChild(headers);
           var body = document.createElement("tbody");
           function drawRows(start, end) {

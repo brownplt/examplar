@@ -48,7 +48,7 @@ class Batch {
   }
 }
 
-window.createProgramCollectionAPI = function createProgramCollectionAPI(collectionName, immediate) {
+window.createProgramCollectionAPI = function createProgramCollectionAPI(collectionName, immediate, publicOnly) {
   function DriveError(err) {
     this.err = err;
   }

@@ -8,7 +8,47 @@ const { drive } = require("googleapis/build/src/apis/drive/index.js");
 
 var BACKREF_KEY = "originalProgram";
 
+// Limits for the streaming proxy. /downloadImg gets larger/looser caps because
+// images can legitimately be tens of MB; also we've seen e.g. Drive ?export=
+// take a while to get going. SHAREURL is intended to always be program
+// plaintext.
+// NOTE(joe + claude): really the timeout maybe should be on idleness at
+// startup/between bytes, not overall per completed request, but that's work to
+// plumb into `request`
+var IMAGE_PROXY_MAX_BYTES    = 20 * 1024 * 1024; // 20 MB
+var IMAGE_PROXY_TIMEOUT_MS   = 30 * 1000;        // 30 s
+var SHAREURL_PROXY_MAX_BYTES  = 1 * 1024 * 1024;  // 1 MB
+var SHAREURL_PROXY_TIMEOUT_MS = 10 * 1000;        // 10 s
+
 function start(config, onServerReady) {
+  var APP_NAME   = process.env.APP_NAME   || "Examplar";
+  var APP_DOMAIN = process.env.APP_DOMAIN || "pyret.cs.brown.edu";
+
+  var defaultOpts = {
+      PYRET: process.env.PYRET,
+      // TypeScript-compiler flavor (opt-in; see editor.html). The ts asset
+      // URLs are never configured: editor.html derives them client-side from
+      // PYRET's directory + canonical names (every host publishes the three
+      // files side by side). PYRET_TS below is the same rule applied early,
+      // so the /editor route can point the preload link and window.PYRET at
+      // the jarr that will actually load in ts mode. No PYRET -> no ts
+      // flavor: ?compiler=ts silently serves the stock compiler.
+      PYRET_TS: process.env.PYRET
+        ? process.env.PYRET.slice(0, process.env.PYRET.lastIndexOf("/") + 1) + "cpo-main-ts.jarr.gz.js"
+        : "",
+      CPO_COMPILER: process.env.CPO_COMPILER || "pyret",
+      BASE_URL: config.baseUrl,
+      GOOGLE_API_KEY: config.google.apiKey,
+      GOOGLE_APP_ID: config.google.appId,
+      LOG_URL: config.logURL,
+      LOG_PASSWORD: config.logPassword,
+      LOG_USER: config.logUser,
+      GIT_REV : config.gitRev,
+      GIT_BRANCH: config.gitBranch,
+      POSTMESSAGE_ORIGIN: process.env.POSTMESSAGE_ORIGIN,
+      APP_NAME:   APP_NAME,
+      APP_DOMAIN: APP_DOMAIN,
+    };
   var express = require('express');
   var cookieSession = require('cookie-session');
   var cookieParser = require('cookie-parser');
@@ -16,6 +56,7 @@ function start(config, onServerReady) {
   var csrf = require('csurf');
   var googleAuth = require('./google-auth.js');
   var request = require('request');
+  var requestFilteringAgent = require('request-filtering-agent');
   var mustache = require('mustache-express');
   var url = require('url');
   var fs = require('fs');
@@ -44,6 +85,7 @@ function start(config, onServerReady) {
   }
 
   app = express();
+  require('./spyret-library').register(app, config.baseUrl);
   app.use(bodyParser.urlencoded({ extended: false }))
   app.use(bodyParser.json())
 
@@ -71,10 +113,23 @@ function start(config, onServerReady) {
     res.set("Content-Type", "application/javascript");
     res.send(fs.readFileSync("build/web/js/cpo-main.jarr.gz.js"));
   });
+  // The ts assets are gzip-at-rest under the same .gz.js convention, so they
+  // need the same explicit routes -- express.static would serve the raw gzip
+  // bytes with no Content-Encoding.
+  app.get("/js/cpo-main-ts.jarr.gz.js", function(req, res) {
+    res.set("Content-Encoding", "gzip");
+    res.set("Content-Type", "application/javascript");
+    res.send(fs.readFileSync("build/web/js/cpo-main-ts.jarr.gz.js"));
+  });
+  app.get("/js/ts-compiler.gz.js", function(req, res) {
+    res.set("Content-Encoding", "gzip");
+    res.set("Content-Type", "application/javascript");
+    res.send(fs.readFileSync("build/web/js/ts-compiler.gz.js"));
+  });
 
   app.use(cookieSession({
     secret: config.sessionSecret,
-    key: "code.pyret.org",
+    key: APP_NAME,
 
     sameSite: 'lax'
   }));
@@ -99,23 +154,19 @@ function start(config, onServerReady) {
 
   app.use(csrf());
 
-  app.get("/close.html", function(_, res) { res.render("close.html"); });
-  app.get("/faq.html", function(_, res) { res.render("faq.html"); });
-  app.get("/privacy.html", function(_, res) { res.render("privacy.html"); });
-  app.get("/privacy/", function(_, res) { res.render("privacy.html"); });
+  app.get("/close.html", function(_, res) { res.render("close.html", defaultOpts); });
+  app.get("/faq.html", function(_, res) { res.render("faq.html", defaultOpts); });
 
-  app.get("/faq", function(_, res) { res.render("faq.html"); });
+  // NOTE(joe): On the mainline deploy code.pyret.org, this keep the old inbound links working.
+  // Other deploys may want to make a different choice here depending on their public-facing URLs
+  app.get(["/privacy.html", "/privacy/"], function(_, res) { res.redirect(301, "/faq/"); });
+
+  app.get("/faq", function(_, res) { res.render("faq.html", defaultOpts); });
 
   app.get("/", function(req, res) {
     var content = loggedIn(req) ? "My Programs" : "Log In";
-    res.render("index.html", {
-      PYRET: process.env.PYRET,
+    res.render("index.html", { ...defaultOpts,
       LEFT_LINK: content,
-      GOOGLE_API_KEY: config.google.apiKey,
-      BASE_URL: config.baseUrl,
-      LOG_URL: config.logURL,
-      GIT_REV : config.gitRev,
-      GIT_BRANCH: config.gitBranch
     });
   });
 
@@ -165,6 +216,19 @@ function start(config, onServerReady) {
   });
 
   if(config.development) {
+    // url-imports fixtures that url-file import each other name their own
+    // origin as {{FIXTURE_ORIGIN}} (see test/url-imports.js).
+    app.use("/pyret-programs/url-imports", function(req, res, next) {
+      if(!req.path.endsWith(".arr")) { return next(); }
+      var root = path.resolve(__dirname, "../test-util/pyret-programs/url-imports");
+      var file = path.resolve(root, "." + decodeURIComponent(req.path));
+      if(!file.startsWith(root + path.sep)) { return next(); }
+      fs.readFile(file, "utf8", function(err, text) {
+        if(err) { return next(); }
+        var origin = req.protocol + "://" + req.get("host");
+        res.type("text/plain").send(text.split("{{FIXTURE_ORIGIN}}").join(origin));
+      });
+    });
     app.use(express.static(__dirname + "/../test-util/"));
     app.get("/keys", function(req, res) {
       var keys = db.getKeys(req.query.q);
@@ -181,24 +245,74 @@ function start(config, onServerReady) {
     });
   }
 
-  app.get("/downloadImg", function(req, response) {
-    var parsed = url.parse(req.url);
-    var googleLink = decodeURIComponent(parsed.query.slice(0));
-    var googleParsed = url.parse(googleLink);
-    var gReq = request({url: googleLink, encoding: 'binary'}, function(error, imgResponse, body) {
-      if(error) {
-        response.status(400).send({type: "image-load-failure", error: "Unable to load image " + String(error)});
+  function proxyStreamFetch(opts) {
+    var res = opts.res;
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Content-Security-Policy', 'sandbox');
+
+    var parsed;
+    try { parsed = new URL(opts.url); }
+    catch (e) { return res.status(400).send({ error: 'invalid-url' }); }
+    if (opts.allowedHosts && !opts.allowedHosts(parsed.hostname)) {
+      return res.status(400).send({ error: 'host-not-allowed' });
+    }
+
+    var bytes = 0;
+    var upstream = request({
+      url: opts.url,
+      timeout: opts.timeoutMs,
+      agent: requestFilteringAgent.useAgent(opts.url),
+      followRedirect: function(resp) {
+        if (!opts.allowedHosts) return true;
+        try {
+          var next = new URL(resp.headers.location, opts.url);
+          return opts.allowedHosts(next.hostname);
+        } catch (_) { return false; }
+      },
+    });
+    // If the client disconnects (e.g. the browser aborts /load-shareurl after
+    // direct succeeded), tear down the upstream connection too — otherwise
+    // we'd keep streaming bytes from raw.githubusercontent.com to nowhere.
+    res.on('close', function() { upstream.destroy(); });
+    upstream.on('error', function(err) {
+      if (!res.headersSent) opts.onError(res, err);
+    });
+    upstream.on('response', function(upRes) {
+      if (opts.contentTypeOk && !opts.contentTypeOk(upRes.headers['content-type'])) {
+        upstream.destroy();
+        return res.status(400).send({ error: 'content-type-not-allowed', detail: upRes.headers['content-type'] });
       }
-      else {
-        var h = imgResponse.headers;
-        var ct = h['content-type'];
-        if((!ct) || (ct.indexOf('image/') !== 0)) {
-          response.status(400).send({type: "non-image", error: "Invalid image type " + ct});
-          return;
+      res.status(upRes.statusCode);
+      if (upRes.headers['content-type']) {
+        res.set('content-type', upRes.headers['content-type']);
+      }
+      upRes.on('data', function(chunk) {
+        bytes += chunk.length;
+        if (bytes > opts.maxBytes) {
+          upstream.destroy();
+          if (!res.headersSent) res.status(502).send({ error: 'too-large' });
+          else res.destroy();
         }
-        response.set('content-type', ct);
-        response.end(body, 'binary');
-      }
+      });
+      // Pipe upRes (IncomingMessage), not upstream (request object). The
+      // request library's .pipe copies upstream headers verbatim, which
+      // would overwrite the security headers set above.
+      upRes.pipe(res);
+    });
+  }
+
+  app.get("/downloadImg", function(req, response) {
+    var googleLink = decodeURIComponent(url.parse(req.url).query.slice(0));
+    proxyStreamFetch({
+      res: response,
+      url: googleLink,
+      allowedHosts: null,
+      maxBytes: IMAGE_PROXY_MAX_BYTES,
+      timeoutMs: IMAGE_PROXY_TIMEOUT_MS,
+      contentTypeOk: function(ct) { return ct && ct.indexOf('image/') === 0; },
+      onError: function(res, err) {
+        res.status(400).send({ type: 'image-load-failure', error: 'Unable to load image ' + String(err) });
+      },
     });
   });
 
@@ -330,17 +444,79 @@ function start(config, onServerReady) {
     });
   });
 
-  app.get("/editor", function(req, res) {
-    res.render("editor.html", {
-      PYRET: process.env.PYRET,
-      BASE_URL: config.baseUrl,
-      GOOGLE_API_KEY: config.google.apiKey,
-      GOOGLE_APP_ID: config.google.appId,
+  // Sticky ts opt-in for this browser: /settings/try-ts pins the ts flavor
+  // in a cookie so ordinary visits -- bookmarks, Drive opens, share links,
+  // none of which carry ?compiler= -- stay on it; /settings/clear-ts unpins.
+  // A cookie (not localStorage) because the flavor is resolved server-side
+  // at render time: the page's preload link and window.PYRET must point at
+  // the jarr that will actually load. 180 days: a class that opts in at the
+  // start of a term shouldn't silently revert mid-course; stale opt-ins are
+  // harmless because this resolution code remains the kill switch.
+  var COMPILER_COOKIE = "pyret-compiler";
+  var COMPILER_COOKIE_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
+  app.get("/settings/try-ts", function(req, res) {
+    res.cookie(COMPILER_COOKIE, "ts", {
+      maxAge: COMPILER_COOKIE_MAX_AGE_MS,
+      sameSite: "lax"
+    });
+    res.type("text/plain").send(
+      "You visited /settings/try-ts, so in this browser you'll use a new version\n" +
+      "of Pyret that is faster. This choice is remembered for around 6 months.\n" +
+      "\n" +
+      "You can visit /settings/clear-ts to clear this option.\n" +
+      "\n" +
+      "If anything seems off, turning it off and telling your teacher/instructor,\n" +
+      "or someone from the Pyret team, what you saw helps a lot.\n" +
+      "\n" +
+      "Thanks for testing it out!\n" +
+      "- The Pyret Team\n"
+    );
+  });
+  app.get("/settings/clear-ts", function(req, res) {
+    res.clearCookie(COMPILER_COOKIE);
+    res.type("text/plain").send(
+      "You visited /settings/clear-ts, so in this browser you'll use the regular\n" +
+      "Pyret version.\n" +
+      "\n" +
+      "You can visit /settings/try-ts to turn on the TypeScript mode (or back on,\n" +
+      "if you've used it before). It is an experimental faster version of the\n" +
+      "compiler.\n" +
+      "\n" +
+      "Thanks!\n" +
+      "- The Pyret Team\n"
+    );
+  });
+
+  app.get(["/editor", "/assignment/:assignmentId"], function(req, res) {
+    if (req.params.assignmentId && !/^[A-Za-z0-9_-]+$/.test(req.params.assignmentId)) {
+      return res.status(400).send("Invalid assignment ID");
+    }
+    // The compiler flavor can be chosen per request (?compiler=ts|pyret),
+    // then by the sticky opt-in cookie (see /settings/try-ts above), then
+    // the CPO_COMPILER env default. Resolving it here (in addition to the
+    // client-side check in editor.html) keeps the preload link and
+    // window.PYRET pointing at the jarr that will actually load, so the
+    // stock jarr isn't downloaded pointlessly in ts mode. Only known
+    // flavor names are honored from the cookie; anything else falls
+    // through to the default. (No route sets "pyret" today, but honoring
+    // it gives a future ramp a per-user pin-to-stock for free.)
+    var cookieFlavor = req.cookies && req.cookies[COMPILER_COOKIE];
+    if (cookieFlavor !== "ts" && cookieFlavor !== "pyret") { cookieFlavor = ""; }
+    var compiler = req.query.compiler || cookieFlavor || defaultOpts.CPO_COMPILER;
+    var compilerOpts = (compiler === "ts" && defaultOpts.PYRET_TS)
+      ? { PYRET: defaultOpts.PYRET_TS, CPO_COMPILER: "ts" }
+      : {};
+    res.render("editor.html", { ...defaultOpts,
+      ...compilerOpts,
+      ASSIGNMENT_ID: req.params.assignmentId || "",
+      CURRENT_VERSION: config.version,
       CSRF_TOKEN: req.csrfToken(),
-      LOG_URL: config.logURL,
-      GIT_REV : config.gitRev,
-      GIT_BRANCH: config.gitBranch,
-      POSTMESSAGE_ORIGIN: process.env.POSTMESSAGE_ORIGIN
+    });
+  });
+
+  app.get("/blocks", function(req, res) {
+    res.render("blocks.html", { ...defaultOpts,
+      CSRF_TOKEN: req.csrfToken(),
     });
   });
 
@@ -361,6 +537,26 @@ function start(config, onServerReady) {
 
   app.get("/share", function(req, res) {
 
+  });
+
+  // Server-side proxy for #shareurl loads from hosts that some school networks
+  // block or will likely block (notably raw.githubusercontent.com).
+  // Eager-proxied client-side for any URL whose host is in
+  // SHAREURL_ALLOWED_HOSTS. We can expand this list as needed.
+  var SHAREURL_ALLOWED_HOSTS = new Set(['raw.githubusercontent.com']);
+
+  app.get("/load-shareurl", function(req, res) {
+    proxyStreamFetch({
+      res: res,
+      url: req.query.url,
+      allowedHosts: function(h) { return SHAREURL_ALLOWED_HOSTS.has(h); },
+      maxBytes: SHAREURL_PROXY_MAX_BYTES,
+      timeoutMs: SHAREURL_PROXY_TIMEOUT_MS,
+      contentTypeOk: null,
+      onError: function(res, err) {
+        res.status(502).send({ error: 'upstream-error' });
+      },
+    });
   });
 
 
@@ -571,7 +767,19 @@ function start(config, onServerReady) {
     if(config.sharedFetchServer) {
       let response = request({url: url});
       response.on("error", (error) => { ret.reject(error); });
-      response.on("response", (resp) => ret.resolve(response));
+      response.on("response", (resp) => {
+        // Only treat 2xx as a real proxy hit. A 4xx from the upstream
+        // (e.g. when the shared id was minted on *this* deploy and the
+        // proxy server has no record of it) must fall through to the
+        // local Drive fetch — otherwise the upstream error body gets
+        // piped straight back to the client.
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          ret.resolve(response);
+        } else {
+          response.abort();
+          ret.reject("Proxy returned status " + resp.statusCode);
+        }
+      });
     }
     else  {
       ret.reject("No fallback server configured");

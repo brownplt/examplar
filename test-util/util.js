@@ -10,12 +10,14 @@ let PATH_TO_CHROME;
 if (process.env.CHROMEDRIVER_BINARY) {
   // Note(Ben): Use `env CHROMDRIVER_BINARY=/snap/bin/chromium.chromedriver npm run mocha`
   // Based on https://stackoverflow.com/a/53971573
+  // This selects the ChromeDriver binary; it is independent of which Chrome
+  // browser binary we use (GOOGLE_CHROME_BINARY), so it must not be an else-if.
   chrome.setDefaultService(new chrome.ServiceBuilder(process.env.CHROMEDRIVER_BINARY).build());
-} else if (process.env.GOOGLE_CHROME_BINARY) {
-  // Used by Travis
-  PATH_TO_CHROME = process.env.GOOGLE_CHROME_BINARY;
 }
-else if (process.platform === 'darwin') {
+
+if (process.env.GOOGLE_CHROME_BINARY) {
+  PATH_TO_CHROME = process.env.GOOGLE_CHROME_BINARY;
+} else if (process.platform === 'darwin') {
   PATH_TO_CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   console.log(`The tester is guessing that you're on a Mac and using ${PATH_TO_CHROME}. You can set GOOGLE_CHROME_BINARY to the path to your Chrome install if this path is not working.`);
 }
@@ -25,6 +27,7 @@ let leave_open = process.env.LEAVE_OPEN === "true" || false;
 let args = process.env.SHOW_BROWSER ? [] : [
   '--headless',
   '--no-sandbox',
+  '--disable-dev-shm-usage',
 ];
 if(!process.env.SHOW_BROWSER) {
   console.log("Running Chrome headless. You can set SHOW_BROWSER=true to see what's going on");
@@ -88,7 +91,18 @@ function pyretLoaded(driver) {
 }
 
 function waitForPyretLoad(driver, timeout) {
-  return driver.wait(function() { return pyretLoaded(driver); }, timeout);
+  return driver.wait(function() {
+    return pyretLoaded(driver).then(function(loaded) {
+      if (!loaded) { return false; }
+      // Also wait for the editor to have its initial contents installed by
+      // programLoaded.then(setValue) in beforePyret.js; otherwise the test's
+      // setDefinitions can race with that setValue and get overwritten.
+      return driver.executeScript(
+        "var cm = $('.CodeMirror')[0] && $('.CodeMirror')[0].CodeMirror;" +
+        "return !!cm && cm.getValue() !== '';"
+      );
+    });
+  }, timeout);
 }
 
 function setCodemirror(driver, getCM, content) {
@@ -458,7 +472,7 @@ function testErrorRendersString(it, name, toEval, expectedString, options) {
 function testRunsAndHasCheckBlocks(it, name, toEval, specs, options) {
   it("should render " + name + " check blocks", function() {
     var self = this;
-    this.timeout(20000);
+    this.timeout((options && options.timeout) || 20000);
     var replOutput = setDefinitionsEvalAndWait(self.browser, toEval, options);
     var checkBlocks = replOutput.then(function(response) {
       self.browser.wait(function () {

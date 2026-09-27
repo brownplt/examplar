@@ -10,12 +10,42 @@ var DummyBackend = function () {
   this.log = function(_, __){};
 };
 
+var FetchWithCredsBackend = function (url, user, pass) {
+  const auth = btoa(user + ":" + pass);
+  this.log = function(name, obj) {
+		const opts = {
+				method: 'POST',
+				credentials: "include",
+				headers: {
+						"Content-Type": "application/json",
+						'Authorization': 'Basic ' + auth
+				},
+				body: JSON.stringify(obj)
+		};
+		const req = fetch("https://bootstrapworld.org/data/actions/LogActions.php?method=pyretLog", opts).then((resp) => {
+			console.log(resp);
+		}).catch((e) => console.error(e));
+  };
+
+}
+
 var AJAXBackend = function (url) {
   this.log = function (name, obj) {
     var request = new XMLHttpRequest();
     request.open("POST", url, true);
     request.send(JSON.stringify(obj));
   }
+}
+
+var backend;
+if(window.LOG_URL && window.LOG_USER) {
+	backend = new FetchWithCredsBackend(LOG_URL, LOG_USER, LOG_PASSWORD);
+}
+else if(window.LOG_URL) {
+	backend = new AJAXBackend(LOG_URL);
+}
+else {
+	backend = new DummyBackend();
 }
 
 var logger = (function(backend) {
@@ -86,21 +116,15 @@ var logger = (function(backend) {
     backend.log(name, obj);
   }
   
-  var isDetailed = localSettings.getItem('log-detailed') == 'true';
-
+  // Set window.LOG_DETAILED = true in a forked deploy (e.g. a study) to
+  // enable per-edit logging in beforePyret/beforeBlocks and the CodeMirror
+  // change/focus/blur hooks below.
   return {
     guid  : guid,
     log   : log,
-    get isDetailed () {
-      var nowIsDetailed = localSettings.getItem('log-detailed') == 'true';
-      if (isDetailed != nowIsDetailed) {
-        log('LOG_DETAIL_CHANGED',{detailed: nowIsDetailed});
-        isDetailed = nowIsDetailed;
-      }
-      return nowIsDetailed;
-    }
+    isDetailed: window.LOG_DETAILED === true
   };
-})( LOG_URL ? new AJAXBackend(LOG_URL) : new DummyBackend() );
+})(backend);
 
 if(window.CodeMirror) {
   CodeMirror.defineOption('logging', false, 

@@ -1,7 +1,6 @@
 // App name in *Title Case*.
-export const APP_NAME = 'Examplar';
+export const APP_NAME = process.env.APP_NAME;
 
-// Collection name (folder where assignments are stored)
 export const COLLECTION_NAME = 'pyret.cs.brown.edu';
 
 // File extension of code files for this app.

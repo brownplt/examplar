@@ -9,6 +9,7 @@ compiled/
 program-deps.js
 program-require.js
 pyret
+mode
 .DS_Store
 test-util/failed-test-screenshots/*
 .coverage/
@@ -16,3 +17,6 @@ test-util/failed-test-screenshots/*
 .vscode/**
 .nvmrc
 *.rdb
+
+# Pinned upstream checkout prepared by npm run setup:pyret
+vendor/

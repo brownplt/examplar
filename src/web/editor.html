@@ -2,24 +2,60 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-  <title>Examplar</title>
-  <link rel="preload" href="{{&PYRET}}" as="script">
-  <link rel="stylesheet" href="/css/reset.css" />
-  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Fira+Mono:400,700" />
-  <link rel="stylesheet" href="/css/codemirror.css" />
-  <link rel="stylesheet" href="/css/foldgutter.css" />
-  <link rel="stylesheet" href="/css/shared.css" />
-  <link rel="stylesheet" href="/css/editor.css" />
-  <link rel="stylesheet" href="/css/font-awesome.min.path-fixed.css" />
-  <link rel="stylesheet" href="/css/themes/default.css" />
-  <link rel="stylesheet" href="/css/themes/base16.css" />
-  <link rel="stylesheet" href="/css/themes/material-darker.css" />
-  <link rel="stylesheet" href="/css/themes/monokai.css" />
-  <link rel="stylesheet" href="/css/themes/panda-syntax.css" />
-  <link rel="stylesheet" href="/css/themes/high-contrast-light.css" />
-  <link rel="stylesheet" href="/css/themes/high-contrast-dark.css" />
-  <link rel="icon" type="image/png" href="/img/pyret-icon.png" />
+  <title>{{APP_NAME}}</title>
+  {{^PYRET_GZIPPED}}<link crossorigin="anonymous" rel="preload" href="{{&PYRET}}" as="script">{{/PYRET_GZIPPED}}
+  <script>
+  window.PYRET = "{{&PYRET}}"; window.PYRET_GZIPPED = "{{ PYRET_GZIPPED }}" === "true"; window.APP_NAME = "{{APP_NAME}}"; window.APP_DOMAIN = "{{APP_DOMAIN}}";
+  // Opt-in TypeScript-compiler flavor: chosen by ?compiler=ts (or the
+  // server-side CPO_COMPILER env default). Swaps in the cpo-main-ts jarr
+  // and loads the TS compiler bundle; default behavior is unchanged.
+  //
+  // The ts asset URLs are never configured -- they are derived from PYRET's
+  // directory plus canonical names, a contract every host satisfies by
+  // publishing the three files side by side (deploys upload them together;
+  // static/webview builds copy them together). Both ts assets are gzip bytes
+  // at rest everywhere. No PYRET means no ts flavor: ?compiler=ts silently
+  // serves the stock compiler.
+  window.CPO_COMPILER = "{{&CPO_COMPILER}}" || "pyret";
+  (function() {
+    var dir = window.PYRET ? window.PYRET.slice(0, window.PYRET.lastIndexOf("/") + 1) : "";
+    window.PYRET_TS = window.PYRET ? dir + "cpo-main-ts.jarr.gz.js" : "";
+    window.PYRET_TS_COMPILER = window.PYRET ? dir + "ts-compiler.gz.js" : "";
+    var m = /[?&]compiler=([^&]*)/.exec(window.location.search);
+    if(m) { window.CPO_COMPILER = decodeURIComponent(m[1]); }
+    if(window.CPO_COMPILER === "ts" && window.PYRET_TS) {
+      window.PYRET = window.PYRET_TS;
+      // Lets pure CSS show ts-only chrome (the "(ts mode)" badge in the
+      // REPL corner) without another script running at DOM-ready.
+      document.documentElement.classList.add("ts-mode");
+      // In gzipped mode the host may serve assets without an executable MIME
+      // type (nosniff), which refuses a <script src> load outright --
+      // beforePyret.js fetches the compiler bundle alongside the jarr instead.
+      if(!window.PYRET_GZIPPED) {
+        document.write('<script src="' + window.PYRET_TS_COMPILER + '"><\/script>');
+      }
+    }
+  })();
+  </script>
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/reset.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/smoothness-jquery-ui.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/fira-mono.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/codemirror.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/foldgutter.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/dialog.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/matchesonscrollbar.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/shared.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/editor.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/font-awesome.min.path-fixed.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/default.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/base16.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/material-darker.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/monokai.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/panda-syntax.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/high-contrast-light.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/high-contrast-dark.css" />
+  <link rel="stylesheet" href="{{ &BASE_URL }}/css/themes/pink.css" />
+  <link rel="icon" type="image/png" href="{{ &BASE_URL }}/img/pyret-icon.png" />
   <style id="highlight-styles"></style>
   <script src="{{ &BASE_URL }}/js/vega.min.js"></script>
 <!--  <script src="https://cdnjs.cloudflare.com/ajax/libs/vega-tooltip/1.0.0-alpha.2/vega-tooltip.min.js"></script> -->
@@ -29,9 +65,6 @@
   <script src="{{ &BASE_URL }}/js/localSettings.js"></script>
 
   <!-- CnD files. These could be conditionally imported or bundled locally if needed. -->
-  <script src="https://cdn.jsdelivr.net/npm/cnd-core@1.1.10-beta.2/dist/browser/cnd-core-complete.global.js"></script>  
-  <script src="https://cdn.jsdelivr.net/npm/cnd-core@1.1.10-beta.2/dist/components/react-component-integration.global.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cnd-core@1.1.10-beta.2/dist/components/react-component-integration.css" /> 
 
 
 
@@ -138,40 +171,10 @@
               </div>
             </li>
             <li role="presentation">
-              <div id="discuss" class="menuButton">
-                <a class="focusable" role="menuitem"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" target="_blank" href="https://groups.google.com/forum/#!forum/pyret-discuss">Discuss Pyret</a>
-              </div>
-            </li>
-            <li role="presentation">
-              <div id="fullConnectButton" class="menuButton loginOnly">
-                <a class="focusable" role="menuitem"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  tabindex="-1" href="javascript:void(0)">Enable Full Google Access</a>
-              </div>
-            </li>
-            <li role="presentation">
               <div id="choose-context" class="menuButton">
                 <a class="focusable" role="menuitem"
                   aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
                   tabindex="-1" href="javascript:void(0)">Choose Context</a>
-              </div>
-            </li>
-            <li role="presentation">
-              <div id="logging" class="menuButton">
-                <span>
-                  <input class="focusable" role="menuitem" tabindex="-1" id="detailed-logging"
-                  aria-labelledby="detailed-logging-label"
-                  aria-describedby="mhelp-submenu mhelp-activate mhelp-escape-submenu"
-                  type="checkbox" aria-pressed="false"
-                  aria-label="Contribute detailed usage information"/>
-                  <label for="detailed-logging" id="detailed-logging-label">
-                    Contribute detailed usage information.</label>
-                  <a href="https://www.pyret.org/cpo-faq#(part._logging)" target="_blank" rel="noopener noreferrer" class="focusable info-btn" role="menuitem" tabindex="-1"
-                    id="detailed-logging-learn-more"
-                    title="Learn More" aria-label="Learn More">?</a>
-                </span>
               </div>
             </li>
             <li role="presentation">
@@ -225,6 +228,7 @@
                 <option value="panda">Panda</option>
                 <option value="high-contrast-light">High Contrast Light</option>
                 <option value="high-contrast-dark">High Contrast Dark</option>
+                <option value="pink">Pink</option>
               </select>
             </li>
           </ul>
@@ -371,6 +375,7 @@
 </div>
 <div id="REPL" class="replContainer" role="region" aria-label="Interactions">
 <div id="handle" class="ui-resizable-handle ui-resizable-w"></div>
+<div id="compilerFlavorBadge" title="This session uses the TypeScript version of Pyret. Visit /settings/clear-ts to turn it off.">(ts mode)</div>
 </div>
 <div id="help-keys">
   <p><b>Press <kbd>Esc</kbd> to close this help window</b></p>
@@ -431,10 +436,24 @@
 
 <script>
 var LOG_URL = "{{ &LOG_URL }}";
+var LOG_USER = "{{ &LOG_USER }}";
+var LOG_PASSWORD = "{{ &LOG_PASSWORD }}";
 var GIT_REV = "{{ &GIT_REV }}";
 var GIT_BRANCH = "{{ &GIT_BRANCH }}";
 </script>
 
+<script>
+if (typeof Promise.withResolvers === 'undefined') {
+  Promise.withResolvers = function () {
+    let resolve, reject
+    const promise = new Promise((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve, reject }
+  }
+}
+</script>
 <script src="{{ &BASE_URL }}/js/es6-shim.js"></script>
 <script src="{{ &BASE_URL }}/js/jquery.min.js"></script>
 <script src="{{ &BASE_URL }}/js/jquery-ui.min.js"></script>
@@ -464,8 +483,8 @@ function handleGoogLoad() {
 var POSTMESSAGE_ORIGIN = "{{{ POSTMESSAGE_ORIGIN }}}";
 console.log(window.performance.now())
 </script>
-<script src="{{ &BASE_URL }}//js/beforePyret.js"></script>
-<script src="{{ &BASE_URL }}//js/make-assignment.js"></script>
+<script src="{{ &BASE_URL }}/js/beforePyret.js"></script>
+<script src="{{ &BASE_URL }}/js/make-assignment.js"></script>
 <script>
 var IMAGE_PROXY_BYPASS = "{{ &IMAGE_PROXY_BYPASS }}" === "true";
 var APP_BASE_URL = "{{ &BASE_URL }}";

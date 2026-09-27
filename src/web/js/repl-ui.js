@@ -241,7 +241,7 @@
 
     // the result of applying `displayResult` is a function that MUST
     // NOT BE CALLED ON THE PYRET STACK.
-    function displayResult(output, callingRuntime, resultRuntime, isMain, updateItems) {
+    function displayResult(output, callingRuntime, resultRuntime, isMain, updateItems, skipChecks) {
       // updateItems() is used to update the repl interaction history
       //console.log('doing displayResult', isMain);
       var runtime = callingRuntime;
@@ -345,6 +345,9 @@
                     console.log("Time to run compiled program:", JSON.stringify(runResult.stats));
                     if(rr.isSuccessResult(runResult)) {
                       return rr.safeCall(function() {
+                        // With checks disabled, upstream keeps the previous
+                        // checker context. Do not display its stale results.
+                        if (skipChecks) return rr.nothing;
                         return checkUI.drawCheckResults(output, CPO.documents, rr,
                                                         runtime.getField(runResult.result, "checks"), v,
                                                         examplarResults);
@@ -563,7 +566,7 @@
         });
       var currentZIndex = 15000;
       runtime.setParam("current-animation-port", function(dom, title, closeCallback) {
-          var animationDiv = $("<div>").css({"z-index": currentZIndex + 1});
+          var animationDiv = $("<div class='repl-animation'>").css({"z-index": currentZIndex + 1});
           animationDivs.push(animationDiv);
           output.append(animationDiv);
           function onClose() {
@@ -683,32 +686,40 @@
                 savedOptions = options;
                 return $.extend({}, options, {chartArea: null});
               });
-              const img = document.createElement('img');
-              img.src = args.getImageURI();
-              const temp = document.createElement('canvas');
-              temp.width = img.width;
-              temp.height = img.height;
-              const ctx = temp.getContext('2d');
-              ctx.drawImage(img, 0, 0);
-              const image = runtime.getField(imageLib, "internal");
-              const trimmed = image.trimCanvas(temp);
-              const download = document.createElement('a');
-              download.href = trimmed.toDataURL();
-              download.download = 'chart.png';
-              // from https://stackoverflow.com/questions/3906142/how-to-save-a-png-from-javascript-variable
-              function fireEvent(obj, evt){
-                const fireOnThis = obj;
-                if(document.createEvent) {
-                  const evObj = document.createEvent('MouseEvents');
-                  evObj.initEvent(evt, true, false);
-                  fireOnThis.dispatchEvent(evObj);
-                } else if(document.createEventObject) {
-                  const evObj = document.createEventObject();
-                  fireOnThis.fireEvent('on' + evt, evObj);
-                }
-              }
-              fireEvent(download, 'click');
-              args.draw(_ => savedOptions);
+              // getImageURI may return a data URL synchronously (Google Charts)
+              // or a Promise resolving to one (Vega, which renders asynchronously).
+              Promise.resolve(args.getImageURI()).then((uri) => {
+                const img = document.createElement('img');
+                // Must wait for the image to load before reading its dimensions
+                // and drawing it; for the async (Vega) path it isn't ready yet.
+                img.onload = () => {
+                  const temp = document.createElement('canvas');
+                  temp.width = img.width;
+                  temp.height = img.height;
+                  const ctx = temp.getContext('2d');
+                  ctx.drawImage(img, 0, 0);
+                  const image = runtime.getField(imageLib, "internal");
+                  const trimmed = image.trimCanvas(temp);
+                  const download = document.createElement('a');
+                  download.href = trimmed.toDataURL();
+                  download.download = 'chart.png';
+                  // from https://stackoverflow.com/questions/3906142/how-to-save-a-png-from-javascript-variable
+                  function fireEvent(obj, evt){
+                    const fireOnThis = obj;
+                    if(document.createEvent) {
+                      const evObj = document.createEvent('MouseEvents');
+                      evObj.initEvent(evt, true, false);
+                      fireOnThis.dispatchEvent(evObj);
+                    } else if(document.createEventObject) {
+                      const evObj = document.createEventObject();
+                      fireOnThis.fireEvent('on' + evt, evObj);
+                    }
+                  }
+                  fireEvent(download, 'click');
+                  args.draw(_ => savedOptions);
+                };
+                img.src = uri;
+              });
             });
           },
           resizeStop: (_, ui) => {
@@ -1009,7 +1020,7 @@
           // Note: renderedLocs is one element shorter than rendered
           var renderedLocs = locs.map(repl.runtime.makeSrcloc);
           var spyBlock = $("<div>").addClass("spy-block");
-          spyBlock.append($("<img>").addClass("spyglass").attr("src", "/img/spyglass.gif"));
+          spyBlock.append($("<img>").addClass("spyglass").attr("src", window.APP_BASE_URL + "/img/spyglass.gif"));
           if (message !== "") {
             spyBlock.append($("<div>").addClass("spy-title").append(message));
           }
@@ -1079,6 +1090,10 @@
         running = true;
         output.empty();
         promptContainer.hide();
+        // This gained stop() after having been just hide() for a while,
+        // because we found cases where queued up fadeIns needed to be
+        // canceled to avoid showing the prompt while running.
+        promptContainer.stop(true, true).hide();
         lastEditorRun = uiOptions.cm || null;
         setWhileRunning();
 
@@ -1159,7 +1174,7 @@
           cloud_log("RUN_END", payload);
         });
 
-        if (!document.getElementById("option-check-mode").checked) {
+        if (window.EXAMPLAR_ASSIGNMENT && !document.getElementById("option-check-mode").checked) {
           // TODO fix repl behavior when wheat fails.
           // repl should happen in context of impl file if wheat fails
           // TODO improve wheat failure error message behavior
@@ -1305,10 +1320,10 @@
             repl.restartInteractions(src, options)
               .then(function(run_result) {
                 send_log.resolve();
-                return displayResult(output, runtime, repl.runtime, true, updateItems)(run_result);
+                return displayResult(output, runtime, repl.runtime, true, updateItems, !options.checkMode)(run_result);
               }, function(error_result) {
                 send_log.resolve();
-                return displayResult(output, runtime, repl.runtime, true, updateItems)(error_result);
+                return displayResult(output, runtime, repl.runtime, true, updateItems, !options.checkMode)(error_result);
               })
               .fin(afterRun(false, uiOptions.synthetic));
         }
@@ -1335,7 +1350,7 @@
         var echoCM = CodeMirror.fromTextArea(echo[0], { readOnly: true });
         echoCM.setValue(code);
         CM.setValue("");
-        promptContainer.hide();
+        promptContainer.stop(true, true).hide();
         setWhileRunning();
         interactionsCount++;
         var thisName = 'interactions://' + interactionsCount;
@@ -1422,7 +1437,8 @@
         runCode: runMainCode,
         runner: runner,
         focus: function() { CM.focus(); },
-        stop: onBreak
+        stop: onBreak,
+        isRunning: function() { return running; }
       };
     }
 
